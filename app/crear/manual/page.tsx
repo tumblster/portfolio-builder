@@ -5,6 +5,8 @@ import { PortfolioEditor } from "@/components/editor/portfolio-editor";
 import { SiteHeader } from "@/components/site-header";
 import { getCreatorAccess } from "@/lib/auth";
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Llenar a mano",
   robots: { index: false, follow: false },

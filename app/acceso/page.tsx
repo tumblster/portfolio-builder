@@ -5,6 +5,8 @@ import { ConfigNotice } from "@/components/config-notice";
 import { SiteHeader } from "@/components/site-header";
 import { getCreatorAccess } from "@/lib/auth";
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Acceso",
   robots: { index: false, follow: false },

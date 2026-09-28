@@ -5,6 +5,8 @@ import { ImportScreen } from "@/components/import-screen";
 import { SiteHeader } from "@/components/site-header";
 import { getCreatorAccess } from "@/lib/auth";
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Nuevo portafolio",
   robots: { index: false, follow: false },

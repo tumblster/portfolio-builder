@@ -14,6 +14,8 @@ import { resolvePortfolio } from "@/lib/portfolio/resolve";
 import { publicPath } from "@/lib/portfolio/slug";
 import { originFromHeaders } from "@/lib/request";
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Editar portafolio",
   robots: { index: false, follow: false },
