@@ -1,0 +1,45 @@
+# Verificación automática en cada push y pull request (checklist: "tests en cada push").
+# Corre lint, tipos, build y la prueba de humo contra el build real, con almacenamiento
+# local y una clave al azar: no toca producción ni gasta saldo (no llama a Apify ni a Groq).
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Tipos
+        run: npx next typegen && npx tsc --noEmit
+
+      - name: Build
+        run: npm run build
+
+      - name: Prueba de humo (API, sesión, editor, página pública y nichos)
+        run: |
+          echo "CREATOR_ACCESS_KEY=$(openssl rand -base64 32)" > .env.local
+          npm run start -- -p 3000 > next.log 2>&1 &
+          for i in $(seq 1 30); do curl -s -o /dev/null http://localhost:3000/acceso && break; sleep 1; done
+          npm run smoke
+
+      - name: Log del servidor (solo si algo falló)
+        if: failure()
+        run: cat next.log || true
