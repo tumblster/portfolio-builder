@@ -36,6 +36,16 @@ export interface Storage {
 
 export function getStorage(): Storage {
   const onVercel = Boolean(process.env.VERCEL);
+  // Los stores se conectaron con prefijo por entorno (Vercel lo exigió):
+  // PROD_BLOB_* en producción, PREV_BLOB_* en preview. El SDK espera BLOB_READ_WRITE_TOKEN.
+  if (onVercel && !process.env.BLOB_READ_WRITE_TOKEN) {
+    const prefix = process.env.VERCEL_ENV === "production" ? "PROD_BLOB" : "PREV_BLOB";
+    const token = process.env[`${prefix}_READ_WRITE_TOKEN`];
+    const storeId = process.env[`${prefix}_STORE_ID`];
+    if (token) process.env.BLOB_READ_WRITE_TOKEN = token;
+    if (storeId) process.env.BLOB_STORE_ID = storeId;
+  }
+
   const choice = process.env.STORAGE_DRIVER?.trim().toLowerCase() || (onVercel ? "blob" : "local");
 
   if (choice === "blob") {
