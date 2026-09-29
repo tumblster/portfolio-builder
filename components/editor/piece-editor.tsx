@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useRef, useState } from "react";
-import { NICHES, NICHE_LABELS, type Niche } from "@/lib/portfolio/niches";
+import type { NicheDef } from "@/lib/portfolio/niches";
 import { LIMITS, parseVideoLink, type StoredImage } from "@/lib/portfolio/schema";
 import { errorText, fieldLabel, textInput } from "../ui";
 import type { FieldErrors, PieceDraft } from "./form-model";
@@ -12,6 +12,8 @@ type PieceEditorProps = {
   piece: PieceDraft;
   index: number;
   total: number;
+  /** Nichos del portafolio (los que la pieza puede usar). */
+  niches: readonly NicheDef[];
   errors: FieldErrors;
   onChange: (patch: Partial<PieceDraft>) => void;
   onMove: (direction: -1 | 1) => void;
@@ -23,7 +25,7 @@ type CoverState = { status: "idle" } | { status: "loading" } | { status: "note" 
 
 const COVER_DELAY_MS = 700;
 
-export function PieceEditor({ piece, index, total, errors, onChange, onMove, onRemove, onPending }: PieceEditorProps) {
+export function PieceEditor({ piece, index, total, niches, errors, onChange, onMove, onRemove, onPending }: PieceEditorProps) {
   const [cover, setCover] = useState<CoverState>({ status: "idle" });
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const lastRequested = useRef<string | null>(null);
@@ -183,16 +185,27 @@ export function PieceEditor({ piece, index, total, errors, onChange, onMove, onR
       <select
         id={id("niche")}
         value={piece.niche ?? ""}
-        onChange={(event) => onChange({ niche: (event.target.value || null) as Niche | null })}
+        onChange={(event) => onChange({ niche: event.target.value || null })}
+        aria-invalid={error("niche") ? true : undefined}
+        aria-describedby={error("niche") ? id("niche-error") : undefined}
         className={`${textInput} mt-2`}
       >
-        <option value="">Sin nicho</option>
-        {NICHES.map((niche) => (
-          <option key={niche} value={niche}>
-            {NICHE_LABELS[niche]}
+        <option value="">Sin nicho (solo en Todo)</option>
+        {niches.map((niche) => (
+          <option key={niche.slug} value={niche.slug}>
+            {niche.label}
           </option>
         ))}
+        {/* Un nicho que ya no existe (no debería pasar): se muestra para poder cambiarlo. */}
+        {piece.niche && !niches.some((niche) => niche.slug === piece.niche) && (
+          <option value={piece.niche}>{piece.niche} (no disponible)</option>
+        )}
       </select>
+      {error("niche") && (
+        <p id={id("niche-error")} className={`${errorText} mt-2`}>
+          {error("niche")}
+        </p>
+      )}
     </fieldset>
   );
 }

@@ -3,18 +3,22 @@
 import { useRouter } from "next/navigation";
 import { useDeferredValue, useMemo, useState, useSyncExternalStore, type FormEvent, type ReactNode } from "react";
 import { MANUAL_PREFILL_KEY, type ManualPrefill } from "@/lib/import/events";
-import { NICHES, NICHE_LABELS, type Niche } from "@/lib/portfolio/niches";
+import { nichesWithPieces } from "@/lib/portfolio/niches";
 import { LIMITS } from "@/lib/portfolio/schema";
+import { SUGGESTED_SERVICES } from "@/lib/portfolio/services";
 import { Avatar } from "../avatar";
 import { PublicPortfolio } from "../public-portfolio";
 import { errorText, fieldLabel, pillButton, primaryButton, textInput } from "../ui";
 import {
   CONTACT_KEYS,
+  NO_EXTRAS,
   emptyForm,
   emptyPiece,
+  extrasFromPortfolio,
   formFromPortfolio,
   formFromPrefill,
   issuesToErrors,
+  serviceDraft,
   toCreatePayload,
   toPreview,
   toUpdatePayload,
@@ -24,6 +28,7 @@ import {
   type FieldErrors,
   type FormState,
   type PieceDraft,
+  type ServiceDraft,
 } from "./form-model";
 import { ImagePicker } from "./image-picker";
 import { PieceEditor } from "./piece-editor";
@@ -33,6 +38,8 @@ import { PieceEditor } from "./piece-editor";
  * Crear: fallback "Prefiero llenarlo manual", con lo que haya dejado la importación.
  * Editar: cualquier portafolio, también los importados de Instagram.
  * Móvil: pestañas Formulario / Vista previa. Escritorio: formulario a la izquierda, vista a la derecha.
+ * v2: la vista previa es la plantilla Creator; se puede mirar por nicho (Todo + los nichos con
+ * piezas) y el formulario suma "servicios" (formas de colaborar).
  */
 
 export type EditorProps = { mode: "create" } | { mode: "edit"; baseline: Baseline };
@@ -97,8 +104,9 @@ function EditorForm({ initial, initialBaseline }: { initial: FormState; initialB
   const [status, setStatus] = useState<SaveStatus>({ kind: "idle" });
   const [pending, setPending] = useState(0);
   const [tab, setTab] = useState<"form" | "preview">("form");
-  const [previewNiche, setPreviewNiche] = useState<Niche | null>(null);
+  const [previewNiche, setPreviewNiche] = useState<string | null>(null);
   const isEdit = baseline !== null;
+  const extras = baseline?.extras ?? NO_EXTRAS;
 
   // Tras el primer intento de guardar, los errores se recalculan mientras se corrige.
   const clientErrors = useMemo(() => (submitted ? validateForm(form, baseline) : {}), [submitted, form, baseline]);
@@ -106,7 +114,10 @@ function EditorForm({ initial, initialBaseline }: { initial: FormState; initialB
 
   // La vista previa se actualiza en cada tecla sin trabar lo que se escribe (RF-01: < 1 s).
   const deferredForm = useDeferredValue(form);
-  const preview = useMemo(() => toPreview(deferredForm), [deferredForm]);
+  const preview = useMemo(() => toPreview(deferredForm, extras), [deferredForm, extras]);
+  // Solo se puede mirar un nicho que tenga piezas; si se quedó sin ninguna, vuelve a "Todo".
+  const previewNiches = nichesWithPieces(preview.niches, preview.pieces);
+  const activePreviewNiche = previewNiches.some((niche) => niche.slug === previewNiche) ? previewNiche : null;
 
   function touched() {
     setServerErrors({});
@@ -139,6 +150,29 @@ function EditorForm({ initial, initialBaseline }: { initial: FormState; initialB
   }
   function removePiece(key: string) {
     setForm((current) => ({ ...current, pieces: current.pieces.filter((piece) => piece.key !== key) }));
+    touched();
+  }
+  function editService(key: string, patch: Partial<ServiceDraft>) {
+    setForm((current) => ({
+      ...current,
+      services: current.services.map((service) => (service.key === key ? { ...service, ...patch } : service)),
+    }));
+    touched();
+  }
+  function removeService(key: string) {
+    setForm((current) => ({ ...current, services: current.services.filter((service) => service.key !== key) }));
+    touched();
+  }
+  function addService() {
+    setForm((current) =>
+      current.services.length >= LIMITS.maxServices
+        ? current
+        : { ...current, services: [...current.services, serviceDraft()] },
+    );
+    touched();
+  }
+  function applySuggestedServices() {
+    setForm((current) => ({ ...current, services: SUGGESTED_SERVICES.map((service) => serviceDraft(service)) }));
     touched();
   }
   function addPiece() {
@@ -202,6 +236,7 @@ function EditorForm({ initial, initialBaseline }: { initial: FormState; initialB
       revision: data.portfolio.revision,
       form: formFromPortfolio(data.resolved),
       manual: data.portfolio.manual,
+      extras: extrasFromPortfolio(data.resolved),
     });
     setStatus({ kind: "saved" });
   }
@@ -335,6 +370,7 @@ function EditorForm({ initial, initialBaseline }: { initial: FormState; initialB
                   piece={piece}
                   index={index}
                   total={form.pieces.length}
+                  niches={form.niches}
                   errors={errors}
                   onChange={(patch) => editPiece(piece.key, patch)}
                   onMove={(direction) => movePiece(index, direction)}
@@ -356,6 +392,49 @@ function EditorForm({ initial, initialBaseline }: { initial: FormState; initialB
             >
               {form.pieces.length >= LIMITS.maxPieces ? `Máximo ${LIMITS.maxPieces} piezas` : "Agregar pieza"}
             </button>
+          </section>
+
+          <section aria-labelledby="seccion-servicios" className="mt-12">
+            <h2 id="seccion-servicios" className="text-3xl">
+              servicios.
+            </h2>
+            <p className="mt-2 text-sm text-muted">
+              Formas de colaborar con marcas, hasta {LIMITS.maxServices}. Sin servicios, esa sección no aparece.
+            </p>
+            {form.services.length > 0 && (
+              <ol className="mt-5 space-y-4">
+                {form.services.map((service, index) => (
+                  <ServiceEditor
+                    key={service.key}
+                    service={service}
+                    index={index}
+                    errors={errors}
+                    onChange={(patch) => editService(service.key, patch)}
+                    onRemove={() => removeService(service.key)}
+                  />
+                ))}
+              </ol>
+            )}
+            {errors.services && (
+              <p data-error-focus tabIndex={-1} className={`${errorText} mt-4 outline-none`}>
+                {errors.services}
+              </p>
+            )}
+            <div className="mt-4 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={addService}
+                disabled={form.services.length >= LIMITS.maxServices}
+                className={pillButton}
+              >
+                {form.services.length >= LIMITS.maxServices ? `Máximo ${LIMITS.maxServices} servicios` : "Agregar servicio"}
+              </button>
+              {form.services.length === 0 && (
+                <button type="button" onClick={applySuggestedServices} className={pillButton}>
+                  Usar sugerencias
+                </button>
+              )}
+            </div>
           </section>
 
           <section aria-labelledby="seccion-contacto" className="mt-12 space-y-5">
@@ -417,30 +496,36 @@ function EditorForm({ initial, initialBaseline }: { initial: FormState; initialB
           className={`${tab === "preview" ? "block" : "hidden lg:block"} lg:sticky lg:top-6`}
         >
           <p className="font-mono text-xs text-muted">vista previa</p>
-          {/* RF-04: la misma página en su versión general o en la de cada nicho, al instante. */}
-          <div role="group" aria-label="Versión del portafolio" className="mt-3 flex flex-wrap gap-2">
-            {[null, ...NICHES].map((niche) => {
-              const active = previewNiche === niche;
-              return (
-                <button
-                  key={niche ?? "general"}
-                  type="button"
-                  aria-pressed={active}
-                  data-niche={niche ?? undefined}
-                  onClick={() => setPreviewNiche(niche)}
-                  className={`flex min-h-tap items-center rounded-full border px-4 text-sm transition ${
-                    active
-                      ? "border-accent bg-accent/15 text-accent-soft"
-                      : "border-line text-muted hover:border-white hover:bg-white hover:text-ink"
-                  }`}
-                >
-                  {niche ? NICHE_LABELS[niche] : "General"}
-                </button>
-              );
-            })}
-          </div>
+          {/* Todo + cada nicho con piezas: lo mismo que filtran las píldoras del portafolio. */}
+          {previewNiches.length > 0 && (
+            <div role="group" aria-label="Ver el portafolio por nicho" className="mt-3 flex flex-wrap gap-2">
+              {[null, ...previewNiches].map((niche) => {
+                const active = activePreviewNiche === (niche?.slug ?? null);
+                return (
+                  <button
+                    key={niche?.slug ?? "todo"}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => setPreviewNiche(niche?.slug ?? null)}
+                    className={`flex min-h-tap items-center rounded-full border px-4 text-sm transition ${
+                      active
+                        ? "border-accent bg-accent/15 text-accent-soft"
+                        : "border-line text-muted hover:border-white hover:bg-white hover:text-ink"
+                    }`}
+                  >
+                    {niche?.label ?? "Todo"}
+                  </button>
+                );
+              })}
+            </div>
+          )}
           <div className="mt-3 overflow-hidden rounded-card border border-line lg:max-h-[calc(100dvh-9rem)] lg:overflow-y-auto">
-            <PublicPortfolio portfolio={preview} variant="preview" niche={previewNiche} />
+            <PublicPortfolio
+              portfolio={preview}
+              variant="preview"
+              niche={activePreviewNiche}
+              onNicheChange={setPreviewNiche}
+            />
           </div>
         </aside>
       </div>
@@ -461,5 +546,63 @@ function Field({ id, label, error, children }: { id: string; label: string; erro
         </p>
       )}
     </div>
+  );
+}
+
+function ServiceEditor({
+  service,
+  index,
+  errors,
+  onChange,
+  onRemove,
+}: {
+  service: ServiceDraft;
+  index: number;
+  errors: FieldErrors;
+  onChange: (patch: Partial<ServiceDraft>) => void;
+  onRemove: () => void;
+}) {
+  const id = (field: string) => `servicio-${service.key}-${field}`;
+  const titleError = errors[`services.${index}.title`];
+  const descriptionError = errors[`services.${index}.description`];
+  return (
+    <li className="panel p-4 sm:p-5">
+      <div className="flex items-center justify-between gap-3">
+        <p className="font-mono text-xs text-muted">servicio {String(index + 1).padStart(2, "0")}</p>
+        <button
+          type="button"
+          onClick={onRemove}
+          className="flex min-h-tap items-center px-2 text-sm text-muted transition hover:text-white"
+        >
+          Quitar<span className="sr-only"> el servicio {index + 1}</span>
+        </button>
+      </div>
+      <div className="mt-2 space-y-4">
+        <Field id={id("title")} label="Nombre" error={titleError}>
+          <input
+            id={id("title")}
+            value={service.title}
+            onChange={(event) => onChange({ title: event.target.value })}
+            maxLength={LIMITS.serviceTitle}
+            placeholder="Videos UGC para anuncios"
+            aria-invalid={titleError ? true : undefined}
+            aria-describedby={titleError ? `${id("title")}-error` : undefined}
+            className={textInput}
+          />
+        </Field>
+        <Field id={id("description")} label="Descripción (opcional)" error={descriptionError}>
+          <textarea
+            id={id("description")}
+            rows={2}
+            value={service.description}
+            onChange={(event) => onChange({ description: event.target.value })}
+            maxLength={LIMITS.serviceDescription}
+            aria-invalid={descriptionError ? true : undefined}
+            aria-describedby={descriptionError ? `${id("description")}-error` : undefined}
+            className={`${textInput} py-3`}
+          />
+        </Field>
+      </div>
+    </li>
   );
 }

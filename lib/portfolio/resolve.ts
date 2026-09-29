@@ -1,9 +1,11 @@
-import type { Contact, Piece, Portfolio, StoredImage, VideoLink } from "./schema";
+import { resolveNiches, type NicheDef } from "./niches";
+import type { Contact, Piece, Portfolio, Service, StoredImage, VideoLink } from "./schema";
+import { pieceMetrics, profileStats, type PieceMetrics, type ProfileStat } from "./stats";
 
 /** A dónde lleva una pieza: su video original o el post de Instagram del que salió. */
 export type PieceLink = VideoLink;
 
-export type ResolvedPiece = Piece & { link: PieceLink | null };
+export type ResolvedPiece = Piece & { link: PieceLink | null; metrics: PieceMetrics };
 
 /** Lo que se muestra: un valor final por campo, sin importar de qué fuente salió. */
 export type ResolvedPortfolio = {
@@ -14,6 +16,11 @@ export type ResolvedPortfolio = {
   valueProp: string;
   /** Solo los canales con valor. */
   contact: Partial<Record<keyof Contact, string>>;
+  /** Todos los nichos del portafolio (cada uno con su link), tengan o no piezas. */
+  niches: NicheDef[];
+  services: Service[];
+  /** Cifras del perfil de Instagram; vacío si se creó a mano. */
+  stats: ProfileStat[];
   pieces: ResolvedPiece[];
 };
 
@@ -36,10 +43,14 @@ export function resolvePortfolio(doc: Portfolio): ResolvedPortfolio {
     if (value) contact[key] = value;
   }
 
-  const postUrls = new Map(ig?.posts.map((post) => [post.id, post.url]));
+  const posts = new Map(ig?.posts.map((post) => [post.id, post]));
   const pieces = doc.pieces.map((piece): ResolvedPiece => {
-    const postUrl = piece.sourcePostId ? postUrls.get(piece.sourcePostId) : undefined;
-    return { ...piece, link: piece.video ?? (postUrl ? { platform: "instagram", url: postUrl } : null) };
+    const post = piece.sourcePostId ? posts.get(piece.sourcePostId) : undefined;
+    return {
+      ...piece,
+      link: piece.video ?? (post ? { platform: "instagram", url: post.url } : null),
+      metrics: pieceMetrics(post),
+    };
   });
 
   return {
@@ -49,6 +60,9 @@ export function resolvePortfolio(doc: Portfolio): ResolvedPortfolio {
     photo: manual.photo !== undefined ? manual.photo : (ig?.profilePhoto ?? null),
     valueProp: manual.valueProp ?? doc.generated?.valueProp ?? "",
     contact,
+    niches: resolveNiches(doc),
+    services: manual.services ?? doc.generated?.services ?? [],
+    stats: profileStats(ig),
     pieces,
   };
 }

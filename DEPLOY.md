@@ -50,7 +50,8 @@ No crees `STORAGE_DRIVER` en Vercel: allá usa Blob solo.
    deploy de prueba (Preview) que usa su propio store.
 2. Abre `https://<tu-proyecto>.vercel.app/acceso` y entra con la clave A.
 3. Importa un perfil real (unos US$0,003) y abre el link en tu celular, fuera de la sesión.
-4. Prueba "Prefiero llenarlo manual", "Editar", los 4 links con "Copiar" y el cambio de nicho.
+4. Prueba "Prefiero llenarlo manual", "Editar", el modal "Portafolio listo" (link general y de cada nicho,
+   con "Copiar") y las píldoras de nicho en la página pública.
 
 Los deploys de Preview piden iniciar sesión en Vercel (Deployment Protection). Es normal: son para ti.
 
@@ -112,8 +113,8 @@ npx vercel domains inspect portafolios.supercreador.tech
 | Criterio | Estado | Cómo se verificó o cómo verificarlo |
 | --- | --- | --- |
 | 1. Fer crea un portafolio completo en menos de 5 minutos en una llamada | ✓ | Importar tarda 30–60 s y deja todo listo; el editor permite ajustar. Ensáyalo cronometrando una llamada de prueba. |
-| 2. El cambio Belleza / Lifestyle / Viajes se ve instantáneo y distinto | ✓ | La vista previa cambia al tocar: color, titular y orden. Lifestyle comparte el violeta de la versión general (§7.2): se distingue por titular y orden. |
-| 3. El link abre perfecto en el celular, sin login | ✓ | 360–390 px sin scroll lateral. Medido como primera visita con red Slow 4G y CPU de celular (4×): se ve completa en 1,0 s (versión Belleza: 0,66 s). Repite la medición con PageSpeed Insights sobre el dominio real. |
+| 2. El cambio de nicho se ve instantáneo y distinto | ✓ (v2) | Las píldoras filtran sin recargar y cambian la URL; cada nicho tiene su link. Verificado en Chromium (ver "Verificación v2 · M1"). |
+| 3. El link abre perfecto en el celular, sin login | ✓ | 360–390 px sin scroll lateral. Primera visita con Slow 4G y CPU 4× (v2 · M1): LCP mediana 0,72 s, primera corrida en frío 1,06 s. Repite la medición con PageSpeed Insights sobre el dominio real. |
 | 4. Una vendedora entiende qué es sin más de 2 frases | Pendiente | Solo se valida con ellas: pásale el link y pídele que te cuente qué ve, sin explicarle antes. |
 
 ### Checklist de arquitectura
@@ -136,6 +137,32 @@ npx vercel domains inspect portafolios.supercreador.tech
 | Rollback | ✓ Paso 8. |
 | IA con permisos mínimos y topes | ✓ Groq solo redacta texto (no ejecuta acciones): una llamada por importación, con respuesta acotada, y todo lo que escribe se puede editar. |
 | Datos sensibles o regulados | No aplica: solo datos públicos de perfiles profesionales. La ubicación GPS de las fotos se borra. |
+
+### Verificación v2 · M1
+
+**Deploy: sin cambios.** Mismas variables de entorno, mismos stores de Blob y mismo dominio; no hay servicios
+nuevos. Los portafolios guardados con la v1 se leen tal cual (sus links, incluidos `/belleza`, `/lifestyle`
+y `/viajes`, siguen abriendo) y pasan a v2 cuando se editan. Las fuentes las descarga `next/font` de Google
+en el build de Vercel, como siempre.
+
+Después del deploy de Preview:
+
+1. Importa un perfil real: se abre el modal "Portafolio listo" con el link general y los de cada nicho detectado.
+2. Abre el link en el celular, fuera de la sesión: toca una píldora (filtra sin recargar y la URL cambia),
+   usa "atrás", copia el link de un nicho y ábrelo en otra pestaña (abre ya filtrado).
+3. Abre un link de la v1 ya compartido (`/p/<slug>/belleza`): sigue abriendo.
+4. En `/editar/<slug>`: cambia el nicho de una pieza, agrega un servicio y guarda; la página lo muestra al instante.
+
+Medición en desarrollo (build de producción local, Chromium 141, 360 px, Slow 4G: 150 ms RTT, 1,6 Mbps,
+CPU 4×, 5 corridas en frío; la misma página `/p/valentina-ruiz` y las mismas condiciones para las dos versiones):
+
+| Versión | LCP mediana | 1ª corrida | JS | CSS | Fuentes | Imágenes | HTML |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Base v1 (Fase 1, re-medida) | 776 ms | 1132 ms | 137,1 KB | 6,8 KB | 138,4 KB (3) | 152,9 KB | 5,9 KB |
+| v2 · M1 | 716 ms | 1056 ms | 139,1 KB | 10,9 KB | 36,4 KB (1) | 60,8 KB | 7,0 KB |
+
+Con un portafolio importado completo (stats, 6 piezas, servicios): 800 ms de mediana; con un link de nicho
+(`/fitness`): 784 ms.
 
 ## 11. Deudas aceptadas
 

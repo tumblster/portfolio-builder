@@ -21,8 +21,11 @@ import type { ImportStep, ManualPrefill } from "./events";
  * Flujo principal: link de Instagram → portafolio multinicho con link.
  *   1. scrape  Apify lee el perfil (foto, bio, últimos ~12 posts).
  *   2. images  Se copian la foto y las imágenes de los posts (sus URLs caducan).
- *   3. ai      Groq escribe la propuesta de valor, y un título y nicho por pieza.
+ *   3. ai      Groq escribe la propuesta de valor, detecta hasta 3 nichos, titula y
+ *              etiqueta cada pieza y sugiere formas de colaborar.
  *   4. save    Se guarda con las 6 publicaciones con más interacción.
+ * Si la IA falla, el portafolio usa los nichos de la v1 (Belleza, Lifestyle, Viajes) sin piezas
+ * etiquetadas: se ve solo en "Todo" hasta que se edite.
  * Perfil privado o con menos de 3 publicaciones → formulario manual prellenado.
  */
 
@@ -115,6 +118,8 @@ export async function importFromInstagram(
         const suggestion = copy.pieces.get(post.id);
         return suggestion ? [{ sourcePostId: post.id, ...suggestion }] : [];
       }),
+      niches: copy.niches,
+      services: copy.services,
     };
   } catch (error) {
     // El scrapeo ya se pagó: se crea igual, con títulos sacados del texto de cada post.

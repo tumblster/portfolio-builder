@@ -7,6 +7,7 @@ import { ImportError } from "@/lib/import/errors";
 import type { ImportErrorCode, ImportEvent } from "@/lib/import/events";
 import { assertImportConfigured, importFromInstagram } from "@/lib/import/instagram-import";
 import { parseInstagramUsername } from "@/lib/instagram/username";
+import { LEGACY_NICHES } from "@/lib/portfolio/niches";
 import { resolvePortfolio } from "@/lib/portfolio/resolve";
 import { publicPath, publicPaths, slugify } from "@/lib/portfolio/slug";
 import { absoluteUrl } from "@/lib/request";
@@ -42,9 +43,11 @@ export async function POST(request: NextRequest) {
   // El portafolio se crea dentro del stream, cuando la respuesta ya empezó, y ahí
   // Next ya no aplica invalidaciones de caché. Si alguien abrió antes el link que
   // va a tener (y quedó un 404 en caché), se purga ahora: /p/usuario y /p/usuario-2,
-  // con sus versiones por nicho.
+  // con las versiones por nicho de la v1. Los nichos nuevos todavía no se conocen
+  // (los detecta la IA), pero tampoco pudo visitarlos nadie antes.
   const base = slugify(username);
-  for (const slug of [base, `${base}-2`]) for (const path of publicPaths(slug)) revalidatePath(path);
+  const legacy = LEGACY_NICHES.map((niche) => niche.slug);
+  for (const slug of [base, `${base}-2`]) for (const path of publicPaths(slug, legacy)) revalidatePath(path);
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({

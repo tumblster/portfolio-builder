@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { ConflictError, NotFoundError } from "@/lib/errors";
 import { getStorage } from "@/lib/storage";
+import { LEGACY_NICHES, resolveNiches } from "./niches";
 import { SCHEMA_VERSION, portfolioSchema, type Piece, type PieceInput, type Portfolio } from "./schema";
 import { publicPaths, slugCandidates, slugify, slugSchema } from "./slug";
 
@@ -16,12 +17,14 @@ const nowUtc = () => new Date().toISOString();
 
 /**
  * Las páginas públicas (/p/<slug> y sus versiones por nicho) quedan en caché (ISR).
- * Tras cada escritura se invalidan todas para que el cambio se vea al instante.
+ * Tras cada escritura se invalidan todas para que el cambio se vea al instante: las de
+ * los nichos de antes y de después del cambio, y siempre las tres de la v1.
  * Va sin el segundo argumento ("page" / "layout"): ese solo aplica a rutas con
  * [segmentos], no a una URL concreta.
  */
-function refreshPublicPages(slug: string): void {
-  for (const path of publicPaths(slug)) {
+function refreshPublicPages(slug: string, ...docs: Portfolio[]): void {
+  const niches = [...LEGACY_NICHES, ...docs.flatMap((doc) => resolveNiches(doc))].map((niche) => niche.slug);
+  for (const path of publicPaths(slug, niches)) {
     try {
       revalidatePath(path);
     } catch (error) {
@@ -61,7 +64,7 @@ export async function createPortfolio(data: NewPortfolio, slugFrom: string): Pro
       ...data,
     });
     if (await storage.createJson(docPath(slug), portfolio)) {
-      refreshPublicPages(slug);
+      refreshPublicPages(slug, portfolio);
       return portfolio;
     }
   }
@@ -101,7 +104,7 @@ export async function updatePortfolio(
     updatedAt: nowUtc(),
   });
   if (!(await storage.replaceJson(docPath(slug), next, stored.etag))) throw new ConflictError();
-  refreshPublicPages(slug);
+  refreshPublicPages(slug, current, next);
   return next;
 }
 

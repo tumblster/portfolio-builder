@@ -1,13 +1,17 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { PublicPortfolio } from "@/components/public-portfolio";
-import { NICHE_LABELS, isNiche } from "@/lib/portfolio/niches";
+import { portfolioMetadata } from "@/lib/portfolio/metadata";
+import { findNiche, isNicheSlug } from "@/lib/portfolio/niches";
 import { loadPublicPortfolio } from "@/lib/portfolio/public";
 
 /*
- * Versión de un nicho (RF-04): /p/<slug>/belleza, /lifestyle o /viajes.
- * Mismos datos que la versión general, con otro acento, otro titular y primero las
- * piezas de ese nicho. Sin pestañas: cada marca recibe el link de su nicho.
+ * Link directo a un nicho: /p/<slug>/<nicho> (p. ej. /p/valentina-ruiz/fitness).
+ * Es la misma página que la versión general, con ese nicho ya elegido en las píldoras: cada
+ * marca recibe el link de su nicho y, si quiere, puede ver todo lo demás sin recargar.
+ * Solo existen los nichos del portafolio (los de la IA, o Belleza/Lifestyle/Viajes en los de
+ * la v1); cualquier otro da 404. Si un nicho se quedó sin piezas, el link sigue abriendo y
+ * muestra todo.
  * Misma caché que la versión general (ver app/p/[slug]/page.tsx).
  */
 export const revalidate = 60;
@@ -16,27 +20,21 @@ export async function generateStaticParams() {
   return []; // ninguno en el build: cada versión se genera en su primera visita
 }
 
-const NO_INDEX = { index: false, follow: false } as const;
+async function load(params: PageProps<"/p/[slug]/[niche]">["params"]) {
+  const { slug, niche } = await params;
+  if (!isNicheSlug(niche)) return null;
+  const portfolio = await loadPublicPortfolio(slug);
+  const def = portfolio ? findNiche(portfolio.niches, niche) : null;
+  return portfolio && def ? { portfolio, niche: def } : null;
+}
 
 export async function generateMetadata({ params }: PageProps<"/p/[slug]/[niche]">): Promise<Metadata> {
-  const { slug, niche } = await params;
-  const portfolio = isNiche(niche) ? await loadPublicPortfolio(slug) : null;
-  if (!portfolio || !isNiche(niche)) return { title: "Portafolio no encontrado", robots: NO_INDEX };
-
-  const title = `${portfolio.name} · Portafolio UGC — ${NICHE_LABELS[niche]}`;
-  const description = portfolio.valueProp || portfolio.bio || "Portafolio UGC";
-  return {
-    title: { absolute: title },
-    description,
-    robots: NO_INDEX,
-    openGraph: { title, description, type: "profile" },
-  };
+  const found = await load(params);
+  return portfolioMetadata(found?.portfolio ?? null, found?.niche ?? null);
 }
 
 export default async function NichePortfolioPage({ params }: PageProps<"/p/[slug]/[niche]">) {
-  const { slug, niche } = await params;
-  if (!isNiche(niche)) notFound();
-  const portfolio = await loadPublicPortfolio(slug);
-  if (!portfolio) notFound();
-  return <PublicPortfolio portfolio={portfolio} niche={niche} />;
+  const found = await load(params);
+  if (!found) notFound();
+  return <PublicPortfolio portfolio={found.portfolio} />;
 }

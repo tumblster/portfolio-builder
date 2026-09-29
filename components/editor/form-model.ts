@@ -1,5 +1,5 @@
 import type { ManualPrefill } from "@/lib/import/events";
-import type { Niche } from "@/lib/portfolio/niches";
+import { LEGACY_NICHES, type NicheDef } from "@/lib/portfolio/niches";
 import type { PieceLink, ResolvedPortfolio } from "@/lib/portfolio/resolve";
 import {
   LIMITS,
@@ -8,8 +8,10 @@ import {
   parseVideoLink,
   updatePortfolioInputSchema,
   type ManualData,
+  type Service,
   type StoredImage,
 } from "@/lib/portfolio/schema";
+import { NO_METRICS, type PieceMetrics, type ProfileStat } from "@/lib/portfolio/stats";
 
 /*
  * Modelo del formulario (crear y editar). Funciones puras: sin React ni red.
@@ -17,6 +19,10 @@ import {
  * Al editar, solo lo que la persona cambió de verdad se guarda como dato manual.
  * Lo que no tocó sigue heredando de la IA o de Instagram (regla manual → IA → Instagram),
  * así que abrir y guardar sin cambios no "congela" nada.
+ *
+ * v2: los nichos son propios de cada portafolio (los de la IA, o Belleza/Lifestyle/Viajes en
+ * los creados a mano y en los de la v1). En M1 no se editan: el formulario los usa para el
+ * selector de cada pieza y los conserva tal cual al guardar. Los servicios sí se editan.
  */
 
 export const CONTACT_KEYS = ["email", "whatsapp", "instagram", "tiktok", "youtube", "website"] as const;
@@ -29,7 +35,8 @@ export type PieceDraft = {
   /** Solo en piezas ya guardadas. */
   id?: string;
   title: string;
-  niche: Niche | null;
+  /** Slug de uno de los nichos del portafolio; null = solo en "Todo". */
+  niche: string | null;
   image: StoredImage | null;
   /** "upload" nunca se reemplaza sola; "auto" y "saved" sí, si cambia el link del video. */
   imageSource: "upload" | "auto" | "saved" | null;
@@ -38,17 +45,29 @@ export type PieceDraft = {
   postLink: PieceLink | null;
 };
 
+export type ServiceDraft = { key: string; title: string; description: string };
+
 export type FormState = {
   name: string;
   bio: string;
   valueProp: string;
   photo: StoredImage | null;
   contact: ContactDraft;
+  /** Nichos disponibles para las piezas (no se editan en M1). */
+  niches: NicheDef[];
+  services: ServiceDraft[];
   pieces: PieceDraft[];
 };
 
+/**
+ * Lo que la vista previa muestra pero el formulario no edita: las cifras de Instagram
+ * (del perfil y de cada pieza importada, por id de pieza).
+ */
+export type PreviewExtras = { stats: ProfileStat[]; metrics: Record<string, PieceMetrics> };
+export const NO_EXTRAS: PreviewExtras = { stats: [], metrics: {} };
+
 /** Lo que estaba guardado al abrir (o al último guardado): para saber qué cambió. */
-export type Baseline = { slug: string; revision: number; form: FormState; manual: ManualData };
+export type Baseline = { slug: string; revision: number; form: FormState; manual: ManualData; extras: PreviewExtras };
 
 /** Errores por campo: "name", "contact.email", "pieces.2.title", "pieces"… */
 export type FieldErrors = Record<string, string>;
@@ -63,6 +82,10 @@ export function emptyPiece(key: string = newPieceKey()): PieceDraft {
   return { key, title: "", niche: null, image: null, imageSource: null, videoUrl: "", postLink: null };
 }
 
+export function serviceDraft(service: Partial<Service> = {}, key: string = newPieceKey()): ServiceDraft {
+  return { key, title: service.title ?? "", description: service.description ?? "" };
+}
+
 export function emptyForm(): FormState {
   return {
     name: "",
@@ -70,6 +93,8 @@ export function emptyForm(): FormState {
     valueProp: "",
     photo: null,
     contact: emptyContact(),
+    niches: LEGACY_NICHES.map((niche) => ({ ...niche })),
+    services: [],
     pieces: Array.from({ length: LIMITS.minPieces }, () => emptyPiece()),
   };
 }
@@ -90,6 +115,8 @@ export function formFromPrefill(prefill: ManualPrefill): FormState {
     valueProp: "",
     photo: prefill.photo,
     contact: { ...emptyContact(), instagram: prefill.contact.instagram, website: prefill.contact.website ?? "" },
+    niches: LEGACY_NICHES.map((niche) => ({ ...niche })),
+    services: [],
     pieces,
   };
 }
@@ -102,6 +129,9 @@ export function formFromPortfolio(resolved: ResolvedPortfolio): FormState {
     valueProp: resolved.valueProp,
     photo: resolved.photo,
     contact: { ...emptyContact(), ...resolved.contact },
+    niches: resolved.niches.map((niche) => ({ ...niche })),
+    // Claves deterministas (servidor y navegador iguales): el índice basta para los guardados.
+    services: resolved.services.map((service, index) => serviceDraft(service, `servicio-${index}`)),
     pieces: resolved.pieces.map((piece) => ({
       key: piece.id,
       id: piece.id,
@@ -115,6 +145,14 @@ export function formFromPortfolio(resolved: ResolvedPortfolio): FormState {
   };
 }
 
+/** Cifras de Instagram del portafolio guardado, para la vista previa. */
+export function extrasFromPortfolio(resolved: ResolvedPortfolio): PreviewExtras {
+  return {
+    stats: resolved.stats,
+    metrics: Object.fromEntries(resolved.pieces.map((piece) => [piece.id, piece.metrics])),
+  };
+}
+
 const pieceInput = (piece: PieceDraft) => ({
   ...(piece.id ? { id: piece.id } : {}),
   title: piece.title,
@@ -123,6 +161,8 @@ const pieceInput = (piece: PieceDraft) => ({
   videoUrl: piece.videoUrl.trim() || null,
 });
 
+const serviceInput = (service: ServiceDraft): Service => ({ title: service.title, description: service.description });
+
 export function toCreatePayload(form: FormState) {
   return {
     name: form.name,
@@ -130,11 +170,15 @@ export function toCreatePayload(form: FormState) {
     photo: form.photo,
     valueProp: form.valueProp,
     contact: form.contact,
+    services: form.services.map(serviceInput),
     pieces: form.pieces.map(pieceInput),
   };
 }
 
 const sameImage = (a: StoredImage | null, b: StoredImage | null) => (a?.url ?? null) === (b?.url ?? null);
+
+const servicesKey = (services: ServiceDraft[]) =>
+  JSON.stringify(services.map((service) => [service.title.trim(), service.description.trim()]));
 
 export function toUpdatePayload(form: FormState, baseline: Baseline) {
   const text = (key: "name" | "bio" | "valueProp") =>
@@ -147,12 +191,20 @@ export function toUpdatePayload(form: FormState, baseline: Baseline) {
     if (value !== undefined) contact[key] = value;
   }
 
+  const services =
+    servicesKey(form.services) !== servicesKey(baseline.form.services)
+      ? form.services.map(serviceInput)
+      : baseline.manual.services;
+
   const manual: ManualData = {
     name: text("name"),
     bio: text("bio"),
     valueProp: text("valueProp"),
     photo: sameImage(form.photo, baseline.form.photo) ? baseline.manual.photo : form.photo,
     ...(Object.keys(contact).length > 0 ? { contact } : {}),
+    // Los nichos no se editan en M1: se conservan tal como estaban guardados.
+    ...(baseline.manual.niches !== undefined ? { niches: baseline.manual.niches } : {}),
+    ...(services !== undefined ? { services } : {}),
   };
   return { revision: baseline.revision, manual, pieces: form.pieces.map(pieceInput) };
 }
@@ -189,7 +241,7 @@ export function validateForm(form: FormState, baseline: Baseline | null): FieldE
 }
 
 /** Lo que muestra la vista previa: la misma forma que la página pública. */
-export function toPreview(form: FormState): ResolvedPortfolio {
+export function toPreview(form: FormState, extras: PreviewExtras = NO_EXTRAS): ResolvedPortfolio {
   const contact: ResolvedPortfolio["contact"] = {};
   for (const key of CONTACT_KEYS) {
     const parsed = contactSchema.shape[key].safeParse(form.contact[key]);
@@ -202,6 +254,11 @@ export function toPreview(form: FormState): ResolvedPortfolio {
     photo: form.photo,
     valueProp: form.valueProp.trim(),
     contact,
+    niches: form.niches,
+    services: form.services
+      .filter((service) => service.title.trim())
+      .map((service) => ({ title: service.title.trim(), description: service.description.trim() })),
+    stats: extras.stats,
     pieces: form.pieces.map((piece, index) => {
       const video = piece.videoUrl.trim() ? parseVideoLink(piece.videoUrl) : null;
       return {
@@ -212,6 +269,7 @@ export function toPreview(form: FormState): ResolvedPortfolio {
         image: piece.image,
         video,
         link: video ?? piece.postLink,
+        metrics: extras.metrics[piece.key] ?? NO_METRICS,
       };
     }),
   };

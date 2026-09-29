@@ -6,9 +6,9 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { IMPORT_STEPS, MANUAL_PREFILL_KEY, type ImportEvent, type ImportStep } from "@/lib/import/events";
 import { readNdjson } from "@/lib/import/ndjson";
 import { parseInstagramUsername } from "@/lib/instagram/username";
+import { nichesWithPieces } from "@/lib/portfolio/niches";
 import { Avatar } from "./avatar";
 import { CopyButton } from "./copy-button";
-import { PieceRow } from "./piece-row";
 import { PrefillSummary } from "./prefill-summary";
 import { errorText, fieldLabel, pillButton, primaryButton, textInput } from "./ui";
 
@@ -17,6 +17,9 @@ import { errorText, fieldLabel, pillButton, primaryButton, textInput } from "./u
  * Estados: vacío (formulario), cargando (pasos reales que manda el servidor),
  * error, éxito, y "a mano" si el perfil es privado o tiene menos de 3 publicaciones.
  * El atajo "Prefiero llenarlo manual" está siempre a la vista antes de importar.
+ *
+ * v2: el éxito es un modal ("Portafolio listo") encima del formulario, con el link, copiar,
+ * abrir, editar y crear otro. Al cerrarlo queda una línea para volver a abrirlo.
  */
 
 type DoneEvent = Extract<ImportEvent, { type: "done" }>;
@@ -26,13 +29,13 @@ type State =
   | { phase: "idle" }
   | { phase: "running"; step: ImportStep; startedAt: number }
   | { phase: "error"; message: string }
-  | { phase: "done"; result: DoneEvent }
+  | { phase: "done"; result: DoneEvent; dialogOpen: boolean }
   | { phase: "manual"; result: ManualEvent };
 
 const STEP_LABELS: Record<ImportStep, string> = {
   scrape: "Leemos el perfil de Instagram",
   images: "Copiamos sus fotos",
-  ai: "La IA escribe la propuesta de valor y los títulos",
+  ai: "La IA detecta sus nichos y escribe los textos",
   save: "Generamos el link",
 };
 
@@ -68,7 +71,7 @@ async function runImport(instagram: string, onStep: (step: ImportStep) => void):
     for await (const event of readNdjson<ImportEvent>(response.body)) {
       if (event.type === "ping") continue; // latido: la conexión sigue viva
       if (event.type === "step") onStep(event.step);
-      else if (event.type === "done") return { kind: "state", state: { phase: "done", result: event } };
+      else if (event.type === "done") return { kind: "state", state: { phase: "done", result: event, dialogOpen: true } };
       else if (event.type === "manual") return { kind: "state", state: { phase: "manual", result: event } };
       else return { kind: "state", state: { phase: "error", message: event.message } };
     }
@@ -88,9 +91,10 @@ export function ImportScreen() {
   const focusInputOnIdle = useRef(false);
   const running = state.phase === "running";
 
-  // Al terminar, el foco (y la vista) van al resultado; al volver a empezar, al campo.
+  // Si no se pudo armar solo, el foco (y la vista) van al aviso; al volver a empezar, al campo.
+  // (El modal de éxito maneja su propio foco.)
   useEffect(() => {
-    if (state.phase === "done" || state.phase === "manual") outcomeRef.current?.focus();
+    if (state.phase === "manual") outcomeRef.current?.focus();
     if (state.phase === "idle" && focusInputOnIdle.current) {
       focusInputOnIdle.current = false;
       inputRef.current?.focus();
@@ -149,22 +153,35 @@ export function ImportScreen() {
     }
   }
 
+  const setDialogOpen = (dialogOpen: boolean) =>
+    setState((current) => (current.phase === "done" ? { ...current, dialogOpen } : current));
+
   return (
     <div className="mt-10">
-      {state.phase === "done" || state.phase === "manual" ? (
+      {state.phase === "manual" ? (
         <div ref={outcomeRef} tabIndex={-1} className="outline-none">
-          {state.phase === "done" ? (
-            <Result result={state.result} onStartOver={startOver} />
-          ) : (
-            <ManualNotice
-              result={state.result}
-              onContinue={() => continueManually(state.result)}
-              onStartOver={startOver}
-            />
-          )}
+          <ManualNotice result={state.result} onContinue={() => continueManually(state.result)} onStartOver={startOver} />
         </div>
       ) : (
         <>
+          {state.phase === "done" && (
+            <div className="panel mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 px-5 py-3">
+              <p className="min-w-0 flex-1">
+                <span aria-hidden="true" className="text-lilac">
+                  ✓{" "}
+                </span>
+                Portafolio de {state.result.resolved.name} listo
+              </p>
+              <button
+                type="button"
+                onClick={() => setDialogOpen(true)}
+                className="min-h-tap text-lilac underline decoration-lilac/40 underline-offset-4 hover:decoration-lilac"
+              >
+                Ver link
+              </button>
+            </div>
+          )}
+
           <form onSubmit={submit} noValidate className="panel p-5 sm:p-6">
             <label htmlFor="instagram" className={fieldLabel}>
               Link o usuario de Instagram
@@ -214,6 +231,10 @@ export function ImportScreen() {
           )}
           {running && (
             <p className="mt-4 text-sm text-muted">Suele tomar entre 30 y 60 segundos. No cierres esta pestaña.</p>
+          )}
+
+          {state.phase === "done" && state.dialogOpen && (
+            <ReadyDialog result={state.result} onClose={() => setDialogOpen(false)} onStartOver={startOver} />
           )}
         </>
       )}
@@ -267,64 +288,113 @@ function Elapsed({ since }: { since: number }) {
   );
 }
 
-function Result({ result, onStartOver }: { result: DoneEvent; onStartOver: () => void }) {
-  const { resolved, url, username, aiWritten, warnings } = result;
+/**
+ * "Portafolio listo" (v2 · M1): modal centrado con el link, copiar, abrir, editar y crear otro.
+ * Es un <dialog> nativo: atrapa el foco, se cierra con Esc, con la X o tocando fuera, y al
+ * cerrarse devuelve el foco a donde estaba.
+ */
+function ReadyDialog({ result, onClose, onStartOver }: { result: DoneEvent; onClose: () => void; onStartOver: () => void }) {
+  const { resolved, url, username, warnings } = result;
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const titleRef = useRef<HTMLHeadingElement>(null);
+  const nicheLinks = nichesWithPieces(resolved.niches, resolved.pieces).map((niche) => ({ ...niche, url: `${url}/${niche.slug}` }));
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    if (!dialog.open) dialog.showModal();
+    titleRef.current?.focus();
+  }, []);
+
   return (
-    <section aria-labelledby="resultado" className="panel p-5 sm:p-6">
-      <h2 id="resultado" className="text-4xl">
-        portafolio listo.
-      </h2>
-
-      <div className="mt-6 flex items-center gap-4">
-        <Avatar photo={resolved.photo} name={resolved.name} />
-        <div className="min-w-0">
-          <p className="truncate text-lg">{resolved.name}</p>
-          <p className="truncate text-sm text-muted">@{username}</p>
-        </div>
-      </div>
-
-      {resolved.valueProp && <p className="mt-5 font-serif text-2xl leading-snug">{resolved.valueProp}</p>}
-      {aiWritten && <p className="mt-2 text-sm text-muted">Propuesta de valor, títulos y nichos sugeridos por la IA.</p>}
-
-      <div className="mt-6">
-        <p className={fieldLabel}>Link del portafolio</p>
-        <p className="mt-1 font-mono text-sm break-all text-lilac select-all">{url}</p>
-      </div>
-
-      <div className="mt-5 flex flex-wrap gap-2">
-        <CopyButton text={url} className={primaryButton} what="el link del portafolio" />
-        <a href={url} target="_blank" rel="noopener noreferrer" className={pillButton}>
-          Abrir portafolio<span className="sr-only"> (se abre en otra pestaña)</span>
-        </a>
-        <Link href={`/editar/${result.slug}`} className={pillButton}>
-          Editar
-        </Link>
-        <button type="button" onClick={onStartOver} className={pillButton}>
-          Crear otro
+    <dialog
+      ref={dialogRef}
+      aria-labelledby="portafolio-listo"
+      data-modal=""
+      onClose={() => {
+        if (!dialogRef.current?.open) onClose();
+      }}
+      onClick={(event) => {
+        // Toque en el fondo oscuro (fuera de la tarjeta): cierra.
+        if (event.target === event.currentTarget) event.currentTarget.close();
+      }}
+      className="m-auto max-h-[calc(100dvh-2rem)] w-[min(100%-2rem,34rem)] overflow-y-auto overscroll-contain rounded-card border border-line bg-ink p-0 text-white shadow-[0_30px_80px_-20px_rgb(0_0_0/0.7)] backdrop:bg-[rgb(10_10_36/0.78)] backdrop:backdrop-blur-sm"
+    >
+      <div className="relative p-5 sm:p-7">
+        <button
+          type="button"
+          onClick={() => dialogRef.current?.close()}
+          aria-label="Cerrar"
+          className="absolute top-3 right-3 flex size-11 items-center justify-center rounded-full text-muted transition hover:bg-white/10 hover:text-white"
+        >
+          <svg viewBox="0 0 16 16" aria-hidden="true" className="size-4">
+            <path d="M3.5 3.5l9 9m0-9l-9 9" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+          </svg>
         </button>
+
+        <h2 id="portafolio-listo" ref={titleRef} tabIndex={-1} className="pr-12 text-4xl outline-none sm:text-5xl">
+          portafolio listo.
+        </h2>
+
+        <div className="mt-6 flex items-center gap-4">
+          <Avatar photo={resolved.photo} name={resolved.name} />
+          <div className="min-w-0">
+            <p className="truncate text-lg">{resolved.name}</p>
+            <p className="truncate text-sm text-muted">@{username}</p>
+          </div>
+        </div>
+
+        <div className="mt-6">
+          <p className={fieldLabel}>Link del portafolio</p>
+          <p className="mt-1 font-mono text-sm break-all text-lilac select-all" data-testid="portfolio-url">
+            {url}
+          </p>
+        </div>
+
+        <div className="mt-5 flex flex-wrap gap-2">
+          <CopyButton text={url} className={primaryButton} what="el link del portafolio" />
+          <a href={url} target="_blank" rel="noopener noreferrer" className={pillButton}>
+            Abrir portafolio<span className="sr-only"> (se abre en otra pestaña)</span>
+          </a>
+          <Link href={`/editar/${result.slug}`} className={pillButton}>
+            Editar
+          </Link>
+          <button type="button" onClick={onStartOver} className={pillButton}>
+            Crear otro
+          </button>
+        </div>
+
+        {nicheLinks.length > 0 && (
+          <div className="mt-7">
+            <h3 className="font-sans text-sm text-muted">Links por nicho</h3>
+            <ul className="mt-2 border-t border-line">
+              {nicheLinks.map((niche) => (
+                <li key={niche.slug} className="flex min-h-tap items-center gap-3 border-b border-line py-2">
+                  <span className="min-w-0 flex-1">
+                    <span className="block">{niche.label}</span>
+                    <span className="block truncate font-mono text-xs text-muted">/{niche.slug}</span>
+                  </span>
+                  <CopyButton
+                    text={niche.url}
+                    label="Copiar"
+                    what={`el link de ${niche.label}`}
+                    className={`${pillButton} min-h-10 px-4`}
+                  />
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {warnings.length > 0 && (
+          <ul className="mt-5 space-y-1 text-sm text-amber">
+            {warnings.map((warning) => (
+              <li key={warning}>{warning}</li>
+            ))}
+          </ul>
+        )}
       </div>
-
-      {warnings.length > 0 && (
-        <ul className="mt-5 space-y-1 text-sm text-amber">
-          {warnings.map((warning) => (
-            <li key={warning}>{warning}</li>
-          ))}
-        </ul>
-      )}
-
-      <h3 className="mt-8 font-sans text-sm text-muted">{resolved.pieces.length} piezas, en este orden</h3>
-      <ul className="mt-1">
-        {resolved.pieces.map((piece) => (
-          <PieceRow
-            key={piece.id}
-            title={piece.title}
-            image={piece.image}
-            isVideo={piece.video !== null}
-            niche={piece.niche}
-          />
-        ))}
-      </ul>
-    </section>
+    </dialog>
   );
 }
 
