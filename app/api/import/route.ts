@@ -1,4 +1,3 @@
-import { revalidatePath } from "next/cache";
 import type { NextRequest } from "next/server";
 import { z } from "zod";
 import { requireCreator } from "@/lib/auth";
@@ -7,9 +6,6 @@ import { ImportError } from "@/lib/import/errors";
 import type { ImportErrorCode, ImportEvent } from "@/lib/import/events";
 import { assertImportConfigured, importFromInstagram } from "@/lib/import/instagram-import";
 import { parseInstagramUsername } from "@/lib/instagram/username";
-import { resolvePortfolio } from "@/lib/portfolio/resolve";
-import { publicPath, publicPaths, slugify } from "@/lib/portfolio/slug";
-import { absoluteUrl } from "@/lib/request";
 
 /** Scrapeo (hasta ~2 min) + fotos + IA. En la práctica tarda 30–60 s. */
 export const maxDuration = 180;
@@ -39,13 +35,8 @@ export async function POST(request: NextRequest) {
     return errorResponse(error);
   }
 
-  // El portafolio se crea dentro del stream, cuando la respuesta ya empezó, y ahí
-  // Next ya no aplica invalidaciones de caché. Si alguien abrió antes el link que
-  // va a tener (y quedó un 404 en caché), se purga ahora: /p/usuario y /p/usuario-2,
-  // con sus versiones por nicho.
-  const base = slugify(username);
-  for (const slug of [base, `${base}-2`]) for (const path of publicPaths(slug)) revalidatePath(path);
-
+  // v2 · M2: aquí ya no se crea el portafolio (solo un borrador). Se crea en /api/import/confirm,
+  // una petición normal donde la invalidación de caché de los links nuevos funciona sin trucos.
   const encoder = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
@@ -53,7 +44,7 @@ export async function POST(request: NextRequest) {
         try {
           controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
         } catch {
-          // Quien pidió cerró la pestaña: la importación termina igual y queda guardada.
+          // Quien pidió cerró la pestaña: la importación termina igual y el borrador queda guardado.
         }
       };
 
@@ -61,17 +52,8 @@ export async function POST(request: NextRequest) {
       const heartbeat = setInterval(() => send({ type: "ping" }), HEARTBEAT_MS);
       try {
         const outcome = await importFromInstagram(username, (step) => send({ type: "step", step }));
-        if (outcome.kind === "created") {
-          const { portfolio } = outcome;
-          send({
-            type: "done",
-            url: absoluteUrl(request, publicPath(portfolio.slug)),
-            slug: portfolio.slug,
-            username,
-            aiWritten: outcome.aiWritten,
-            resolved: resolvePortfolio(portfolio),
-            warnings: outcome.warnings,
-          });
+        if (outcome.kind === "draft") {
+          send({ type: "draft", draft: outcome.draft });
         } else {
           send({ type: "manual", reason: outcome.reason, message: outcome.message, prefill: outcome.prefill });
         }

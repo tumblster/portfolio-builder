@@ -1,6 +1,7 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
 import sharp from "sharp";
+import { extractSwatch } from "@/lib/palette/extract";
 import { InvalidInputError } from "@/lib/errors";
 import { MEDIA_FILE_PATTERN, type StoredImage } from "@/lib/portfolio/schema";
 import { getStorage, type StoredMedia } from "@/lib/storage";
@@ -40,8 +41,11 @@ export async function saveImage(input: Uint8Array): Promise<StoredImage> {
     .toBuffer({ resolveWithObject: true });
 
   const file = `${randomUUID()}.webp`;
-  await getStorage().putMedia(file, data, "image/webp");
-  return { url: `/media/${file}`, width: info.width, height: info.height };
+  const [swatch] = await Promise.all([
+    extractSwatch(data).catch(() => null), // el color es un extra: si falla, la imagen se guarda igual
+    getStorage().putMedia(file, data, "image/webp"),
+  ]);
+  return { url: `/media/${file}`, width: info.width, height: info.height, ...(swatch ? { swatch } : {}) };
 }
 
 /** Devuelve la imagen guardada, o null si el nombre no es válido o no existe. */

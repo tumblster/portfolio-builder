@@ -5,31 +5,33 @@ import { ConfigError } from "@/lib/errors";
 import { assertApifyConfigured, scrapeInstagramProfile, type ApifyProfile } from "@/lib/instagram/apify";
 import { copyInstagramImage, mapWithConcurrency } from "@/lib/instagram/images";
 import { httpUrlOrNull, pickTopPosts, titleFromCaption, toInstagramPost, toSnapshot } from "@/lib/instagram/snapshot";
-import { createPortfolio } from "@/lib/portfolio/repository";
 import {
   LIMITS,
   type GeneratedContent,
   type InstagramPost,
   type Piece,
-  type Portfolio,
   type StoredImage,
 } from "@/lib/portfolio/schema";
 import { ImportError } from "./errors";
-import type { ImportStep, ManualPrefill } from "./events";
+import { saveDraft } from "./draft";
+import type { DraftPreview, ImportStep, ManualPrefill } from "./events";
 
 /*
  * Flujo principal: link de Instagram → portafolio multinicho con link.
  *   1. scrape  Apify lee el perfil (foto, bio, últimos ~12 posts).
  *   2. images  Se copian la foto y las imágenes de los posts (sus URLs caducan).
- *   3. ai      Groq escribe la propuesta de valor, y un título y nicho por pieza.
+ *   3. ai      Groq escribe la propuesta de valor, detecta hasta 3 nichos, titula y
+ *              etiqueta cada pieza y sugiere formas de colaborar.
  *   4. save    Se guarda con las 6 publicaciones con más interacción.
+ * Si la IA falla, el portafolio usa los nichos de la v1 (Belleza, Lifestyle, Viajes) sin piezas
+ * etiquetadas: se ve solo en "Todo" hasta que se edite.
  * Perfil privado o con menos de 3 publicaciones → formulario manual prellenado.
  */
 
 const IMAGE_CONCURRENCY = 6;
 
 export type ImportOutcome =
-  | { kind: "created"; portfolio: Portfolio; aiWritten: boolean; warnings: string[] }
+  | { kind: "draft"; draft: DraftPreview }
   | { kind: "manual"; reason: "private_profile" | "not_enough_posts"; message: string; prefill: ManualPrefill };
 
 /** Falla antes de gastar nada si falta alguna key. */
@@ -115,6 +117,8 @@ export async function importFromInstagram(
         const suggestion = copy.pieces.get(post.id);
         return suggestion ? [{ sourcePostId: post.id, ...suggestion }] : [];
       }),
+      niches: copy.niches,
+      services: copy.services,
     };
   } catch (error) {
     // El scrapeo ya se pagó: se crea igual, con títulos sacados del texto de cada post.
@@ -126,12 +130,9 @@ export async function importFromInstagram(
     );
   }
 
-  onStep("save");
-  const portfolio = await createPortfolio(
-    { source: "instagram", instagram: snapshot, generated, manual: {}, pieces: toPieces(selected, generated) },
-    handle,
-  );
-  return { kind: "created", portfolio, aiWritten: generated !== null, warnings };
+  // v2 · M2: no se crea todavía. El creador confirma nichos, plantilla y paleta (./draft.ts).
+  const draft = await saveDraft({ username: handle, snapshot, generated, pieces: toPieces(selected, generated), warnings });
+  return { kind: "draft", draft };
 }
 
 function toPieces(selected: InstagramPost[], generated: GeneratedContent | null): Piece[] {

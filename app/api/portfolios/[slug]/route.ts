@@ -46,6 +46,7 @@ export async function PATCH(request: NextRequest, { params }: Context) {
     const portfolio = await updatePortfolio(slug, input.revision, (current) => ({
       ...(input.manual !== undefined && { manual: input.manual }),
       ...(input.pieces !== undefined && { pieces: toStoredPieces(input.pieces, current.pieces) }),
+      ...(input.design !== undefined && { design: input.design }),
     }));
     return jsonResponse(body(request, portfolio));
   } catch (error) {

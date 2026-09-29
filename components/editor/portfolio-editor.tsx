@@ -3,18 +3,24 @@
 import { useRouter } from "next/navigation";
 import { useDeferredValue, useMemo, useState, useSyncExternalStore, type FormEvent, type ReactNode } from "react";
 import { MANUAL_PREFILL_KEY, type ManualPrefill } from "@/lib/import/events";
-import { NICHES, NICHE_LABELS, type Niche } from "@/lib/portfolio/niches";
+import { PalettePicker, TemplatePicker } from "@/components/design/design-pickers";
+import { resolvePalette } from "@/lib/palette/palettes";
+import { nichesWithPieces } from "@/lib/portfolio/niches";
 import { LIMITS } from "@/lib/portfolio/schema";
+import { SUGGESTED_SERVICES } from "@/lib/portfolio/services";
 import { Avatar } from "../avatar";
 import { PublicPortfolio } from "../public-portfolio";
 import { errorText, fieldLabel, pillButton, primaryButton, textInput } from "../ui";
 import {
   CONTACT_KEYS,
+  NO_EXTRAS,
   emptyForm,
   emptyPiece,
+  extrasFromPortfolio,
   formFromPortfolio,
   formFromPrefill,
   issuesToErrors,
+  serviceDraft,
   toCreatePayload,
   toPreview,
   toUpdatePayload,
@@ -24,6 +30,7 @@ import {
   type FieldErrors,
   type FormState,
   type PieceDraft,
+  type ServiceDraft,
 } from "./form-model";
 import { ImagePicker } from "./image-picker";
 import { PieceEditor } from "./piece-editor";
@@ -33,6 +40,8 @@ import { PieceEditor } from "./piece-editor";
  * Crear: fallback "Prefiero llenarlo manual", con lo que haya dejado la importación.
  * Editar: cualquier portafolio, también los importados de Instagram.
  * Móvil: pestañas Formulario / Vista previa. Escritorio: formulario a la izquierda, vista a la derecha.
+ * v2: la vista previa es la plantilla Creator; se puede mirar por nicho (Todo + los nichos con
+ * piezas) y el formulario suma "servicios" (formas de colaborar).
  */
 
 export type EditorProps = { mode: "create" } | { mode: "edit"; baseline: Baseline };
@@ -97,8 +106,9 @@ function EditorForm({ initial, initialBaseline }: { initial: FormState; initialB
   const [status, setStatus] = useState<SaveStatus>({ kind: "idle" });
   const [pending, setPending] = useState(0);
   const [tab, setTab] = useState<"form" | "preview">("form");
-  const [previewNiche, setPreviewNiche] = useState<Niche | null>(null);
+  const [previewNiche, setPreviewNiche] = useState<string | null>(null);
   const isEdit = baseline !== null;
+  const extras = baseline?.extras ?? NO_EXTRAS;
 
   // Tras el primer intento de guardar, los errores se recalculan mientras se corrige.
   const clientErrors = useMemo(() => (submitted ? validateForm(form, baseline) : {}), [submitted, form, baseline]);
@@ -106,7 +116,10 @@ function EditorForm({ initial, initialBaseline }: { initial: FormState; initialB
 
   // La vista previa se actualiza en cada tecla sin trabar lo que se escribe (RF-01: < 1 s).
   const deferredForm = useDeferredValue(form);
-  const preview = useMemo(() => toPreview(deferredForm), [deferredForm]);
+  const preview = useMemo(() => toPreview(deferredForm, extras), [deferredForm, extras]);
+  // Solo se puede mirar un nicho que tenga piezas; si se quedó sin ninguna, vuelve a "Todo".
+  const previewNiches = nichesWithPieces(preview.niches, preview.pieces);
+  const activePreviewNiche = previewNiches.some((niche) => niche.slug === previewNiche) ? previewNiche : null;
 
   function touched() {
     setServerErrors({});
@@ -139,6 +152,33 @@ function EditorForm({ initial, initialBaseline }: { initial: FormState; initialB
   }
   function removePiece(key: string) {
     setForm((current) => ({ ...current, pieces: current.pieces.filter((piece) => piece.key !== key) }));
+    touched();
+  }
+  function setDesign(patch: Partial<FormState["design"]>) {
+    setForm((current) => ({ ...current, design: { ...current.design, ...patch } }));
+    touched();
+  }
+  function editService(key: string, patch: Partial<ServiceDraft>) {
+    setForm((current) => ({
+      ...current,
+      services: current.services.map((service) => (service.key === key ? { ...service, ...patch } : service)),
+    }));
+    touched();
+  }
+  function removeService(key: string) {
+    setForm((current) => ({ ...current, services: current.services.filter((service) => service.key !== key) }));
+    touched();
+  }
+  function addService() {
+    setForm((current) =>
+      current.services.length >= LIMITS.maxServices
+        ? current
+        : { ...current, services: [...current.services, serviceDraft()] },
+    );
+    touched();
+  }
+  function applySuggestedServices() {
+    setForm((current) => ({ ...current, services: SUGGESTED_SERVICES.map((service) => serviceDraft(service)) }));
     touched();
   }
   function addPiece() {
@@ -202,6 +242,7 @@ function EditorForm({ initial, initialBaseline }: { initial: FormState; initialB
       revision: data.portfolio.revision,
       form: formFromPortfolio(data.resolved),
       manual: data.portfolio.manual,
+      extras: extrasFromPortfolio(data.resolved),
     });
     setStatus({ kind: "saved" });
   }
@@ -222,7 +263,7 @@ function EditorForm({ initial, initialBaseline }: { initial: FormState; initialB
       <div
         role="tablist"
         aria-label="Formulario o vista previa"
-        className="sticky top-0 z-20 -mx-5 mb-6 flex gap-2 border-b border-line bg-ink px-5 py-2 sm:-mx-8 sm:px-8 lg:hidden"
+        className="sticky top-0 z-20 -mx-5 mb-6 flex gap-2 border-b border-line bg-sand px-5 py-2 sm:-mx-8 sm:px-8 lg:hidden"
       >
         {(["form", "preview"] as const).map((value) => (
           <button
@@ -234,7 +275,7 @@ function EditorForm({ initial, initialBaseline }: { initial: FormState; initialB
             aria-controls={`panel-${value}`}
             onClick={() => setTab(value)}
             className={`flex min-h-tap flex-1 items-center justify-center rounded-full text-sm transition ${
-              tab === value ? "bg-violet text-white" : "text-muted hover:text-white"
+              tab === value ? "bg-ink text-cream" : "text-muted hover:text-ink"
             }`}
           >
             {value === "form" ? "Formulario" : "Vista previa"}
@@ -252,8 +293,8 @@ function EditorForm({ initial, initialBaseline }: { initial: FormState; initialB
           className={tab === "form" ? "block" : "hidden lg:block"}
         >
           <section aria-labelledby="seccion-datos" className="space-y-5">
-            <h2 id="seccion-datos" className="text-3xl">
-              datos.
+            <h2 id="seccion-datos" className="title-2">
+              Datos
             </h2>
 
             <Field id="campo-name" label="Nombre de la clienta" error={errors.name}>
@@ -296,7 +337,7 @@ function EditorForm({ initial, initialBaseline }: { initial: FormState; initialB
                     <button
                       type="button"
                       onClick={() => edit({ photo: null })}
-                      className="flex min-h-tap items-center px-2 text-sm text-muted transition hover:text-white"
+                      className="flex min-h-tap items-center px-2 text-sm text-muted transition hover:text-ink"
                     >
                       Quitar
                     </button>
@@ -321,8 +362,8 @@ function EditorForm({ initial, initialBaseline }: { initial: FormState; initialB
           </section>
 
           <section aria-labelledby="seccion-piezas" className="mt-12">
-            <h2 id="seccion-piezas" className="text-3xl">
-              piezas.
+            <h2 id="seccion-piezas" className="title-2">
+              Piezas
             </h2>
             <p className="mt-2 text-sm text-muted">
               Entre {LIMITS.minPieces} y {LIMITS.maxPieces}, en el orden en que se muestran. Cada una lleva una imagen o
@@ -335,6 +376,7 @@ function EditorForm({ initial, initialBaseline }: { initial: FormState; initialB
                   piece={piece}
                   index={index}
                   total={form.pieces.length}
+                  niches={form.niches}
                   errors={errors}
                   onChange={(patch) => editPiece(piece.key, patch)}
                   onMove={(direction) => movePiece(index, direction)}
@@ -358,9 +400,52 @@ function EditorForm({ initial, initialBaseline }: { initial: FormState; initialB
             </button>
           </section>
 
+          <section aria-labelledby="seccion-servicios" className="mt-12">
+            <h2 id="seccion-servicios" className="title-2">
+              Servicios
+            </h2>
+            <p className="mt-2 text-sm text-muted">
+              Formas de colaborar con marcas, hasta {LIMITS.maxServices}. Sin servicios, esa sección no aparece.
+            </p>
+            {form.services.length > 0 && (
+              <ol className="mt-5 space-y-4">
+                {form.services.map((service, index) => (
+                  <ServiceEditor
+                    key={service.key}
+                    service={service}
+                    index={index}
+                    errors={errors}
+                    onChange={(patch) => editService(service.key, patch)}
+                    onRemove={() => removeService(service.key)}
+                  />
+                ))}
+              </ol>
+            )}
+            {errors.services && (
+              <p data-error-focus tabIndex={-1} className={`${errorText} mt-4 outline-none`}>
+                {errors.services}
+              </p>
+            )}
+            <div className="mt-4 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={addService}
+                disabled={form.services.length >= LIMITS.maxServices}
+                className={pillButton}
+              >
+                {form.services.length >= LIMITS.maxServices ? `Máximo ${LIMITS.maxServices} servicios` : "Agregar servicio"}
+              </button>
+              {form.services.length === 0 && (
+                <button type="button" onClick={applySuggestedServices} className={pillButton}>
+                  Usar sugerencias
+                </button>
+              )}
+            </div>
+          </section>
+
           <section aria-labelledby="seccion-contacto" className="mt-12 space-y-5">
-            <h2 id="seccion-contacto" className="text-3xl">
-              contacto.
+            <h2 id="seccion-contacto" className="title-2">
+              Contacto
             </h2>
             <p className="-mt-3 text-sm text-muted">Todo opcional. Aparece en el portafolio lo que llenes.</p>
             <div className="grid gap-5 sm:grid-cols-2">
@@ -389,13 +474,40 @@ function EditorForm({ initial, initialBaseline }: { initial: FormState; initialB
             </div>
           </section>
 
+          <section aria-labelledby="seccion-diseno" className="mt-12" data-testid="editor-design">
+            <h2 id="seccion-diseno" className="title-2">
+              Diseño
+            </h2>
+            <p className="mt-2 text-sm text-muted">
+              Plantilla y paleta: cambian cómo se ve, nunca los datos. La vista previa se actualiza al instante.
+            </p>
+            <p className={`${fieldLabel} mt-5`}>Plantilla</p>
+            <div className="mt-2">
+              <TemplatePicker
+                value={form.design.template}
+                onChange={(template) => setDesign({ template })}
+                palette={resolvePalette(form.design.palette, form.photo)}
+                name="editor-plantilla"
+              />
+            </div>
+            <p className={`${fieldLabel} mt-6`}>Paleta</p>
+            <div className="mt-2">
+              <PalettePicker
+                value={form.design.palette}
+                onChange={(palette) => setDesign({ palette })}
+                photo={form.photo}
+                name="editor-paleta"
+              />
+            </div>
+          </section>
+
           <div
             data-sticky-actions
-            className="sticky bottom-0 z-10 -mx-5 mt-10 border-t border-line bg-ink px-5 py-3 sm:-mx-8 sm:px-8 lg:mx-0 lg:rounded-card lg:border lg:px-5"
+            className="sticky bottom-0 z-10 -mx-5 mt-10 border-t border-line bg-sand px-5 py-3 sm:-mx-8 sm:px-8 lg:mx-0 lg:rounded-card lg:border lg:px-5"
           >
             <div aria-live="polite" className="min-h-5 text-sm">
-              {status.kind === "error" && <p className="text-fuchsia">{status.message}</p>}
-              {status.kind === "saved" && <p className="text-lilac">Cambios guardados. El portafolio ya los muestra.</p>}
+              {status.kind === "error" && <p className="text-accent-ink">{status.message}</p>}
+              {status.kind === "saved" && <p className="text-success">Cambios guardados. El portafolio ya los muestra.</p>}
               {status.kind !== "error" && status.kind !== "saved" && pending > 0 && (
                 <p className="text-muted">Esperando que terminen de subir las fotos.</p>
               )}
@@ -417,30 +529,36 @@ function EditorForm({ initial, initialBaseline }: { initial: FormState; initialB
           className={`${tab === "preview" ? "block" : "hidden lg:block"} lg:sticky lg:top-6`}
         >
           <p className="font-mono text-xs text-muted">vista previa</p>
-          {/* RF-04: la misma página en su versión general o en la de cada nicho, al instante. */}
-          <div role="group" aria-label="Versión del portafolio" className="mt-3 flex flex-wrap gap-2">
-            {[null, ...NICHES].map((niche) => {
-              const active = previewNiche === niche;
-              return (
-                <button
-                  key={niche ?? "general"}
-                  type="button"
-                  aria-pressed={active}
-                  data-niche={niche ?? undefined}
-                  onClick={() => setPreviewNiche(niche)}
-                  className={`flex min-h-tap items-center rounded-full border px-4 text-sm transition ${
-                    active
-                      ? "border-accent bg-accent/15 text-accent-soft"
-                      : "border-line text-muted hover:border-white hover:bg-white hover:text-ink"
-                  }`}
-                >
-                  {niche ? NICHE_LABELS[niche] : "General"}
-                </button>
-              );
-            })}
-          </div>
+          {/* Todo + cada nicho con piezas: lo mismo que filtran las píldoras del portafolio. */}
+          {previewNiches.length > 0 && (
+            <div role="group" aria-label="Ver el portafolio por nicho" className="mt-3 flex flex-wrap gap-2">
+              {[null, ...previewNiches].map((niche) => {
+                const active = activePreviewNiche === (niche?.slug ?? null);
+                return (
+                  <button
+                    key={niche?.slug ?? "todo"}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => setPreviewNiche(niche?.slug ?? null)}
+                    className={`flex min-h-tap items-center rounded-full border px-4 text-sm transition ${
+                      active
+                        ? "border-ink bg-highlight text-accent-ink"
+                        : "border-line text-muted hover:border-ink hover:bg-sand hover:text-ink"
+                    }`}
+                  >
+                    {niche?.label ?? "Todo"}
+                  </button>
+                );
+              })}
+            </div>
+          )}
           <div className="mt-3 overflow-hidden rounded-card border border-line lg:max-h-[calc(100dvh-9rem)] lg:overflow-y-auto">
-            <PublicPortfolio portfolio={preview} variant="preview" niche={previewNiche} />
+            <PublicPortfolio
+              portfolio={preview}
+              variant="preview"
+              niche={activePreviewNiche}
+              onNicheChange={setPreviewNiche}
+            />
           </div>
         </aside>
       </div>
@@ -461,5 +579,63 @@ function Field({ id, label, error, children }: { id: string; label: string; erro
         </p>
       )}
     </div>
+  );
+}
+
+function ServiceEditor({
+  service,
+  index,
+  errors,
+  onChange,
+  onRemove,
+}: {
+  service: ServiceDraft;
+  index: number;
+  errors: FieldErrors;
+  onChange: (patch: Partial<ServiceDraft>) => void;
+  onRemove: () => void;
+}) {
+  const id = (field: string) => `servicio-${service.key}-${field}`;
+  const titleError = errors[`services.${index}.title`];
+  const descriptionError = errors[`services.${index}.description`];
+  return (
+    <li className="panel p-4 sm:p-5">
+      <div className="flex items-center justify-between gap-3">
+        <p className="font-mono text-xs text-muted">servicio {String(index + 1).padStart(2, "0")}</p>
+        <button
+          type="button"
+          onClick={onRemove}
+          className="flex min-h-tap items-center px-2 text-sm text-muted transition hover:text-ink"
+        >
+          Quitar<span className="sr-only"> el servicio {index + 1}</span>
+        </button>
+      </div>
+      <div className="mt-2 space-y-4">
+        <Field id={id("title")} label="Nombre" error={titleError}>
+          <input
+            id={id("title")}
+            value={service.title}
+            onChange={(event) => onChange({ title: event.target.value })}
+            maxLength={LIMITS.serviceTitle}
+            placeholder="Videos UGC para anuncios"
+            aria-invalid={titleError ? true : undefined}
+            aria-describedby={titleError ? `${id("title")}-error` : undefined}
+            className={textInput}
+          />
+        </Field>
+        <Field id={id("description")} label="Descripción (opcional)" error={descriptionError}>
+          <textarea
+            id={id("description")}
+            rows={2}
+            value={service.description}
+            onChange={(event) => onChange({ description: event.target.value })}
+            maxLength={LIMITS.serviceDescription}
+            aria-invalid={descriptionError ? true : undefined}
+            aria-describedby={descriptionError ? `${id("description")}-error` : undefined}
+            className={`${textInput} py-3`}
+          />
+        </Field>
+      </div>
+    </li>
   );
 }

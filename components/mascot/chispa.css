@@ -1,0 +1,48 @@
+/*
+ * Chispa (v2 · M4-rev, dirección definitiva): animación sutil. El parpadeo aplasta cada ojo hasta una
+ * línea y vuelve; la sonrisa "respira" (se ensancha y se asienta despacio). Solo transform. Con
+ * "reducir movimiento", quieta.
+ */
+.mascot-eye,
+.mascot-mouth {
+  transform-box: fill-box;
+}
+.mascot-eye {
+  transform-origin: 50% 55%;
+}
+.mascot-mouth {
+  transform-origin: 50% 0%;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .mascot-eye {
+    animation: mascot-blink 5.6s ease-in-out infinite;
+  }
+  .mascot-eye + .mascot-eye {
+    animation-delay: 50ms;
+  }
+  .mascot-mouth {
+    animation: mascot-breathe 3.8s ease-in-out infinite;
+  }
+}
+@keyframes mascot-blink {
+  0%,
+  90%,
+  100% {
+    transform: scaleY(1);
+  }
+  93% {
+    transform: scaleY(0.08);
+  }
+  96% {
+    transform: scaleY(1);
+  }
+}
+@keyframes mascot-breathe {
+  0%,
+  100% {
+    transform: scale(1, 1);
+  }
+  50% {
+    transform: scale(1.045, 0.965);
+  }
+}

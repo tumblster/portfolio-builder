@@ -1,0 +1,56 @@
+/*
+ * Chispitas alrededor de una palabra (v2 · M4-rev): trazos hechos a mano en la tinta del sistema (no neón).
+ * Casi siempre quietas; cada tanto una parpadea como una chispa eléctrica, cada una a su ritmo. Solo opacidad y
+ * transform. Con "reducir movimiento" quedan quietas.
+ * Van en las esquinas de arriba, por encima de la altura de las minúsculas: nunca tocan la palabra de al lado ni
+ * se leen como tildes sobre sus letras.
+ */
+.electric-spark {
+  position: absolute;
+  overflow: visible;
+  pointer-events: none;
+}
+.electric-spark--a {
+  top: -0.04em;
+  left: -0.32em;
+  width: 0.22em;
+  height: 0.34em;
+  transform: rotate(-18deg);
+}
+.electric-spark--b {
+  top: -0.14em;
+  right: -0.34em;
+  width: 0.32em;
+  height: 0.32em;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .electric-spark {
+    animation: electric-flicker 5.4s ease-in-out infinite;
+  }
+  .electric-spark--b {
+    animation-delay: 1.8s;
+  }
+}
+@keyframes electric-flicker {
+  0%,
+  78%,
+  100% {
+    opacity: 1;
+    scale: 1;
+  }
+  80% {
+    opacity: 0.12;
+  }
+  82% {
+    opacity: 1;
+    scale: 1.16;
+  }
+  84% {
+    opacity: 0.3;
+  }
+  87% {
+    opacity: 1;
+    scale: 1;
+  }
+}

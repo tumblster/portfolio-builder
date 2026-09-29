@@ -1,0 +1,1008 @@
+/*
+ * Plantilla Creator — página pública del portafolio (v2 · M1).
+ * Lenguaje de la referencia Starlet (brief-diseno-referencias-framer.md), implementación propia:
+ *   una sola familia (DM Sans) con tracking apretado en titulares, crema + tinta + azul acero,
+ *   nav píldora de vidrio, secciones oscuras/azules como contenedores "inset" redondeados,
+ *   carrusel de piezas verticales, CTA monumental en beige.
+ *
+ * Contraste de textos ≥ 7:1 (regla del proyecto). Por eso algunos colores del brief se usan
+ * solo como decoración y tienen una versión oscura para texto:
+ *   #7FA6C6 acento (2,4:1 sobre crema)  → decoración; "Hablemos" usa #23445E (8,0:1 sobre beige)
+ *   #3E87AD servicios (blanco 4,0:1)    → fondo #1F5475 (blanco 8,1:1)
+ *   #2E9E8F teal (3,1:1)                → solo puntos decorativos
+ *
+ * Todo se adapta al ancho del CONTENEDOR (container queries), no de la ventana: la vista
+ * previa del editor, en una columna angosta, se ve igual que un celular.
+ * Tokens como variables: cada paleta (lib/palette/palettes.ts) las reemplaza desde el estilo en línea.
+ * Las otras 3 plantillas están en app/portfolio-templates.css.
+ */
+
+@layer components {
+  .pf {
+    --pf-bg: #faf7f2;
+    --pf-ink: #101b29;
+    --pf-muted: #3a4552; /* 9,1:1 sobre crema · 7,6:1 sobre beige */
+    --pf-line: color-mix(in srgb, var(--pf-ink) 12%, transparent);
+    --pf-accent: #7fa6c6; /* decorativo */
+    --pf-accent-soft: #a9c9e2; /* decorativo */
+    --pf-beige: #eae3d4;
+    --pf-display: #23445e;
+    --pf-work: #0b1b2e;
+    --pf-work-card: #16283d;
+    --pf-work-muted: #b7c7d6; /* 10:1 sobre navy */
+    --pf-services: #1f5475;
+    --pf-services-muted: #f1f6fa; /* 7,5:1 sobre el azul */
+    --pf-teal: var(--pf-accent); /* decorativo (en el M1 era teal fijo) */
+    --pf-live: #22c55e; /* decorativo */
+    --pf-radius-card: 20px;
+    --pf-radius-inset: 28px;
+    --pf-ease: cubic-bezier(0.22, 1, 0.36, 1);
+
+    position: relative;
+    isolation: isolate;
+    background: var(--pf-bg);
+    color: var(--pf-ink);
+    font-family: var(--font-dm-sans), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-optical-sizing: auto;
+    font-size: 17px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* La herramienta pone serif en h1–h3 (globals.css); aquí manda la plantilla. */
+  .pf :where(h1, h2, h3, h4) {
+    font-family: inherit;
+    font-weight: 600;
+    letter-spacing: -0.04em;
+    line-height: 1;
+    text-wrap: balance;
+  }
+  .pf :where(p) {
+    text-wrap: pretty;
+  }
+  .pf :where(a) {
+    color: inherit;
+    text-decoration: none;
+  }
+  .pf :where(ul) {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .pf :focus-visible {
+    outline: 2px solid var(--pf-ink);
+    outline-offset: 3px;
+  }
+  .pf :where(.pf-work, .pf-services) :focus-visible {
+    outline-color: #ffffff;
+  }
+
+  .pf-body {
+    container: pf / inline-size;
+  }
+
+  .pf-shell {
+    width: 100%;
+    max-width: 1240px;
+    margin-inline: auto;
+    padding-inline: 16px;
+  }
+
+  /* ── Nav píldora de vidrio ────────────────────────────────────── */
+  .pf-nav {
+    container: pfnav / inline-size;
+    position: fixed;
+    z-index: 30;
+    inset: 12px 12px auto;
+    display: flex;
+    justify-content: center;
+    pointer-events: none;
+  }
+  .pf[data-variant="preview"] .pf-nav {
+    position: relative;
+    inset: auto;
+    padding: 12px 12px 0;
+  }
+  .pf-nav__bar {
+    pointer-events: auto;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    max-width: 100%;
+    padding: 5px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--pf-bg) 86%, transparent);
+    border: 1px solid rgb(255 255 255 / 0.7);
+    box-shadow:
+      0 1px 0 rgb(255 255 255 / 0.6) inset,
+      0 10px 30px -12px color-mix(in srgb, var(--pf-ink) 28%, transparent);
+    -webkit-backdrop-filter: blur(18px) saturate(1.5);
+    backdrop-filter: blur(18px) saturate(1.5);
+  }
+  .pf-nav__brand {
+    display: none;
+    align-items: center;
+    gap: 8px;
+    min-height: 40px;
+    padding: 0 12px 0 4px;
+    border-radius: 999px;
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    white-space: nowrap;
+  }
+  .pf-nav__bar[data-solo] .pf-nav__brand {
+    display: inline-flex;
+  }
+  .pf-nav__cta {
+    display: none;
+    align-items: center;
+    min-height: 40px;
+    padding: 0 18px;
+    border-radius: 999px;
+    background: var(--pf-ink);
+    color: #ffffff;
+    font-size: 15px;
+    font-weight: 600;
+    white-space: nowrap;
+    transition: background-color 250ms var(--pf-ease);
+  }
+  .pf-nav__bar[data-solo] .pf-nav__cta {
+    display: inline-flex;
+  }
+  .pf-nav__cta:hover {
+    background: #000000;
+  }
+  @container pfnav (min-width: 30rem) {
+    .pf-pill {
+      padding: 0 16px;
+    }
+  }
+  @container pfnav (min-width: 48rem) {
+    .pf-nav__brand,
+    .pf-nav__cta {
+      display: inline-flex;
+    }
+  }
+
+  .pf-pills {
+    position: relative;
+    display: flex;
+    gap: 2px;
+    min-width: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+    overscroll-behavior-x: contain;
+  }
+  .pf-pills::-webkit-scrollbar {
+    display: none;
+  }
+  /* Si hay más píldoras de las que caben, el borde se desvanece hacia donde queda más.
+   * data-overflow lo pone niche-filter.tsx solo con un desborde real (no por fracciones de píxel). */
+  @supports (animation-timeline: scroll()) {
+    .pf-pills[data-overflow] {
+      --pf-fade-start: 0px;
+      --pf-fade-end: 24px;
+      -webkit-mask-image: linear-gradient(to right, transparent, #000 var(--pf-fade-start), #000 calc(100% - var(--pf-fade-end)), transparent);
+      mask-image: linear-gradient(to right, transparent, #000 var(--pf-fade-start), #000 calc(100% - var(--pf-fade-end)), transparent);
+      animation: pf-pills-edges linear both;
+      animation-timeline: scroll(self inline);
+    }
+  }
+  .pf-pill {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    min-height: 40px;
+    padding: 0 12px; /* en el celular caben más nichos; 16 px desde 30rem */
+    border-radius: 999px;
+    font-size: 15px;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    white-space: nowrap;
+    color: var(--pf-ink);
+    transition:
+      background-color 250ms var(--pf-ease),
+      color 250ms var(--pf-ease);
+  }
+  .pf-pill::after {
+    /* área táctil de 44 px aunque la píldora mida 40 */
+    content: "";
+    position: absolute;
+    inset: -2px 0;
+  }
+  .pf-pill:hover {
+    background: color-mix(in srgb, var(--pf-ink) 7%, transparent);
+  }
+  .pf-pill[aria-current="page"] {
+    background: var(--pf-ink);
+    color: #ffffff;
+  }
+
+  .pf-avatar {
+    position: relative;
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    border-radius: 999px;
+    background: var(--pf-beige);
+    color: var(--pf-display);
+    font-weight: 600;
+  }
+  .pf-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  /* ── Hero ─────────────────────────────────────────────────────── */
+  .pf-hero {
+    padding-top: 84px;
+    padding-bottom: 56px;
+  }
+  .pf[data-variant="preview"] .pf-hero {
+    padding-top: 20px;
+  }
+  .pf-hero__grid {
+    display: grid;
+    gap: 28px;
+  }
+  .pf-hero__media {
+    position: relative;
+    margin: 0;
+  }
+  .pf-hero__photo {
+    position: relative;
+    aspect-ratio: 5 / 4; /* en el celular deja ver nombre, propuesta y botones sin hacer scroll */
+    overflow: hidden;
+    border-radius: 28px;
+    background: var(--pf-beige);
+  }
+  .pf-hero__photo img {
+    object-fit: cover;
+    object-position: 50% 30%; /* las caras suelen estar en el tercio de arriba */
+  }
+  .pf-hero__avatar {
+    margin-bottom: 20px;
+  }
+
+  .pf-glass {
+    position: absolute;
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px 8px 8px;
+    border-radius: 20px;
+    background: rgb(255 255 255 / 0.88);
+    border: 1px solid rgb(255 255 255 / 0.9);
+    box-shadow: 0 16px 40px -18px color-mix(in srgb, var(--pf-ink) 45%, transparent);
+    -webkit-backdrop-filter: blur(16px) saturate(1.4);
+    backdrop-filter: blur(16px) saturate(1.4);
+  }
+  .pf-glass__who {
+    display: grid;
+    min-width: 0;
+    flex: 1;
+    line-height: 1.25;
+  }
+  .pf-glass__who strong {
+    overflow: hidden;
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .pf-glass__who span {
+    overflow: hidden;
+    color: var(--pf-muted);
+    font-size: 13px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .pf-live {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 6px;
+    min-height: 28px;
+    padding: 0 10px;
+    border-radius: 999px;
+    background: #ffffff;
+    border: 1px solid var(--pf-line);
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .pf-live::before {
+    content: "";
+    width: 7px;
+    height: 7px;
+    border-radius: 999px;
+    background: var(--pf-live);
+    box-shadow: 0 0 0 3px rgb(34 197 94 / 0.22);
+  }
+
+  .pf-hero__copy {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .pf-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    color: var(--pf-muted);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .pf-eyebrow__star {
+    color: var(--pf-accent);
+    font-size: 14px;
+  }
+  .pf-h1 {
+    margin: 14px 0 0;
+    font-size: 40px;
+    line-height: 1.02;
+    word-break: break-word;
+  }
+  .pf-lead {
+    margin: 16px 0 0;
+    max-width: 34ch;
+    font-size: 20px;
+    font-weight: 500;
+    letter-spacing: -0.02em;
+    line-height: 1.35;
+  }
+  .pf-bio {
+    display: -webkit-box;
+    margin: 12px 0 0;
+    max-width: 52ch;
+    overflow: hidden;
+    color: var(--pf-muted);
+    font-size: 16px;
+    white-space: pre-line;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+  }
+  .pf-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 24px;
+  }
+  .pf-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 48px;
+    padding: 0 22px;
+    border-radius: 999px;
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    white-space: nowrap;
+    transition:
+      background-color 250ms var(--pf-ease),
+      border-color 250ms var(--pf-ease),
+      transform 250ms var(--pf-ease);
+  }
+  .pf-btn--solid {
+    background: var(--pf-ink);
+    color: #ffffff;
+  }
+  .pf-btn--solid:hover {
+    background: #000000;
+  }
+  .pf-btn--ghost {
+    background: rgb(255 255 255 / 0.6);
+    border: 1px solid var(--pf-line);
+    color: var(--pf-ink);
+  }
+  .pf-btn--ghost:hover {
+    background: color-mix(in srgb, var(--pf-ink) 8%, transparent);
+    border-color: color-mix(in srgb, var(--pf-ink) 20%, transparent);
+  }
+
+  /* ── Tira de stats ────────────────────────────────────────────── */
+  .pf-stats {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin: 40px 0 0;
+    border-top: 1px solid var(--pf-line);
+  }
+  .pf-stat {
+    display: flex;
+    flex-direction: column-reverse;
+    gap: 6px;
+    padding: 20px 12px 0 0;
+  }
+  .pf-stat dd {
+    margin: 0;
+    white-space: nowrap;
+    font-size: 34px;
+    font-weight: 600;
+    letter-spacing: -0.04em;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .pf-stat dt {
+    display: flex;
+    gap: 8px;
+    color: var(--pf-muted);
+    font-size: 14px;
+    line-height: 1.35;
+  }
+  /* Engagement Rate: la métrica principal, primera y más grande, con la base de su cálculo. */
+  .pf-stat--er {
+    grid-column: 1 / -1;
+    flex-direction: column;
+  }
+  .pf-stat--er > dd:first-of-type {
+    order: 0;
+    font-size: 56px;
+  }
+  .pf-stat--er > dt {
+    order: 1;
+    color: var(--pf-ink);
+    font-weight: 600;
+  }
+  .pf-stat .pf-stat__basis {
+    order: 2;
+    white-space: normal;
+    color: var(--pf-muted);
+    font-size: 13px;
+    font-weight: 400;
+    letter-spacing: 0;
+    line-height: 1.4;
+  }
+  .pf-stat dt::before {
+    content: "";
+    flex-shrink: 0;
+    width: 6px;
+    height: 6px;
+    margin-top: 0.45em;
+    border-radius: 999px;
+    background: var(--pf-teal);
+  }
+
+  /* ── Contenedores inset (trabajo, servicios, contacto) ────────── */
+  .pf-inset {
+    max-width: 1280px;
+    margin: 0 8px 12px;
+    border-radius: var(--pf-radius-inset);
+    padding: 56px 0;
+  }
+  .pf-section-head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px;
+    padding-inline: 20px;
+  }
+  .pf-h2 {
+    margin: 12px 0 0;
+    font-size: 34px;
+    line-height: 0.98;
+  }
+  .pf-eyebrow--dark {
+    color: var(--pf-work-muted);
+  }
+  .pf-eyebrow--dark .pf-eyebrow__star {
+    color: var(--pf-accent-soft);
+  }
+
+  /* ── Trabajo seleccionado ─────────────────────────────────────── */
+  .pf-work {
+    background: var(--pf-work);
+    color: #ffffff;
+  }
+  .pf-carousel {
+    position: relative;
+    margin-top: 28px;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x mandatory;
+    scroll-padding-inline: 20px;
+    scrollbar-width: none;
+  }
+  .pf-carousel::-webkit-scrollbar {
+    display: none;
+  }
+  .pf-carousel__track {
+    display: flex;
+    gap: 14px;
+    width: max-content;
+    padding-inline: 20px;
+  }
+  .pf-card {
+    width: min(62cqw, 260px);
+    scroll-snap-align: start;
+  }
+  .pf-card__link {
+    display: block;
+    border-radius: var(--pf-radius-card);
+  }
+  .pf-card__media {
+    position: relative;
+    aspect-ratio: 9 / 16;
+    overflow: hidden;
+    border-radius: var(--pf-radius-card);
+    background: var(--pf-work-card);
+    transition:
+      transform 400ms var(--pf-ease),
+      box-shadow 400ms var(--pf-ease);
+  }
+  .pf-card__media img {
+    object-fit: cover;
+  }
+  .pf-card__placeholder {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    color: var(--pf-work-muted);
+    font-size: 14px;
+    text-align: center;
+  }
+  .pf-badge {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 28px;
+    padding: 0 10px 0 8px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--pf-work) 80%, transparent);
+    color: #ffffff;
+    font-size: 12px;
+    font-weight: 600;
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+  }
+  .pf-play {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 56px;
+    height: 56px;
+    border-radius: 999px;
+    background: rgb(255 255 255 / 0.9);
+    color: var(--pf-ink);
+    box-shadow: 0 10px 30px -10px rgb(0 0 0 / 0.5);
+    transform: translate(-50%, -50%);
+    transition: transform 300ms var(--pf-ease);
+  }
+  .pf-card__title {
+    margin: 14px 0 0;
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1.3;
+  }
+  .pf-card__meta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 4px 0 0;
+    color: var(--pf-work-muted);
+    font-size: 14px;
+  }
+  @media (hover: hover) {
+    .pf-card__link:hover .pf-card__media {
+      transform: translateY(-6px);
+      box-shadow: 0 24px 40px -20px rgb(0 0 0 / 0.7);
+    }
+    .pf-card__link:hover .pf-play {
+      transform: translate(-50%, -50%) scale(1.06);
+    }
+  }
+
+  .pf-arrows {
+    display: none;
+    gap: 8px;
+  }
+  .pf-arrow {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 48px;
+    height: 48px;
+    border-radius: 999px;
+    border: 1px solid rgb(255 255 255 / 0.22);
+    color: #ffffff;
+    transition:
+      background-color 250ms var(--pf-ease),
+      opacity 250ms var(--pf-ease);
+  }
+  .pf-arrow:hover:not(:disabled) {
+    background: rgb(255 255 255 / 0.12);
+  }
+  .pf-arrow:disabled {
+    opacity: 0.35;
+    cursor: default;
+  }
+
+  /* ── Servicios ────────────────────────────────────────────────── */
+  .pf-services {
+    background: var(--pf-services);
+    color: #ffffff;
+  }
+  .pf-services .pf-eyebrow--dark {
+    color: var(--pf-services-muted);
+  }
+  .pf-services__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr));
+    gap: 12px;
+    margin-top: 28px;
+    padding-inline: 20px;
+  }
+  .pf-service {
+    display: flex;
+    flex-direction: column;
+    padding: 24px;
+    border-radius: var(--pf-radius-card);
+    background: rgb(0 0 0 / 0.16);
+    border: 1px solid rgb(255 255 255 / 0.16);
+  }
+  .pf-service__icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 999px;
+    background: rgb(0 0 0 / 0.24);
+    color: #ffffff; /* ≥ 10:1: el celeste de la referencia no llegaba a 7:1 sobre el azul */
+    font-size: 15px;
+    font-weight: 600;
+  }
+  .pf-service__title {
+    margin: 28px 0 0;
+    font-size: 22px;
+    line-height: 1.1;
+    letter-spacing: -0.03em;
+  }
+  .pf-service__text {
+    margin: 10px 0 0;
+    color: var(--pf-services-muted);
+    font-size: 16px;
+    line-height: 1.5;
+  }
+
+  /* ── Contacto: CTA monumental ─────────────────────────────────── */
+  .pf-contact {
+    padding: 56px 20px;
+    background: var(--pf-beige);
+    color: var(--pf-ink);
+  }
+  .pf-hello {
+    margin: 0;
+    color: var(--pf-display);
+    font-size: clamp(48px, 17cqw, 124px);
+    line-height: 0.9;
+  }
+  .pf-contact__lead {
+    margin: 20px 0 0;
+    max-width: 40ch;
+    color: var(--pf-muted);
+    font-size: 18px;
+  }
+  .pf-mail {
+    display: inline-block;
+    margin-top: 28px;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    font-size: 24px;
+    font-weight: 600;
+    letter-spacing: -0.03em;
+    text-decoration: underline;
+    text-decoration-color: color-mix(in srgb, var(--pf-ink) 25%, transparent);
+    text-decoration-thickness: 2px;
+    text-underline-offset: 6px;
+    transition: text-decoration-color 250ms var(--pf-ease);
+  }
+  .pf-mail:hover {
+    text-decoration-color: var(--pf-ink);
+  }
+  .pf-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 28px;
+  }
+  .pf-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 48px;
+    padding: 0 20px;
+    border-radius: 999px;
+    border: 1.5px solid color-mix(in srgb, var(--pf-ink) 22%, transparent);
+    font-size: 16px;
+    font-weight: 600;
+    transition:
+      background-color 250ms var(--pf-ease),
+      border-color 250ms var(--pf-ease);
+  }
+  .pf-link:hover {
+    background: color-mix(in srgb, var(--pf-ink) 7%, transparent);
+    border-color: color-mix(in srgb, var(--pf-ink) 40%, transparent);
+  }
+  .pf-link--solid {
+    background: var(--pf-ink);
+    border-color: var(--pf-ink);
+    color: #ffffff;
+  }
+  .pf-link--solid:hover {
+    background: #000000;
+    border-color: #000000;
+  }
+
+  /* ── Footer mínimo ────────────────────────────────────────────── */
+  .pf-footer {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 8px 24px;
+    padding-top: 28px;
+    padding-bottom: 36px;
+    color: var(--pf-muted);
+    font-size: 14px;
+  }
+  .pf-footer p {
+    margin: 0;
+  }
+
+  /* ── Estado de error (app/p/[slug]/error.tsx) ─────────────────── */
+  .pf-state {
+    min-height: 100dvh;
+    padding-top: 96px;
+    padding-bottom: 96px;
+  }
+  .pf-state .pf-h1 {
+    max-width: 16ch;
+  }
+  .pf-state button {
+    cursor: pointer;
+    border: 0;
+    font: inherit;
+  }
+
+  /* ── Tablet ───────────────────────────────────────────────────── */
+  @container pf (min-width: 40rem) {
+    .pf-shell {
+      padding-inline: 32px;
+    }
+    .pf-hero {
+      padding-top: 112px;
+      padding-bottom: 72px;
+    }
+    .pf-hero__photo {
+      aspect-ratio: 4 / 3;
+    }
+    .pf-h1 {
+      font-size: 52px;
+    }
+    .pf-lead {
+      font-size: 22px;
+    }
+    .pf-stats {
+      grid-template-columns: repeat(var(--pf-stat-count, 4), minmax(0, 1fr));
+    }
+    .pf-stats--er {
+      grid-template-columns: minmax(0, 1.5fr) repeat(var(--pf-stat-count, 3), minmax(0, 1fr));
+    }
+    .pf-stat--er {
+      grid-column: auto;
+    }
+    .pf-stat dd {
+      font-size: 40px;
+    }
+    .pf-inset {
+      margin: 0 16px 16px;
+      padding: 88px 0;
+      --pf-radius-inset: 36px;
+    }
+    .pf-section-head,
+    .pf-services__grid {
+      padding-inline: 40px;
+    }
+    .pf-carousel {
+      scroll-padding-inline: 40px;
+    }
+    .pf-carousel__track {
+      gap: 20px;
+      padding-inline: 40px;
+    }
+    .pf-card {
+      width: 240px;
+    }
+    .pf-h2 {
+      font-size: 44px;
+    }
+    .pf-contact {
+      padding: 88px 40px;
+    }
+    .pf-mail {
+      font-size: 30px;
+    }
+    .pf-footer {
+      padding-top: 36px;
+    }
+    .pf-arrows {
+      display: flex;
+    }
+  }
+
+  /* ── Escritorio ───────────────────────────────────────────────── */
+  @container pf (min-width: 64rem) {
+    .pf-hero__grid {
+      grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+      align-items: center;
+      gap: 64px;
+    }
+    .pf-hero__grid[data-solo] {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .pf-hero__grid[data-solo] .pf-h1 {
+      font-size: 72px;
+    }
+    .pf-hero__media {
+      order: 2;
+    }
+    .pf-hero__photo {
+      aspect-ratio: 4 / 5;
+      max-height: 640px;
+      border-radius: 36px;
+    }
+    .pf-glass {
+      left: 20px;
+      right: auto;
+      bottom: 20px;
+      min-width: 300px;
+      max-width: calc(100% - 40px);
+    }
+    .pf-h1 {
+      font-size: 64px;
+    }
+    .pf-lead {
+      font-size: 24px;
+    }
+    .pf-stats {
+      margin-top: 56px;
+    }
+    .pf-stat dd {
+      font-size: 44px;
+    }
+    .pf-inset {
+      margin-inline: auto;
+      padding: 128px 0;
+      --pf-radius-inset: 40px;
+      width: calc(100% - 48px);
+    }
+    .pf-section-head,
+    .pf-services__grid {
+      padding-inline: 64px;
+    }
+    .pf-carousel {
+      scroll-padding-inline: 64px;
+    }
+    .pf-carousel__track {
+      padding-inline: 64px;
+    }
+    .pf-card {
+      width: 264px;
+    }
+    .pf-h2 {
+      font-size: 52px;
+      line-height: 0.92;
+    }
+    .pf-service {
+      min-height: 260px;
+      padding: 28px;
+    }
+    .pf-contact {
+      padding: 128px 64px;
+    }
+    .pf-footer {
+      padding-bottom: 48px;
+    }
+  }
+
+  /* ── Movimiento: un solo gesto de entrada y reveals por scroll, sin JS ── */
+  @keyframes pf-pills-edges {
+    from {
+      --pf-fade-start: 0px;
+      --pf-fade-end: 24px;
+    }
+    10% {
+      --pf-fade-start: 24px;
+    }
+    90% {
+      --pf-fade-end: 24px;
+    }
+    to {
+      --pf-fade-start: 24px;
+      --pf-fade-end: 0px;
+    }
+  }
+  @keyframes pf-settle {
+    from {
+      transform: scale(1.06);
+    }
+    to {
+      transform: scale(1);
+    }
+  }
+  @keyframes pf-rise {
+    from {
+      opacity: 0;
+      transform: translateY(28px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .pf-hero__photo img {
+      animation: pf-settle 1.1s var(--pf-ease) both;
+    }
+    @supports (animation-timeline: view()) {
+      /* Sin "backwards": antes de asomar, la sección se ve normal. Si la línea de tiempo no
+       * avanza (capturas, vistas previas de links, impresión), nada queda invisible. */
+      .pf-reveal {
+        animation: pf-rise linear forwards;
+        animation-timeline: view();
+        animation-range: entry 0% entry 35%;
+      }
+    }
+  }
+}
+
+/* Bordes desvanecidos de las píldoras: variables animables (ver .pf-pills). */
+@property --pf-fade-start {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+@property --pf-fade-end {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+/* ── Zona pública: sin el fondo índigo de la herramienta ────────── */
+html:has([data-site="portfolio"]) {
+  background-color: #faf7f2;
+  color: #101b29;
+  color-scheme: light;
+  scroll-padding-top: 88px;
+}
+html:has([data-site="portfolio"]) body::before {
+  display: none;
+}
+@media (prefers-reduced-motion: no-preference) {
+  html:has([data-site="portfolio"]) {
+    scroll-behavior: smooth;
+  }
+}

@@ -3,13 +3,19 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { IMPORT_STEPS, MANUAL_PREFILL_KEY, type ImportEvent, type ImportStep } from "@/lib/import/events";
+import {
+  IMPORT_STEPS,
+  MANUAL_PREFILL_KEY,
+  type DraftPreview,
+  type ImportEvent,
+  type ImportResult,
+  type ImportStep,
+} from "@/lib/import/events";
 import { readNdjson } from "@/lib/import/ndjson";
 import { parseInstagramUsername } from "@/lib/instagram/username";
-import { Avatar } from "./avatar";
-import { CopyButton } from "./copy-button";
-import { PieceRow } from "./piece-row";
+import { ImportReview } from "./import-review";
 import { PrefillSummary } from "./prefill-summary";
+import { ReadyDialog } from "./ready-dialog";
 import { errorText, fieldLabel, pillButton, primaryButton, textInput } from "./ui";
 
 /*
@@ -17,23 +23,27 @@ import { errorText, fieldLabel, pillButton, primaryButton, textInput } from "./u
  * Estados: vacío (formulario), cargando (pasos reales que manda el servidor),
  * error, éxito, y "a mano" si el perfil es privado o tiene menos de 3 publicaciones.
  * El atajo "Prefiero llenarlo manual" está siempre a la vista antes de importar.
+ *
+ * v2 · M1: el éxito es un modal ("Portafolio listo") encima del formulario, con el link, copiar,
+ * abrir, editar y crear otro. Al cerrarlo queda una línea para volver a abrirlo.
+ * v2 · M2: nada se genera a ciegas. Al terminar la importación se confirma lo que sugirió la IA
+ * (nichos) y se eligen plantilla y paleta (import-review.tsx); recién ahí se genera.
  */
 
-type DoneEvent = Extract<ImportEvent, { type: "done" }>;
 type ManualEvent = Extract<ImportEvent, { type: "manual" }>;
 
 type State =
   | { phase: "idle" }
   | { phase: "running"; step: ImportStep; startedAt: number }
   | { phase: "error"; message: string }
-  | { phase: "done"; result: DoneEvent }
+  | { phase: "review"; draft: DraftPreview }
+  | { phase: "done"; result: ImportResult; dialogOpen: boolean }
   | { phase: "manual"; result: ManualEvent };
 
 const STEP_LABELS: Record<ImportStep, string> = {
   scrape: "Leemos el perfil de Instagram",
   images: "Copiamos sus fotos",
-  ai: "La IA escribe la propuesta de valor y los títulos",
-  save: "Generamos el link",
+  ai: "La IA detecta sus nichos y escribe los textos",
 };
 
 const CONNECTION_LOST = "Se cortó la conexión antes de terminar. Revisa tu internet e intenta de nuevo.";
@@ -68,7 +78,7 @@ async function runImport(instagram: string, onStep: (step: ImportStep) => void):
     for await (const event of readNdjson<ImportEvent>(response.body)) {
       if (event.type === "ping") continue; // latido: la conexión sigue viva
       if (event.type === "step") onStep(event.step);
-      else if (event.type === "done") return { kind: "state", state: { phase: "done", result: event } };
+      else if (event.type === "draft") return { kind: "state", state: { phase: "review", draft: event.draft } };
       else if (event.type === "manual") return { kind: "state", state: { phase: "manual", result: event } };
       else return { kind: "state", state: { phase: "error", message: event.message } };
     }
@@ -88,9 +98,10 @@ export function ImportScreen() {
   const focusInputOnIdle = useRef(false);
   const running = state.phase === "running";
 
-  // Al terminar, el foco (y la vista) van al resultado; al volver a empezar, al campo.
+  // Si no se pudo armar solo, el foco (y la vista) van al aviso; al volver a empezar, al campo.
+  // (El modal de éxito maneja su propio foco.)
   useEffect(() => {
-    if (state.phase === "done" || state.phase === "manual") outcomeRef.current?.focus();
+    if (state.phase === "manual") outcomeRef.current?.focus();
     if (state.phase === "idle" && focusInputOnIdle.current) {
       focusInputOnIdle.current = false;
       inputRef.current?.focus();
@@ -149,22 +160,42 @@ export function ImportScreen() {
     }
   }
 
+  const setDialogOpen = (dialogOpen: boolean) =>
+    setState((current) => (current.phase === "done" ? { ...current, dialogOpen } : current));
+
   return (
     <div className="mt-10">
-      {state.phase === "done" || state.phase === "manual" ? (
+      {state.phase === "review" ? (
+        <ImportReview
+          draft={state.draft}
+          onGenerated={(result) => setState({ phase: "done", result, dialogOpen: true })}
+          onStartOver={startOver}
+          onUnauthorized={() => router.replace("/acceso")}
+        />
+      ) : state.phase === "manual" ? (
         <div ref={outcomeRef} tabIndex={-1} className="outline-none">
-          {state.phase === "done" ? (
-            <Result result={state.result} onStartOver={startOver} />
-          ) : (
-            <ManualNotice
-              result={state.result}
-              onContinue={() => continueManually(state.result)}
-              onStartOver={startOver}
-            />
-          )}
+          <ManualNotice result={state.result} onContinue={() => continueManually(state.result)} onStartOver={startOver} />
         </div>
       ) : (
         <>
+          {state.phase === "done" && (
+            <div className="panel mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 px-5 py-3">
+              <p className="min-w-0 flex-1">
+                <span aria-hidden="true" className="text-success">
+                  ✓{" "}
+                </span>
+                Portafolio de {state.result.resolved.name} listo
+              </p>
+              <button
+                type="button"
+                onClick={() => setDialogOpen(true)}
+                className="min-h-tap text-success underline decoration-accent underline-offset-4 hover:decoration-accent"
+              >
+                Ver link
+              </button>
+            </div>
+          )}
+
           <form onSubmit={submit} noValidate className="panel p-5 sm:p-6">
             <label htmlFor="instagram" className={fieldLabel}>
               Link o usuario de Instagram
@@ -215,6 +246,15 @@ export function ImportScreen() {
           {running && (
             <p className="mt-4 text-sm text-muted">Suele tomar entre 30 y 60 segundos. No cierres esta pestaña.</p>
           )}
+
+          {state.phase === "done" && state.dialogOpen && (
+            <ReadyDialog
+              result={state.result}
+              onClose={() => setDialogOpen(false)}
+              onStartOver={startOver}
+              onResultChange={(result) => setState((current) => (current.phase === "done" ? { ...current, result } : current))}
+            />
+          )}
         </>
       )}
 
@@ -238,11 +278,11 @@ function Steps({ state }: { state: State }) {
             className="flex min-h-tap items-center gap-4 border-b border-line py-3"
           >
             <span className="w-6 shrink-0 font-mono text-xs text-muted">{String(index + 1).padStart(2, "0")}</span>
-            <span className={`min-w-0 ${status === "active" || status === "done" ? "text-white" : "text-muted"}`}>
+            <span className={`min-w-0 ${status === "active" || status === "done" ? "text-ink" : "text-muted"}`}>
               {STEP_LABELS[step]}
             </span>
             <span className="ml-auto shrink-0 font-mono text-xs">
-              {status === "done" && <span className="text-lilac">listo</span>}
+              {status === "done" && <span className="text-success">listo</span>}
               {status === "active" && state.phase === "running" && <Elapsed since={state.startedAt} />}
             </span>
           </li>
@@ -261,70 +301,9 @@ function Elapsed({ since }: { since: number }) {
   }, []);
   const seconds = Math.max(0, Math.floor((now - since) / 1000));
   return (
-    <span className="text-lilac tabular-nums">
+    <span className="text-success tabular-nums">
       {String(Math.floor(seconds / 60)).padStart(2, "0")}:{String(seconds % 60).padStart(2, "0")}
     </span>
-  );
-}
-
-function Result({ result, onStartOver }: { result: DoneEvent; onStartOver: () => void }) {
-  const { resolved, url, username, aiWritten, warnings } = result;
-  return (
-    <section aria-labelledby="resultado" className="panel p-5 sm:p-6">
-      <h2 id="resultado" className="text-4xl">
-        portafolio listo.
-      </h2>
-
-      <div className="mt-6 flex items-center gap-4">
-        <Avatar photo={resolved.photo} name={resolved.name} />
-        <div className="min-w-0">
-          <p className="truncate text-lg">{resolved.name}</p>
-          <p className="truncate text-sm text-muted">@{username}</p>
-        </div>
-      </div>
-
-      {resolved.valueProp && <p className="mt-5 font-serif text-2xl leading-snug">{resolved.valueProp}</p>}
-      {aiWritten && <p className="mt-2 text-sm text-muted">Propuesta de valor, títulos y nichos sugeridos por la IA.</p>}
-
-      <div className="mt-6">
-        <p className={fieldLabel}>Link del portafolio</p>
-        <p className="mt-1 font-mono text-sm break-all text-lilac select-all">{url}</p>
-      </div>
-
-      <div className="mt-5 flex flex-wrap gap-2">
-        <CopyButton text={url} className={primaryButton} what="el link del portafolio" />
-        <a href={url} target="_blank" rel="noopener noreferrer" className={pillButton}>
-          Abrir portafolio<span className="sr-only"> (se abre en otra pestaña)</span>
-        </a>
-        <Link href={`/editar/${result.slug}`} className={pillButton}>
-          Editar
-        </Link>
-        <button type="button" onClick={onStartOver} className={pillButton}>
-          Crear otro
-        </button>
-      </div>
-
-      {warnings.length > 0 && (
-        <ul className="mt-5 space-y-1 text-sm text-amber">
-          {warnings.map((warning) => (
-            <li key={warning}>{warning}</li>
-          ))}
-        </ul>
-      )}
-
-      <h3 className="mt-8 font-sans text-sm text-muted">{resolved.pieces.length} piezas, en este orden</h3>
-      <ul className="mt-1">
-        {resolved.pieces.map((piece) => (
-          <PieceRow
-            key={piece.id}
-            title={piece.title}
-            image={piece.image}
-            isVideo={piece.video !== null}
-            niche={piece.niche}
-          />
-        ))}
-      </ul>
-    </section>
   );
 }
 
@@ -339,8 +318,8 @@ function ManualNotice({
 }) {
   return (
     <section role="alert" aria-labelledby="a-mano" className="panel p-5 sm:p-6">
-      <h2 id="a-mano" className="text-4xl">
-        {result.reason === "private_profile" ? "cuenta privada." : "faltan publicaciones."}
+      <h2 id="a-mano" className="title-2">
+        {result.reason === "private_profile" ? "Cuenta privada" : "Faltan publicaciones"}
       </h2>
       <p className="mt-4 text-lg">{result.message}</p>
       <PrefillSummary prefill={result.prefill} />
