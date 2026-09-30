@@ -366,7 +366,12 @@ export function ImportReview({ draft, onGenerated, onStartOver, onUnauthorized }
             <p className="mt-1 text-sm text-muted">Cada pieza aparece en &quot;Todo&quot; y en la píldora de su nicho.</p>
             <ul className="mt-3 border-t border-line">
               {draft.pieces.map((piece) => (
-                <li key={piece.id} className="flex items-center gap-3 border-b border-line py-3">
+                // Menos de 26 rem: miniatura + título arriba y el selector a lo ancho abajo (r3 · 8), así el título
+                // nunca queda estrujado entre la miniatura y el selector.
+                <li
+                  key={piece.id}
+                  className="grid grid-cols-[3rem_minmax(0,1fr)] items-center gap-x-3 gap-y-2 border-b border-line py-3 min-[26rem]:grid-cols-[3rem_minmax(0,1fr)_9rem] sm:grid-cols-[3rem_minmax(0,1fr)_11rem]"
+                >
                   {piece.image ? (
                     <Image src={piece.image.url} alt="" width={48} height={48} className="size-12 shrink-0 rounded-lg object-cover" />
                   ) : (
@@ -379,7 +384,7 @@ export function ImportReview({ draft, onGenerated, onStartOver, onUnauthorized }
                     id={`${uid}-p-${piece.id}`}
                     value={rowOf(piece.id) ?? ""}
                     onChange={(event) => setPieceRows((current) => ({ ...current, [piece.id]: event.target.value || null }))}
-                    className={`${compactSelect} w-36 shrink-0 sm:w-44`}
+                    className={`${compactSelect} col-span-2 w-full min-[26rem]:col-span-1`}
                   >
                     <option value="">Solo en Todo</option>
                     {active.map((row) => (
