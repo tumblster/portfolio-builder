@@ -1136,6 +1136,36 @@ try {
       policy.confirmRequestTimeout(0, policy.CONFIRM_DEADLINE_MS) === 0 && policy.confirmRequestTimeout(0, 0) <= policy.CONFIRM_DEADLINE_MS,
       "Cliente: ninguna petición colgada pasa el plazo global (se corta)",
     );
+
+    // ── Spec 10.1: round-trip de escritura condicional en el almacenamiento del servidor (disco en CI; Blob si BASE
+    //    apunta a un deployment): leer → escribir con el etag leído → leer → el etag viejo se rechaza. ──
+    const roundtrip = await call("GET", "/api/import/health?roundtrip=1");
+    const rt = roundtrip.data?.checks?.roundtrip;
+    check(
+      roundtrip.status === 200 && rt?.ok === true && rt.steps.read && rt.steps.conditionalWrite && rt.steps.readBack && rt.steps.staleRejected,
+      `Almacenamiento (${rt?.driver}): leer → escritura condicional → leer funciona y un etag viejo se rechaza`,
+      roundtrip.data?.checks,
+    );
+    if (roundtrip.data?.checks?.blobEtags) {
+      const blobEtags = roundtrip.data.checks.blobEtags;
+      check(blobEtags.writeWithHeadEtag === "ok" && blobEtags.staleWriteRejected, "Blob: ifMatch con el etag canónico (head) funciona", blobEtags);
+    }
+
+    // ── Spec 10.2: en "De tu perfil" TODA pieza abre un visor (la misma regla que usa la grilla). ──
+    const { viewerFor } = await import(new URL("../lib/import/piece-viewer.ts", import.meta.url));
+    const { embedFor: embedOf } = await import(new URL("../lib/portfolio/embed.ts", import.meta.url));
+    const hasEmbed = (video) => embedOf(video) !== null;
+    const img = { url: "/media/x.webp" };
+    const viewers = [
+      viewerFor({ video: { platform: "instagram", url: "https://www.instagram.com/reel/C1abc/" }, image: img }, hasEmbed),
+      viewerFor({ video: null, image: img }, hasEmbed),
+      viewerFor({ video: { platform: "instagram", url: "https://www.instagram.com/prueba/" }, image: img }, hasEmbed),
+    ];
+    check(
+      JSON.stringify(viewers) === JSON.stringify(["reel", "image", "image"]),
+      "«De tu perfil»: toda pieza abre visor (reel inline; foto, carrusel o video sin embed → visor de imagen)",
+      viewers,
+    );
   } else {
     console.log("· (se omiten las pruebas del borrador de importación: no es almacenamiento local)");
   }

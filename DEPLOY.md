@@ -95,8 +95,17 @@ el correo **no** se marca como anotado: puede volver a intentarlo. En los logs: 
   lo haya tomado (el almacenamiento no respeta el etag: era la forma de tener un 409 eterno), queda `failed` con
   causa `storage_conflict`. El cliente reintenta los 409 a lo más 6 veces y corta a los 50 s con un error claro.
   "Generar portafolio" otra vez pide un reintento explícito.
-- **Si ves `storage_conflict` en Preview:** es el almacenamiento, no el código ni una variable: revisa que el Blob
-  store de Preview sea **privado** y esté conectado a Preview, y mándame el log de ese `draftId`.
+- **Causa real del `storage_conflict` (spec 10.1, corregida):** la lectura del borrador tomaba el etag del header
+  HTTP `ETag` de la descarga (`get()` del SDK), y la escritura condicional (`put` con `ifMatch`) lo compara contra el
+  etag canónico de la API (el de `head()` / `put()`; el SDK solo documenta esos como válidos para `ifMatch`). Si
+  difieren en formato (comillas, `W/"…"`), **ninguna** escritura condicional funciona: toda confirmación terminaba en
+  `storage_conflict` (y antes, en el 409 eterno), y lo mismo le pasaba a guardar ediciones. Ahora `readJson` toma el
+  etag canónico con `head()` antes de leer el contenido (`lib/storage/blob.ts`); el diseño del candado no cambió.
+- **Para confirmarlo en el Preview:** abre **`/api/import/health?roundtrip=1`** con la sesión iniciada. En
+  `checks.roundtrip` debe salir `ok: true` (leer → escritura condicional → leer, y un etag viejo rechazado), y en
+  `checks.blobEtags` se ven los dos etags lado a lado (`headEtag` vs `getEtag`), `writeWithGetEtag` (el camino viejo,
+  que debería dar 412) y `writeWithHeadEtag: "ok"` (el nuevo). Si `writeWithHeadEtag` no fuera `ok`, la causa es otra:
+  mándame esa respuesta.
 
 ## 5. Primer deploy y prueba
 
@@ -410,7 +419,14 @@ Sin cambios de deploy (ninguna variable nueva). Hecho en local (build de producc
 - **SOBRE MÍ** muestra las vistas de cada pieza; las cifras del perfil y el ER siguen en el Media Kit.
 - **8.2** Electricidad en Brasa: 7 fotogramas de rayos quebrados con ramas, en ráfagas irregulares, con glow.
 
-**Para probar en el Preview:** un reel de Instagram real (tap/clic lo abre ahí mismo y se le da play dentro), uno de
+**Ronda de feedback 3 (spec 10):** 10.1 corregido como se describe en §4.2 (etag canónico); la prueba de humo cubre el
+round-trip leer → escritura condicional → leer (y, apuntada a un deployment con `BASE=…`, lo prueba contra su Blob).
+10.2: en "De tu perfil" toda pieza (agregada o no) se ve con tap/clic: los reels con el reproductor inline y las fotos
+y carruseles en un visor dentro de la página (de un carrusel se ve su portada, que es lo que se importa); cierra con
+×, tap fuera o Escape; nunca hover.
+
+**Para probar en el Preview:** `/api/import/health?roundtrip=1` (ver §4.2), luego importar → confirmar → generar con un
+perfil real; en "De tu perfil", tocar una foto, un carrusel y un reel. Un reel de Instagram real (tap/clic lo abre ahí mismo y se le da play dentro), uno de
 TikTok o YouTube si hay (igual: se abre y se le da play; nunca arranca solo), y subir una foto al banner desde
 `/editar/<slug>`.
 
