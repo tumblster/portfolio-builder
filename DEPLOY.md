@@ -402,15 +402,17 @@ Sin cambios de deploy (ninguna variable nueva). Hecho en local (build de producc
   el banner cambia al instante, se guarda y la página pública la muestra (Creator, Editorial y Bio).
 - **9.6** El botón dice "Elegir plantilla". **9.7** Plantilla y Paleta: el switch "Sobre mí | Media kit" cambia la
   vista previa en vivo.
-- **Reels en línea (3.1 / 7.1):** hover en web y tap en móvil reproducen ahí mismo; al pasar a otro, el anterior
-  se cierra (nunca dos a la vez); el segundo tap cae en el reproductor oficial, que pausa; la × o un toque fuera lo
-  cierran; sin iframes en la carga inicial. **Instagram no permite autoplay en su embed:** se abre ahí y se toca
-  para reproducir (TikTok y YouTube sí arrancan solos).
+- **Reels en línea (3.1 / 7.1, ajuste 30/09):** tap o clic (web y móvil igual, sin hover) abre el embed oficial ahí
+  mismo, en un iframe, sin salir de la página; el play es siempre manual dentro del reproductor de la plataforma
+  (sin autoplay en ninguna, ni siquiera TikTok o YouTube: el iframe no recibe el permiso de autoplay). Al abrir otro,
+  el anterior se cierra (nunca dos a la vez); la × , un toque fuera o Escape lo cierran; sin iframes en la carga
+  inicial.
 - **SOBRE MÍ** muestra las vistas de cada pieza; las cifras del perfil y el ER siguen en el Media Kit.
 - **8.2** Electricidad en Brasa: 7 fotogramas de rayos quebrados con ramas, en ráfagas irregulares, con glow.
 
-**Para probar en el Preview:** un reel de Instagram real (el embed se carga y se toca para reproducir), uno de TikTok
-o YouTube si hay (arrancan solos, YouTube en silencio al hover), y subir una foto al banner desde `/editar/<slug>`.
+**Para probar en el Preview:** un reel de Instagram real (tap/clic lo abre ahí mismo y se le da play dentro), uno de
+TikTok o YouTube si hay (igual: se abre y se le da play; nunca arranca solo), y subir una foto al banner desde
+`/editar/<slug>`.
 
 ## 11. Deudas aceptadas
 
