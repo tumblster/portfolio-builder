@@ -294,7 +294,7 @@ export function PiecePicker(props: {
           const added = chosen.has(piece.id);
           return (
             <li key={piece.id} className="flex min-w-0 flex-col gap-2 rounded-2xl border border-line bg-paper p-2" data-profile-piece={piece.id}>
-              {/* Ajuste 5: si es un reel, se ve ahí mismo (hover en web, tap en móvil, uno a la vez). */}
+              {/* Spec 7.1: si es un reel, tap o clic lo abre ahí mismo (play manual, uno a la vez). */}
               {piece.video ? (
                 <InlineReel link={piece.video} title={piece.title} className="block aspect-square overflow-hidden rounded-xl bg-sand">
                   <span className="absolute inset-0" data-reel-media>

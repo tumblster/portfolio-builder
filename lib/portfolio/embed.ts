@@ -1,18 +1,17 @@
 /*
- * Embeds oficiales para ver una pieza sin salir de la página (spec 3.1, adelantado a la ronda 30/09 · 7.1,
- * ajuste 30/09: play siempre manual, sin autoplay ni hover-to-play).
+ * Embeds oficiales para ver una pieza sin salir de la página (spec 3.1 / 7.1, ajuste 30/09: sin autoplay).
  * Sin dependencias: lo usan el reproductor (components/reel/inline-reel.tsx) y la prueba de humo.
- * - TikTok y YouTube: reproductor oficial SIN autoplay; el play es manual con tap/click.
- * - Instagram: su embed oficial NO permite autoplay; se carga ahí mismo y se reproduce con un toque dentro de él.
- *   Además mide al menos 326 px de ancho (mínimo de Instagram): el reproductor lo escala para que quepa.
+ * El play es SIEMPRE manual, en todas las plataformas: el embed se carga en la página (iframe) y la persona le da
+ * play dentro del reproductor oficial. Aunque TikTok o YouTube lo permitan, no se pide autoplay (autoplay=0 donde
+ * existe el parámetro). Instagram, además, mide al menos 326 px de ancho: el reproductor lo escala para que quepa.
  * Nada se descarga ni se aloja aquí (no self-hosting en esta fase).
  */
 
 export type Embed = {
   src: string;
   platform: "instagram" | "tiktok" | "youtube";
-  /** Si el reproductor empieza solo al cargarse. Siempre false: el play es manual (decisión 30/09). */
-  autoplay: boolean;
+  /** Siempre false: el play es manual en todas las plataformas (ajuste 30/09). */
+  autoplay: false;
   /** Ancho natural del embed (px): Instagram no baja de 326. null = se adapta al espacio. */
   naturalWidth: number | null;
 };
@@ -35,7 +34,7 @@ export function embedFor(link: { platform: string; url: string }): Embed | null 
     const id = /\/video\/(\d+)/.exec(path)?.[1];
     return id
       ? {
-          src: `https://www.tiktok.com/player/v1/${id}?loop=1&music_info=0&description=0&rel=0`,
+          src: `https://www.tiktok.com/player/v1/${id}?autoplay=0&music_info=0&description=0&rel=0`,
           platform: "tiktok",
           autoplay: false,
           naturalWidth: null,
@@ -49,7 +48,7 @@ export function embedFor(link: { platform: string; url: string }): Embed | null 
       (url.hostname.endsWith("youtu.be") ? path.slice(1).split("/")[0] : null);
     return id
       ? {
-          src: `https://www.youtube-nocookie.com/embed/${id}?playsinline=1&loop=1&playlist=${id}&rel=0`,
+          src: `https://www.youtube-nocookie.com/embed/${id}?autoplay=0&playsinline=1&rel=0`,
           platform: "youtube",
           autoplay: false,
           naturalWidth: null,

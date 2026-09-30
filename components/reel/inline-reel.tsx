@@ -6,15 +6,17 @@ import { embedFor } from "@/lib/portfolio/embed";
 import "./inline-reel.css";
 
 /*
- * Reel en línea (spec 3.1 / 7.1, ajuste 5 + ajuste 30/09: play siempre manual), patrón facade: la miniatura queda
- * tal cual y el embed oficial se carga recién al interactuar (la carga inicial no trae ningún iframe ni JS de las
- * plataformas).
- * - Web y móvil: tap/click en la miniatura abre el reproductor inline ahí mismo; el play es manual dentro del
- *   reproductor de cada plataforma (sin autoplay, sin hover-to-play). La ×, un toque fuera o Escape lo cierran.
- * - Nunca dos a la vez: hay un solo reel activo en toda la página; al activar uno, los demás se desmontan (su iframe
+ * Reel en línea (spec 3.1 / 7.1; ajuste 30/09: sin autoplay ni hover), patrón facade: la miniatura queda tal cual y
+ * el embed oficial se carga recién al interactuar (la carga inicial no trae ningún iframe ni JS de las plataformas).
+ * - Web y móvil, igual: tap o clic en la miniatura abre el reproductor oficial AHÍ MISMO (iframe, sin salir de la
+ *   página ni redirigir) y la persona le da play dentro de él. Nunca hay autoplay ni hover-to-play: el iframe ni
+ *   siquiera recibe el permiso de autoplay, así ninguna plataforma puede arrancar sola.
+ * - Nunca dos a la vez: hay un solo reel abierto en toda la página; al abrir otro, el anterior se desmonta (su iframe
  *   desaparece y deja de sonar), como en TikTok o Instagram.
+ * - La × , un toque fuera o Escape lo cierran. Un segundo toque sobre el video cae en el reproductor oficial, que
+ *   pausa como siempre.
  * El reproductor va sobre la miniatura ([data-reel-media]): la llena si es grande o flota agrandado encima si es
- * chica, y la sigue al hacer scroll. Instagram no permite autoplay: su embed se abre ahí y se toca para reproducir.
+ * chica, y la sigue al hacer scroll.
  */
 
 let activeId: string | null = null;
@@ -113,7 +115,7 @@ export function InlineReel({
 
   if (!embed) return <div className={className}>{children}</div>;
 
-  const label = `${active ? "Pausar" : "Reproducir"} «${title}»`;
+  const label = active ? `Cerrar «${title}»` : `Ver «${title}»`;
 
   return (
     <div
@@ -143,7 +145,8 @@ export function InlineReel({
               <iframe
                 src={embed.src}
                 title={`Video: ${title}`}
-                allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+                // Sin "autoplay": el play es siempre manual, dentro del reproductor oficial.
+                allow="encrypted-media; picture-in-picture; fullscreen"
                 allowFullScreen
                 referrerPolicy="strict-origin-when-cross-origin"
                 data-reel-iframe

@@ -162,8 +162,8 @@ export function pieceMeta(piece: ResolvedPiece): { platform: string | null; meta
 
 /** La pieza lleva a su original (otra pestaña); sin link, solo se muestra. */
 /**
- * La pieza como enlace. Ajuste 5 (spec 3.1): si es un video con embed oficial, se reproduce AHÍ MISMO (hover en web,
- * tap en móvil, uno a la vez) en vez de llevar a otra pestaña; si no, abre su original.
+ * La pieza como enlace. Spec 3.1 / 7.1: si es un video con embed oficial, tap o clic lo abre AHÍ MISMO (play manual,
+ * sin autoplay ni hover, uno a la vez) en vez de llevar a otra pestaña; si no, abre su original.
  */
 export function PieceLink({ piece, className, children }: { piece: ResolvedPiece; className: string; children: ReactNode }) {
   if (piece.video && embedFor(piece.video)) {
