@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { PalettePicker, TemplatePicker, TemplateMockup, recommendedPalette } from "@/components/design/design-pickers";
 import type { DraftPreview, ImportResult } from "@/lib/import/events";
 import { resolvePalette } from "@/lib/palette/palettes";
@@ -23,6 +23,28 @@ import { compactSelect, errorText, pillButton, primaryButton, textInput } from "
 
 type NicheRow = { key: string; label: string; on: boolean };
 const STEPS = ["Nichos", "Plantilla", "Paleta"] as const;
+
+/*
+ * 409 al generar = otra petición tiene el borrador reclamado (doble toque, o una generación que murió a medias).
+ * Se reintenta solo: a los 2, 5 y 10 s; si el servidor dice cuándo vence el candado (retryAt), se sigue cada 10 s
+ * hasta esa hora y se hace un último intento justo después: para entonces el servidor ya lo liberó (o devuelve el
+ * portafolio si llegó a crearse). El error técnico nunca se muestra.
+ */
+const RETRY_DELAYS_MS = [2_000, 5_000, 10_000];
+const RETRY_STEADY_MS = 10_000;
+const RETRY_AFTER_EXPIRY_MS = 1_500;
+
+/** Espera del próximo reintento, o null si ya no hay que reintentar. */
+function nextRetryDelay(retry: number, retryAt: number): number | null {
+  if (retry < RETRY_DELAYS_MS.length) return RETRY_DELAYS_MS[retry];
+  if (Number.isNaN(retryAt)) return null;
+  const untilExpiry = retryAt + RETRY_AFTER_EXPIRY_MS - Date.now();
+  // Si el intento que falló ya fue después del vencimiento, no hay más: ese era el último.
+  if (untilExpiry <= 0) return null;
+  return Math.min(RETRY_STEADY_MS, untilExpiry);
+}
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 type Props = {
   draft: DraftPreview;
@@ -48,7 +70,16 @@ export function ImportReview({ draft, onGenerated, onStartOver, onUnauthorized }
   const [formError, setFormError] = useState<string | null>(null);
   const [expired, setExpired] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [retrying, setRetrying] = useState(false);
   const stepHeading = useRef<HTMLHeadingElement>(null);
+  // Si la pantalla se desmonta (Empezar de nuevo) mientras espera un reintento, no se sigue.
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
 
   const active = rows.filter((row) => row.on);
   const canAdd = active.length < MAX_NICHES;
@@ -107,40 +138,70 @@ export function ImportReview({ draft, onGenerated, onStartOver, onUnauthorized }
       return;
     }
     setGenerating(true);
+    setRetrying(false);
     setFormError(null);
     const slugOf = (key: string | null) => {
       const row = key ? active.find((candidate) => candidate.key === key) : null;
       return row ? (nicheFromLabel(row.label)?.slug ?? null) : null;
     };
+    const body = JSON.stringify({
+      draftId: draft.draftId,
+      niches: active.map((row) => ({ label: row.label })),
+      pieceNiches: Object.fromEntries(draft.pieces.map((piece) => [piece.id, slugOf(rowOf(piece.id))])),
+      design: { template, palette },
+    });
     try {
-      const response = await fetch("/api/import/confirm", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          draftId: draft.draftId,
-          niches: active.map((row) => ({ label: row.label })),
-          pieceNiches: Object.fromEntries(draft.pieces.map((piece) => [piece.id, slugOf(rowOf(piece.id))])),
-          design: { template, palette },
-        }),
-      });
-      if (response.status === 401) return onUnauthorized();
-      const data = await response.json().catch(() => null);
-      if (response.ok && data) return onGenerated(data as ImportResult);
+      for (let retry = 0; ; retry += 1) {
+        const response = await fetch("/api/import/confirm", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body,
+        });
+        if (!mounted.current) return;
+        if (response.status === 401) return onUnauthorized();
+        const data = await response.json().catch(() => null);
+        if (response.ok && data) return onGenerated(data as ImportResult);
 
-      const issue = data?.error?.issues?.[0];
-      const match = typeof issue?.path === "string" ? /^niches\.(\d+)\./.exec(issue.path) : null;
-      if (match) {
-        const row = active[Number(match[1])];
-        if (row) setRowErrors({ [row.key]: issue.message });
-        goTo(0);
-      } else {
-        if (response.status === 404 || response.status === 410) setExpired(true);
-        setFormError(issue?.message ?? data?.error?.message ?? "No pudimos generar el portafolio. Intenta de nuevo.");
+        if (response.status === 409) {
+          const retryAt = Date.parse(data?.error?.retryAt ?? "");
+          const delay = nextRetryDelay(retry, retryAt);
+          if (delay !== null) {
+            setRetrying(true);
+            await sleep(delay);
+            if (!mounted.current) return;
+            continue;
+          }
+          if (Number.isNaN(retryAt)) {
+            // El candado no se cura solo: lo único que sirve es importar de nuevo.
+            setExpired(true);
+            setFormError("No pudimos terminar de generar este portafolio. Toca «Volver a importar» para empezar de nuevo con el perfil.");
+          } else {
+            setFormError(
+              "Tu portafolio no terminó de generarse. Toca «Generar portafolio» otra vez: si ya quedó listo te lo mostramos, y si no, se genera de nuevo.",
+            );
+          }
+          return;
+        }
+
+        const issue = data?.error?.issues?.[0];
+        const match = typeof issue?.path === "string" ? /^niches\.(\d+)\./.exec(issue.path) : null;
+        if (match) {
+          const row = active[Number(match[1])];
+          if (row) setRowErrors({ [row.key]: issue.message });
+          goTo(0);
+        } else {
+          if (response.status === 404 || response.status === 410) setExpired(true);
+          setFormError(issue?.message ?? data?.error?.message ?? "No pudimos generar el portafolio. Intenta de nuevo.");
+        }
+        return;
       }
     } catch {
-      setFormError("Se cortó la conexión. Revisa tu internet e intenta de nuevo: no se pierde nada.");
+      if (mounted.current) setFormError("Se cortó la conexión. Revisa tu internet e intenta de nuevo: no se pierde nada.");
     } finally {
-      setGenerating(false);
+      if (mounted.current) {
+        setGenerating(false);
+        setRetrying(false);
+      }
     }
   }
 
@@ -338,7 +399,7 @@ export function ImportReview({ draft, onGenerated, onStartOver, onUnauthorized }
         </button>
       </div>
       <p className="sr-only" aria-live="polite">
-        {generating ? "Generando el portafolio…" : ""}
+        {generating ? (retrying ? "Reintentando…" : "Generando el portafolio…") : ""}
       </p>
     </div>
   );

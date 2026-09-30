@@ -11,7 +11,12 @@ import { absoluteUrl } from "@/lib/request";
 /*
  * Genera el portafolio de una importación (v2 · M2), con los nichos que confirmó el creador y la
  * plantilla y paleta que eligió. 201 si lo creó; 200 con el mismo portafolio si ya estaba creado.
+ * 409 solo mientras otra petición lo está generando (el candado se cura solo a los 5 min: lib/import/draft.ts).
  */
+
+// Tope explícito: garantiza que un candado con más de 5 minutos ya no tiene ninguna ejecución viva detrás.
+export const maxDuration = 60;
+
 export async function POST(request: NextRequest) {
   const denied = requireCreator(request);
   if (denied) return denied;

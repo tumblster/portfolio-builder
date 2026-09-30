@@ -7,6 +7,8 @@ export class HttpError extends Error {
     readonly status: number,
     readonly code: string,
     message: string,
+    /** Datos extra que viajan en `error` junto al mensaje (p. ej. `retryAt`). */
+    readonly details: Record<string, unknown> = {},
   ) {
     super(message);
     this.name = new.target.name;
@@ -26,8 +28,11 @@ export class NotFoundError extends HttpError {
 }
 
 export class ConflictError extends HttpError {
-  constructor(message = "Este portafolio cambió mientras lo editabas. Recarga para ver la versión más reciente.") {
-    super(409, "conflict", message);
+  constructor(
+    message = "Este portafolio cambió mientras lo editabas. Recarga para ver la versión más reciente.",
+    details: Record<string, unknown> = {},
+  ) {
+    super(409, "conflict", message, details);
   }
 }
 
@@ -62,7 +67,7 @@ export function errorResponse(error: unknown): Response {
     );
   }
   if (error instanceof HttpError) {
-    return jsonResponse({ error: { code: error.code, message: error.message } }, { status: error.status });
+    return jsonResponse({ error: { ...error.details, code: error.code, message: error.message } }, { status: error.status });
   }
   console.error(error);
   return jsonResponse(
