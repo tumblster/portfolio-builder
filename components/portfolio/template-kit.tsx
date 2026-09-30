@@ -63,6 +63,8 @@ export function portfolioView(portfolio: ResolvedPortfolio, variant: TemplatePro
     er: portfolio.engagementRate ? describeEngagementRate(portfolio.engagementRate) : null,
     palette: resolvePalette(portfolio.design.palette, portfolio.photo),
     isPage: variant === "page",
+    /** Ronda 30/09 · 7.3: el selector de nichos es para quien crea (vista previa del studio); la marca no lo ve. */
+    showNicheNav: variant === "preview",
     id: (part: string) => `pf-${variant}-${part}`,
     headings:
       variant === "page"

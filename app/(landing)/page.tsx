@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { ElectricWord } from "@/components/electric-word";
-import { PortfolioMock } from "@/components/landing/hero-visual";
+import { HeroMorph } from "@/components/landing/hero-morph";
 import { InstagramGlyph } from "@/components/landing/instagram-glyph";
 import { LandingFooter, LandingHeader, landingContainer as container, landingPrimary as primary } from "@/components/landing/landing-chrome";
 import { PilotFloat } from "@/components/landing/pilot-float";
@@ -117,7 +117,7 @@ export default function LandingPage() {
             <Chispa expression="carcajada" id="chispa-hero" className="block h-auto w-full text-ink" />
           </div>
           <div className="landing-hero__mock">
-            <PortfolioMock />
+            <HeroMorph />
           </div>
         </section>
 

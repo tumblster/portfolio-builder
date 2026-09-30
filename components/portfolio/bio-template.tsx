@@ -137,7 +137,7 @@ export function BioTemplate({ portfolio, variant, filter }: TemplateProps) {
         </Root>
       </div>
 
-      {filterable.length > 0 && (
+      {view.showNicheNav && filterable.length > 0 && (
         <nav className="bio-dock" aria-label={`Nichos de ${name}`}>
           <NichePills {...filter} niches={filterable} name={name} />
         </nav>

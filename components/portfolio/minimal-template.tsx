@@ -116,7 +116,7 @@ export function MinimalTemplate({ portfolio, variant, filter }: TemplateProps) {
                 Trabajo seleccionado
                 <NicheSuffix niches={filterable} />
               </H2>
-              {filterable.length > 0 && <NichePills {...filter} niches={filterable} name={name} />}
+              {view.showNicheNav && filterable.length > 0 && <NichePills {...filter} niches={filterable} name={name} />}
             </div>
             <ul className="min-grid">
               {pieces.map((piece) => {

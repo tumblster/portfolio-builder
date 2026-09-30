@@ -42,7 +42,7 @@ export function CreatorTemplate({ portfolio, variant, filter }: TemplateProps) {
             <Avatar photo={portfolio.photo} name={name} size={32} />
             <span>{firstName}</span>
           </a>
-          {filterable.length > 0 && <NichePills {...filter} niches={filterable} name={name} />}
+          {view.showNicheNav && filterable.length > 0 && <NichePills {...filter} niches={filterable} name={name} />}
           {hasContact && (
             <a className="pf-nav__cta" href={`#${id("contacto")}`}>
               Hablemos

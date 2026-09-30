@@ -34,7 +34,7 @@ export function EditorialTemplate({ portfolio, variant, filter }: TemplateProps)
           <a className="ed-top__name" href={`#${id("inicio")}`}>
             {name}
           </a>
-          {filterable.length > 0 && <NichePills {...filter} niches={filterable} name={name} />}
+          {view.showNicheNav && filterable.length > 0 && <NichePills {...filter} niches={filterable} name={name} />}
           {hasContact && (
             <a className="ed-top__cta" href={`#${id("contacto")}`}>
               Contacto
