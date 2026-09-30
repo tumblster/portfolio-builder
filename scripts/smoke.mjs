@@ -239,8 +239,8 @@ try {
   check(html.includes("https://www.tiktok.com/@prueba/video/"), "La pieza de video conoce su original");
   // Ajuste 5 (spec 3.1): reels en línea con facade. Sin iframes ni JS de las plataformas en la carga inicial.
   check(
-    /data-inline-reel="tiktok"/.test(html) && /<button[^>]*class="reel-hit"[^>]*aria-label="Reproducir «[^"]+»"/.test(html) && !/<iframe/i.test(html),
-    "Reels en línea: el video se reproduce ahí mismo (tap / hover); la carga inicial no trae ningún iframe (facade)",
+    /data-inline-reel="tiktok"/.test(html) && /<button[^>]*class="reel-hit"[^>]*aria-label="Ver «[^"]+»"/.test(html) && !/<iframe/i.test(html),
+    "Reels en línea: tap o clic abre el video ahí mismo; la carga inicial no trae ningún iframe (facade)",
   );
   const embed = await import(new URL("../lib/portfolio/embed.ts", import.meta.url));
   const embeds = [
@@ -252,6 +252,13 @@ try {
     embeds.every(([platform, url, prefix]) => embed.embedFor({ platform, url })?.src.startsWith(prefix)) &&
       embed.embedFor({ platform: "instagram", url: "https://www.instagram.com/prueba/" }) === null,
     "Reels en línea: cada link va a su embed oficial (Instagram, TikTok, YouTube); lo que no es un video, no",
+  );
+  check(
+    embeds.every(([platform, url]) => {
+      const e = embed.embedFor({ platform, url });
+      return e && e.autoplay === false && !/autoplay=1|mute=1/.test(e.src);
+    }),
+    "Reels en línea: sin autoplay en ninguna plataforma (play manual, también en TikTok y YouTube)",
   );
   check(html.includes("Formas de colaborar") && html.includes("Videos UGC para anuncios"), "Muestra los servicios");
   check(html.includes('href="mailto:hola@prueba.pe"') && html.includes("Hablemos"), 'Cierra con "Hablemos" y el correo a la vista');
