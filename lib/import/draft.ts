@@ -240,7 +240,7 @@ async function markFailed(draft: StoredDraft, code: string, message: string): Pr
 }
 
 const failedError = (failure: DraftFailure) =>
-  new GenerationFailedError(undefined, { failedAt: failure.at, reason: failure.code });
+  new GenerationFailedError(failure.message || undefined, { failedAt: failure.at, reason: failure.code });
 
 /** Las piezas elegidas (7.1), en el orden de los chips; o, si el cliente es anterior, todas las del borrador. */
 function selectedPieces(draft: StoredDraft, input: ConfirmImportInput, slugs: Set<string>): Piece[] {
