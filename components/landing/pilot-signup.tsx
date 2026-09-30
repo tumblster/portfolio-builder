@@ -4,7 +4,8 @@ import { useState, type FormEvent } from "react";
 
 /*
  * Captura de correo del programa piloto (cierre de la landing). Va sobre el bloque de color: textos en crema
- * (11,9:1) y campo blanco con tinta. Los mensajes se anuncian a lectores de pantalla.
+ * (≥ 8,3:1 en todo el degradado) y campo blanco con tinta, de 56 px (r2, B7), con foco en el acento (B9).
+ * El botón lleva el borde 3D de los primarios. Los mensajes se anuncian a lectores de pantalla.
  */
 export function PilotSignup() {
   const [status, setStatus] = useState<"idle" | "sending" | "done" | "error">("idle");
@@ -62,13 +63,13 @@ export function PilotSignup() {
           placeholder="tu@correo.com"
           aria-invalid={status === "error" || undefined}
           aria-describedby="piloto-ayuda"
-          className="h-12 min-w-0 flex-1 rounded-full bg-paper px-5 text-[0.9375rem] text-ink placeholder:text-muted"
+          className="h-14 min-w-0 rounded-full sm:flex-1 bg-paper px-6 text-base text-ink placeholder:text-muted focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-accent"
         />
         <input type="text" name="website" tabIndex={-1} autoComplete="off" aria-hidden="true" className="hidden" />
         <button
           type="submit"
           disabled={status === "sending"}
-          className="inline-flex h-12 items-center justify-center rounded-full bg-cream px-6 text-[0.9375rem] font-medium text-ink transition-colors hover:bg-paper disabled:opacity-70"
+          className="landing-btn-3d inline-flex h-14 items-center justify-center rounded-full bg-cream px-6 text-[0.9375rem] font-medium text-ink transition-colors hover:bg-paper disabled:opacity-70"
         >
           {status === "sending" ? "Enviando…" : "Quiero unirme"}
         </button>

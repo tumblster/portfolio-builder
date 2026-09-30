@@ -46,3 +46,9 @@
     transform: scale(1.045, 0.965);
   }
 }
+
+/* Chispa quieta (decorativa), p. ej. en /acceso: sin parpadeo ni respiración aunque se permita movimiento. */
+.mascot-static .mascot-eye,
+.mascot-static .mascot-mouth {
+  animation: none;
+}

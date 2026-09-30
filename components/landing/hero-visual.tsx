@@ -1,11 +1,25 @@
 /*
  * Mini-mock del portafolio del hero (v2 · M4-rev): un dibujo (no un screenshot) en línea limpia, tinta sobre
  * blanco y arena, con sus textos a ≥ 7:1. Para lectores de pantalla es una imagen con su descripción.
+ *
+ * r2 (B3): la fila de piezas es un carrusel lento. Cada 5 s se desliza una pieza (700 ms) dentro de un recorte;
+ * las 3 últimas repiten las 3 primeras, así el bucle no salta. Solo CSS (transform), nítido a cualquier tamaño.
+ * Con "reducir movimiento" queda quieto (landing.css).
  */
 
 const INK = "#0e110b";
 const MUTED = "#3f4236";
 const SAND = "#efe8dc";
+
+/** Paso entre piezas (ancho 68 + aire 4) en unidades del dibujo: lo que se desliza en cada vuelta. */
+const PIECE_PITCH = 72;
+/** Sus videos, de sus dos nichos. Tonos de arena distintos para que se vea el paso de una a otra. */
+const PIECES = [
+  { niche: "Recetas", fill: SAND },
+  { niche: "Fitness", fill: "#e3d8c7" },
+  { niche: "Recetas", fill: "#eae0cf" },
+  { niche: "Fitness", fill: "#ddd1bd" },
+];
 
 export function PortfolioMock() {
   return (
@@ -19,6 +33,9 @@ export function PortfolioMock() {
       <defs>
         <clipPath id="mock-avatar">
           <circle cx="295" cy="146" r="30" />
+        </clipPath>
+        <clipPath id="mock-pieces">
+          <rect x="182" y="300" width="221" height="86" />
         </clipPath>
       </defs>
       <rect x="180" y="36" width="250" height="372" rx="24" fill="#e3ddd0" />
@@ -60,13 +77,23 @@ export function PortfolioMock() {
           </text>
         </g>
       ))}
-      {[189, 261, 333].map((x) => (
-        <g key={x}>
-          <rect x={x} y="306" width="68" height="74" rx="10" fill={SAND} stroke={INK} strokeWidth="2" />
-          <circle cx={x + 14} cy="320" r="8" fill="#fff" stroke={INK} strokeWidth="1.5" />
-          <path d={`M${x + 11.5} 315.5v9l7-4.5z`} fill={INK} />
+      <g clipPath="url(#mock-pieces)">
+        <g className="mock-pieces-track" data-mock-carousel>
+          {[...PIECES, ...PIECES.slice(0, 3)].map((piece, index) => {
+            const x = 189 + index * PIECE_PITCH;
+            return (
+              <g key={index}>
+                <rect x={x} y="306" width="68" height="74" rx="10" fill={piece.fill} stroke={INK} strokeWidth="2" />
+                <circle cx={x + 14} cy="320" r="8" fill="#fff" stroke={INK} strokeWidth="1.5" />
+                <path d={`M${x + 11.5} 315.5v9l7-4.5z`} fill={INK} />
+                <text x={x + 8} y="371" fontSize="10" fontWeight="600" fill={INK}>
+                  {piece.niche}
+                </text>
+              </g>
+            );
+          })}
         </g>
-      ))}
+      </g>
     </svg>
   );
 }

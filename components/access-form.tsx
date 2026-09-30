@@ -2,7 +2,19 @@
 
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
-import { errorText, fieldLabel, pillButton, primaryButton, textInput } from "./ui";
+
+/*
+ * Formulario de la clave de acceso. Desde r2 (B8) se ve con el sistema de la landing: campo en píldora con borde
+ * fino, botón "Ver" secundario y el primario con borde 3D en el acento (landing-btn-3d, B9). La lógica no cambió.
+ */
+const fieldLabel = "block text-sm font-medium text-ink";
+const textInput =
+  "h-14 w-full min-w-0 rounded-full border border-ink/60 bg-paper px-6 text-base text-ink placeholder:text-muted focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-accent read-only:bg-sand aria-[invalid=true]:border-accent-ink";
+const secondaryButton =
+  "inline-flex h-14 items-center justify-center rounded-full border border-ink/60 bg-paper px-5 text-[0.9375rem] font-medium text-ink transition-colors hover:border-ink";
+const primaryButton =
+  "landing-btn-3d inline-flex h-14 items-center justify-center rounded-full bg-ink px-6 text-[0.9375rem] font-medium text-cream transition-colors hover:bg-[#2a2e24] disabled:cursor-not-allowed disabled:opacity-60";
+const errorText = "text-sm font-semibold text-accent-ink";
 
 export function AccessForm({ next }: { next: string }) {
   const router = useRouter();
@@ -39,7 +51,7 @@ export function AccessForm({ next }: { next: string }) {
   }
 
   return (
-    <form onSubmit={submit} noValidate className="panel mt-10 p-5 sm:p-6">
+    <form onSubmit={submit} noValidate className="mt-10 rounded-[1.75rem] border border-line bg-paper p-6 sm:p-8">
       <label htmlFor="clave" className={fieldLabel}>
         Clave de acceso
       </label>
@@ -65,7 +77,7 @@ export function AccessForm({ next }: { next: string }) {
           type="button"
           onClick={() => setVisible((current) => !current)}
           aria-pressed={visible}
-          className={`${pillButton} shrink-0 px-4`}
+          className={`${secondaryButton} shrink-0`}
         >
           {visible ? "Ocultar" : "Ver"}
         </button>
@@ -75,7 +87,7 @@ export function AccessForm({ next }: { next: string }) {
           {error}
         </p>
       )}
-      <button type="submit" disabled={sending} className={`${primaryButton} mt-4 w-full`}>
+      <button type="submit" disabled={sending} className={`${primaryButton} mt-5 w-full`}>
         {sending ? "Entrando…" : "Entrar"}
       </button>
     </form>

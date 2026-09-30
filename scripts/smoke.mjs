@@ -1,4 +1,4 @@
-// Prueba de humo de la API, el acceso, el studio, la landing y la página pública (v2 · M4-rev). No gasta saldo: nunca llega a Apify ni a Groq.
+// Prueba de humo de la API, el acceso, el studio, la landing y la página pública (v2 · M4-rev r2). No gasta saldo: nunca llega a Apify ni a Groq.
 // Úsala en tu compu, no contra producción (crea datos de prueba en .data/).
 // 1) npm run dev   2) en otra terminal: npm run smoke
 
@@ -372,17 +372,24 @@ try {
     accessWithSession.headers.get("location"),
   );
 
-  // ── Landing "/" (v2 · M4-rev): hero → cómo funciona en 3 cards → cierre con captura de correo ──
+  // ── Landing "/" (v2 · M4-rev r2): hero → roadmap de producto → cierre con captura de correo ──
   const landing = await fetch(BASE + "/", { redirect: "manual" });
   const landingHtml = await landing.text();
   const visible = landingHtml.replace(/<(script|style|title)[^>]*>[\s\S]*?<\/\1>/g, " ");
-  const textOf = (html) => html.replace(/<svg[\s\S]*?<\/svg>/g, "").replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
+  // El glyph de Instagram (B4) se lee como la palabra, igual que para un lector de pantalla (aria-label).
+  const textOf = (html) =>
+    html
+      .replace(/<svg[^>]*aria-label="Instagram"[\s\S]*?<\/svg>/g, "Instagram")
+      .replace(/<svg[\s\S]*?<\/svg>/g, "")
+      .replace(/<[^>]+>/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
   check(landing.status === 200, "La landing abre sin sesión (/)", landing.status);
   check(/<meta name="robots" content="noindex, nofollow"/.test(landingHtml), "La landing sigue fuera de los buscadores (noindex)");
   const sections = [...visible.matchAll(/<section[^>]*>/g)].map((m) => m[0]);
   check(
     sections.length === 3 && /data-hero/.test(sections[0]) && /id="como-funciona"/.test(sections[1]) && /id="piloto"/.test(sections[2]),
-    "La landing queda en 3 bloques: hero, cómo funciona y el cierre del piloto",
+    "La landing queda en 3 bloques: hero, roadmap (#como-funciona) y el cierre del piloto",
     sections,
   );
   check(
@@ -407,10 +414,19 @@ try {
     /\btext-center\b/.test(heroCopy?.[1] ?? "") && /\bmd:text-left\b/.test(heroCopy?.[1] ?? ""),
     "Hero: el stack de texto va centrado en el celular y a la izquierda desde tablet",
   );
-  const electric = visible.match(/<span[^>]*data-electric[^>]*>superpoderes([\s\S]*?)<\/span>/)?.[1] ?? "";
+  const heroSubHtml = landingHtml.match(/<\/h1>\s*<p[^>]*>([\s\S]*?)<\/p>/)?.[1] ?? "";
   check(
-    (electric.match(/class="electric-spark/g) ?? []).length === 2 && /stroke="currentColor"/.test(electric) && /whitespace-nowrap/.test(visible.match(/<span[^>]*data-electric[^>]*>/)?.[0] ?? ""),
-    "\"superpoderes\" tiene sus chispitas de electricidad (en la tinta del sistema, sin partir la palabra)",
+    /<svg[^>]*role="img"[^>]*aria-label="Instagram"/.test(heroSubHtml) && !/Instagram/.test(heroSubHtml.replace(/<svg[\s\S]*?<\/svg>/g, "")),
+    "Instagram va como glyph (la cámara, con aria-label) en vez de la palabra",
+  );
+  const electric = visible.match(/<span[^>]*data-electric[^>]*>superpoderes([\s\S]*?)<\/span>/)?.[1] ?? "";
+  const bolts = [...electric.matchAll(/<svg[^>]*class="electric-bolt [^"]*"[^>]*>/g)].map((m) => m[0]);
+  check(
+    bolts.length === 4 &&
+      bolts.every((bolt) => /aria-hidden="true"/.test(bolt)) &&
+      (electric.match(/pathLength="1"/g) ?? []).length === 4 &&
+      /whitespace-nowrap/.test(visible.match(/<span[^>]*data-electric[^>]*>/)?.[0] ?? ""),
+    "\"superpoderes\" tiene sus 4 rayos dentados (decorativos, dibujables con dashoffset, sin partir la palabra)",
   );
   check(
     !/data-brush-underline/.test(visible) && (visible.match(/data-electric/g) ?? []).length === 1 && /web profesional, listo/.test(visible),
@@ -424,14 +440,21 @@ try {
   // Chispa: la de los dientes (carcajada) en el hero y las 5 del recorrido al bajar.
   const heroMascot = visible.match(/data-hero-mascot[^>]*>\s*<svg[^>]*>/)?.[0] ?? "";
   check(/data-expression="carcajada"/.test(heroMascot), "Chispa en el hero: la carcajada (el grin con dientes)", heroMascot.slice(0, 120));
-  const companion = visible.match(/<div[^>]*data-mascot-companion[\s\S]*?<\/div>/)?.[0] ?? "";
-  const companionFaces = [...companion.matchAll(/data-face="(\w+)"/g)].map((m) => m[1]);
+  const traveler = visible.match(/<div[^>]*data-mascot-traveler[\s\S]*?<\/div>/)?.[0] ?? "";
+  const travelerFaces = [...traveler.matchAll(/data-face="(\w+)"/g)].map((m) => m[1]);
   const zones = [...visible.matchAll(/data-mascot-zone="(\w+)"/g)].map((m) => m[1]);
   const order = ["guino", "sorprendida", "picara", "estrella", "carcajada"];
   check(
-    JSON.stringify(companionFaces) === JSON.stringify(order) && JSON.stringify(zones) === JSON.stringify(order),
-    `Al bajar, Chispa acompaña y cambia de expresión por tramo: ${zones.join(" → ")}`,
-    { companionFaces, zones },
+    JSON.stringify(travelerFaces) === JSON.stringify(order) && JSON.stringify(zones) === JSON.stringify(order),
+    `Al bajar, la carita viajera cambia de expresión por tramo: ${zones.join(" → ")}`,
+    { travelerFaces, zones },
+  );
+  check(
+    /<div[^>]*class="mascot-traveler"[^>]*aria-hidden="true"/.test(visible) &&
+      !/mascot-companion/.test(landingHtml) &&
+      (visible.match(/data-mascot-target/g) ?? []).length === 1 &&
+      /<footer[\s\S]*data-mascot-target[\s\S]*<\/footer>/.test(visible),
+    "Sin la burbuja de antes: una sola carita viajera (decorativa) que aterriza en el logo del footer",
   );
   const cssLinks = [...landingHtml.matchAll(/<link[^>]+href="([^"]+\.css[^"]*)"/g)].map((m) => m[1]);
   let landingCss = "";
@@ -440,25 +463,51 @@ try {
     ...(landingCss.replace(/@(keyframes|media)[^{]*\{(?:[^{}]*\{[^{}]*\})*[^{}]*\}/g, "").match(/[^{}]*\.mascot[^{}]*\{[^{}]*\}/g) ?? []),
     ...(landingCss.match(/@(?:keyframes|media)[^{]*\{(?:[^{}]*\{[^{}]*\})*[^{}]*\}/g) ?? []).filter((block) => block.includes("mascot")),
   ].join("");
-  const mascotSvgs = [...visible.matchAll(/<svg[^>]*data-mascot[\s\S]*?<\/svg>/g)].map((m) => m[0]);
+  // Solo las caras (data-mascot="…"), no el logo del footer (data-mascot-target).
+  const mascotSvgs = [...visible.matchAll(/<svg[^>]*\sdata-mascot="[\s\S]*?<\/svg>/g)].map((m) => m[0]);
   const mascotBytes = mascotSvgs.reduce((sum, svg) => sum + Buffer.byteLength(svg), 0) + Buffer.byteLength(mascotCss);
   check(
     mascotSvgs.length === 6 && mascotBytes < 10_000,
-    `Chispa pesa ${(mascotBytes / 1024).toFixed(1)} KB en la página: ${mascotSvgs.length} caras (hero + 5 del recorrido) y su CSS (< 10 KB)`,
+    `Chispa pesa ${(mascotBytes / 1024).toFixed(1)} KB en la página: ${mascotSvgs.length} caras (hero + 5 de la viajera) y su CSS (< 10 KB)`,
   );
   check(
-    /prefers-reduced-motion:\s*reduce\)\s*\{\s*\.mascot-companion\s*\{\s*display:\s*none/.test(landingCss.replace(/\s+/g, " ")) &&
-      /prefers-reduced-motion:\s*no-preference/.test(mascotCss) && /electric-flicker/.test(landingCss),
-    "Con \"reducir movimiento\" todo queda quieto: sin acompañante, sin parpadeo y sin chispitas animadas",
+    /prefers-reduced-motion:\s*reduce\)\s*\{\s*\.mascot-traveler\s*\{\s*display:\s*none/.test(landingCss.replace(/\s+/g, " ")) &&
+      /prefers-reduced-motion:\s*no-preference/.test(mascotCss) && /electric-discharge/.test(landingCss) && /mock-carousel/.test(landingCss),
+    "Con \"reducir movimiento\" todo queda quieto: sin viajera, sin parpadeo, rayos y carrusel sin animar",
+  );
+  const roadmap = visible.slice(visible.indexOf('id="como-funciona"'), visible.indexOf('id="piloto"'));
+  check(
+    /For you page/i.test(roadmap) &&
+      textOf(roadmap.match(/<h2[^>]*>([\s\S]*?)<\/h2>/)?.[1] ?? "") === "Estamos construyendo herramientas para ti" &&
+      [
+        ["Portfolio Builder", "Disponible ahora"],
+        ["Tablero de oportunidades", "En construcción"],
+        ["Tarifar sin fricción", "Próximo"],
+      ].every(([name, status]) => roadmap.includes(name) && roadmap.includes(`data-roadmap-status="${status}"`)) &&
+      (roadmap.match(/<li[^>]*data-mascot-zone/g) ?? []).length === 3 &&
+      /<a[^>]*href="\/crear"[^>]*>Probarlo<\/a>/.test(roadmap) &&
+      (roadmap.match(/<button[^>]*disabled=""[^>]*>Próximamente<\/button>/g) ?? []).length === 2,
+    "Roadmap: 3 herramientas con su estado; solo Portfolio Builder se puede probar (/crear)",
   );
   check(
-    ["Importa tu Instagram", "Confirma tus nichos y elige el diseño", "Comparte tu link"].every((step) => visible.includes(step)) &&
-      (visible.match(/<li[^>]*data-mascot-zone/g) ?? []).length === 3,
-    "Cómo funciona: los 3 pasos en cards",
+    /<a[^>]*href="#piloto"[^>]*data-pilot-float[^>]*>Únete al programa piloto<\/a>/.test(visible) && /\.pilot-float\s*\{[^}]*z-index:\s*20/.test(landingCss),
+    "Botón flotante del piloto (lleva a #piloto, por debajo de la carita viajera)",
   );
   check(
     /<form[^>]*data-pilot-form/.test(visible) && /type="email"/.test(visible) && /Únete al programa piloto/.test(visible),
     "Cierre: captura de correo del programa piloto",
+  );
+  const accessPage = await fetch(BASE + "/acceso", { redirect: "manual" });
+  const accessHtml = await accessPage.text();
+  check(
+    accessPage.status === 200 &&
+      /class="[^"]*\blanding\b/.test(accessHtml) &&
+      /<header class="fixed/.test(accessHtml) &&
+      /<footer/.test(accessHtml) &&
+      /id="clave"/.test(accessHtml) &&
+      /landing-btn-3d/.test(accessHtml) &&
+      /data-expression="sonriente"/.test(accessHtml),
+    "/acceso usa el sistema de la landing: su header y footer, Chispa y el botón 3D",
   );
 
   // API del programa piloto (pública)

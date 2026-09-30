@@ -1,56 +1,92 @@
 /*
- * Chispitas alrededor de una palabra (v2 · M4-rev): trazos hechos a mano en la tinta del sistema (no neón).
- * Casi siempre quietas; cada tanto una parpadea como una chispa eléctrica, cada una a su ritmo. Solo opacidad y
- * transform. Con "reducir movimiento" quedan quietas.
- * Van en las esquinas de arriba, por encima de la altura de las minúsculas: nunca tocan la palabra de al lado ni
- * se leen como tildes sobre sus letras.
+ * Rayos alrededor de una palabra (v2 · M4-rev r2, B2). Trazo en la tinta del sistema con glow del acento
+ * (drop-shadow: no cuesta layout). Reposo: tenues y quietos. Descarga: el rayo se vuelve a dibujar
+ * (stroke-dashoffset 1 → 0 con pathLength=1) y parpadea a opacidad plena, ~600 ms, cada 4–6 s según el rayo.
+ * Van en las esquinas de arriba, por encima de la altura de las minúsculas: no tocan las palabras vecinas ni se
+ * leen como tildes. Con "reducir movimiento": visibles y completamente quietos.
  */
-.electric-spark {
+.electric-bolt {
   position: absolute;
   overflow: visible;
   pointer-events: none;
+  filter: drop-shadow(0 0 0.045em rgb(252 51 0 / 0.65));
 }
-.electric-spark--a {
-  top: -0.04em;
-  left: -0.32em;
-  width: 0.22em;
-  height: 0.34em;
-  transform: rotate(-18deg);
+.electric-bolt path {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.85;
 }
-.electric-spark--b {
-  top: -0.14em;
-  right: -0.34em;
-  width: 0.32em;
-  height: 0.32em;
+.electric-bolt--a {
+  top: -0.46em;
+  left: -0.36em;
+  width: 0.3em;
+  height: 0.45em;
+}
+.electric-bolt--b {
+  top: -0.5em;
+  left: -0.02em;
+  width: 0.2em;
+  height: 0.17em;
+}
+.electric-bolt--c {
+  top: -0.48em;
+  right: -0.4em;
+  width: 0.33em;
+  height: 0.45em;
+}
+.electric-bolt--d {
+  top: -0.5em;
+  right: 0em;
+  width: 0.2em;
+  height: 0.2em;
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .electric-spark {
-    animation: electric-flicker 5.4s ease-in-out infinite;
+  .electric-bolt path {
+    opacity: 0.32;
+    stroke-dasharray: 1;
+    animation: electric-discharge 5.2s linear infinite;
   }
-  .electric-spark--b {
-    animation-delay: 1.8s;
+  /* Cada rayo a su ritmo (4–6 s) y desfasado: las descargas se ven de a una, nunca todas juntas. */
+  .electric-bolt--b path {
+    animation-duration: 4.4s;
+    animation-delay: 1.3s;
+  }
+  .electric-bolt--c path {
+    animation-duration: 5.8s;
+    animation-delay: 2.6s;
+  }
+  .electric-bolt--d path {
+    animation-duration: 4.8s;
+    animation-delay: 3.7s;
   }
 }
-@keyframes electric-flicker {
+/* La descarga ocupa los últimos ~600 ms del ciclo: se dibuja rápido y parpadea antes de volver a reposo. */
+@keyframes electric-discharge {
   0%,
-  78%,
+  88% {
+    stroke-dashoffset: 0;
+    opacity: 0.32;
+  }
+  88.5% {
+    stroke-dashoffset: 1;
+    opacity: 1;
+  }
+  93% {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+  95% {
+    opacity: 0.2;
+  }
+  97% {
+    opacity: 1;
+  }
   100% {
-    opacity: 1;
-    scale: 1;
-  }
-  80% {
-    opacity: 0.12;
-  }
-  82% {
-    opacity: 1;
-    scale: 1.16;
-  }
-  84% {
-    opacity: 0.3;
-  }
-  87% {
-    opacity: 1;
-    scale: 1;
+    stroke-dashoffset: 0;
+    opacity: 0.32;
   }
 }

@@ -15,7 +15,11 @@ export const MARK_BOX = { x: 66.1, y: 135.8, width: 198.3, height: 109.9 };
 /** Espacio de seguridad: la altura del diente central, en las mismas unidades (≈ 49 % del alto de la marca). */
 export const MARK_CLEARANCE = 54;
 
-export function SupercreadorMark({ className }: { className?: string }) {
+/**
+ * `mascotTarget`: marca este mark como el punto donde aterriza la carita viajera de la landing
+ * (components/mascot/mascot-traveler.tsx). La cara se alinea con él usando MARK_BOX.
+ */
+export function SupercreadorMark({ className, mascotTarget = false }: { className?: string; mascotTarget?: boolean }) {
   return (
     <svg
       viewBox={`${MARK_BOX.x} ${MARK_BOX.y} ${MARK_BOX.width} ${MARK_BOX.height}`}
@@ -24,6 +28,7 @@ export function SupercreadorMark({ className }: { className?: string }) {
       fillRule="evenodd"
       aria-hidden="true"
       data-brand-mark
+      data-mascot-target={mascotTarget ? "" : undefined}
     >
       <path d={CHISPA_SMILE} />
     </svg>
