@@ -1,0 +1,74 @@
+/*
+ * Reel en línea (ajuste 5). La tarjeta gana un botón invisible encima (todo el área es tocable/cliqueable; el lector
+ * de pantalla oye "Reproducir «título»"); el reproductor es un recuadro fijo sobre la miniatura, con el embed oficial.
+ */
+.reel-card {
+  position: relative;
+}
+.reel-hit {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  cursor: pointer;
+}
+.reel-hit:focus-visible {
+  outline: 3px solid #fc3300;
+  outline-offset: -3px;
+}
+.reel-player {
+  position: fixed;
+  z-index: 60;
+  top: 0;
+  left: 0;
+  overflow: hidden;
+  border-radius: 16px;
+  background: #0e110b;
+  box-shadow:
+    0 0 0 1px rgb(255 255 255 / 0.12),
+    0 24px 48px -20px rgb(14 17 11 / 0.7);
+  --reel-scale: 1;
+}
+.reel-player__frame {
+  width: calc(100% / var(--reel-scale));
+  height: calc(100% / var(--reel-scale));
+  transform: scale(var(--reel-scale));
+  transform-origin: 0 0;
+}
+.reel-player__frame iframe {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+.reel-player__close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.92);
+  color: #0e110b;
+  box-shadow: 0 4px 12px -4px rgb(14 17 11 / 0.5);
+}
+.reel-player__close svg {
+  width: 12px;
+  height: 12px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+}
+.reel-player__close:focus-visible {
+  outline: 3px solid #fc3300;
+  outline-offset: 2px;
+}
