@@ -45,6 +45,19 @@ function pills(html) {
   }));
 }
 
+/** Nichos filtrables de la página (las reglas CSS del filtro), sin "todo": los links /p/<slug>/<nicho> que funcionan. */
+function filterNiches(html) {
+  return [...new Set([...html.matchAll(/\.pf\[data-pf-filter="([a-z0-9-]+)"\]/g)].map((m) => m[1]))].filter((n) => n !== "todo");
+}
+/** Nicho activo de la página (atributo del marco de la plantilla). */
+const activeNiche = (html) => html.match(/class="pf"[^>]*data-pf-filter="([a-z0-9-]+)"|data-pf-filter="([a-z0-9-]+)"[^>]*class="pf"/)?.slice(1).find(Boolean) ?? null;
+/** Las dos vistas del portafolio público (7.3): el panel "Sobre mí" y el del Media Kit. */
+function panelsOf(html) {
+  const about = html.indexOf('id="pf-panel-about"');
+  const kit = html.indexOf('id="pf-panel-kit"');
+  return { about: about >= 0 && kit > about ? html.slice(about, kit) : "", kit: kit >= 0 ? html.slice(kit) : "" };
+}
+
 /** Piezas de la página: { id → "todo belleza" }. */
 function pieceViews(html) {
   return Object.fromEntries([...html.matchAll(/data-pf-piece="([^"]+)" data-pf-show="([^"]+)"/g)].map(([, id, views]) => [id, views]));
@@ -216,13 +229,26 @@ try {
   const fontPreloads = (html.match(/<link[^>]*as="font"[^>]*>/g) ?? []).length;
   check(fontPreloads === 1, `La página pública precarga una sola fuente (DM Sans): ${fontPreloads}`);
 
-  const general = pills(html);
+  // Ronda 30/09 · 7.3: el selector de nichos es para quien crea (studio); la marca no lo ve. Los links por nicho siguen.
+  check(pills(html).length === 0, "La marca no ve el selector de nichos en la página pública (queda en el studio)", pills(html));
   check(
-    general.map((pill) => pill.href).join() === [`/p/${slug}`, ...["belleza", "lifestyle", "viajes"].map((n) => `/p/${slug}/${n}`)].join(),
-    "Las píldoras son links reales: Todo y un link por nicho",
-    general,
+    filterNiches(html).join() === "belleza,lifestyle,viajes" && activeNiche(html) === "todo",
+    'Los nichos siguen filtrando por link: "Todo" y uno por nicho (belleza, lifestyle, viajes)',
+    filterNiches(html),
   );
-  check(general[0]?.current && general.filter((pill) => pill.current).length === 1, 'En la versión general, "Todo" es la píldora activa', general);
+  const views = panelsOf(html);
+  check(
+    /role="tablist"/.test(html) && />Sobre mí</.test(html) && />Media kit</.test(html) && views.about && views.kit,
+    "Arriba del portafolio: el toggle SOBRE MÍ / MEDIA KIT, con las dos vistas en la página",
+  );
+  check(
+    /id="pf-tab-about"[^>]*aria-selected="true"/.test(html) && /id="pf-panel-kit"[^>]*hidden/.test(html),
+    "SOBRE MÍ es la vista por defecto; el Media Kit empieza oculto (link directo: #media-kit)",
+  );
+  check(
+    views.about && !/pf-stats|Engagement Rate|Seguidores en Instagram/.test(views.about),
+    "SOBRE MÍ no muestra métricas",
+  );
   const shown = pieceViews(html);
   check(
     ids.length === 3 && ids.every((id) => shown[id]) && shown[ids[0]] === "todo belleza" && shown[ids[2]] === "todo viajes",
@@ -235,7 +261,7 @@ try {
   const viajes = await fetch(`${BASE}/p/${slug}/viajes`);
   const viajesHtml = await viajes.text();
   check(viajes.status === 200 && viajesHtml.includes('data-pf-filter="viajes"'), "El link de un nicho abre ya filtrado → /p/…/viajes");
-  check(pills(viajesHtml).find((pill) => pill.current)?.href === `/p/${slug}/viajes`, "En /viajes, la píldora Viajes es la activa");
+  check(activeNiche(viajesHtml) === "viajes" && pills(viajesHtml).length === 0, "En /viajes, la página ya viene filtrada (sin selector para la marca)");
   check(/<title>[^<]*— Viajes<\/title>/.test(viajesHtml), "El título de la pestaña nombra el nicho");
   check(/<meta name="robots" content="noindex, nofollow"/.test(viajesHtml), "El link de nicho tampoco se indexa");
   const belleza = await (await fetch(`${BASE}/p/${slug}/belleza`)).text();
@@ -259,8 +285,8 @@ try {
   const lifestyle = await fetch(`${BASE}/p/${slug}/lifestyle`);
   const lifestyleHtml = await lifestyle.text();
   check(
-    lifestyle.status === 200 && lifestyleHtml.includes('data-pf-filter="todo"') && !pills(lifestyleHtml).some((pill) => pill.href.endsWith("/lifestyle")),
-    "Un nicho sin piezas conserva su link (muestra todo) y deja de aparecer en las píldoras",
+    lifestyle.status === 200 && lifestyleHtml.includes('data-pf-filter="todo"') && !filterNiches(lifestyleHtml).includes("lifestyle"),
+    "Un nicho sin piezas conserva su link (muestra todo) y deja de ser filtrable",
   );
 
   const missingPage = await fetch(`${BASE}/p/este-link-no-existe`);
@@ -301,11 +327,16 @@ try {
     const v1 = await fetch(`${BASE}/p/${v1Slug}`);
     const v1Html = await v1.text();
     check(v1.status === 200 && v1Html.includes("Valentina Fixture"), "Un portafolio guardado en la v1 sigue abriendo");
+    // Ronda 30/09 · 7.3: las cifras de Instagram viven en el MEDIA KIT; SOBRE MÍ no muestra métricas.
+    const v1Views = panelsOf(v1Html);
     check(
-      /48,2\smil/.test(v1Html) && v1Html.includes("Seguidores en Instagram") && /10,2\smil/.test(v1Html),
-      "Muestra las cifras reales de Instagram (seguidores y vistas promedio)",
+      /48,2\s?mil/.test(v1Views.kit) && v1Views.kit.includes("Seguidores") && v1Views.kit.includes("Interacciones promedio"),
+      "Sus cifras reales de Instagram (seguidores e interacciones promedio) están en el Media Kit",
     );
-    check(/12,4\smil vistas/.test(v1Html), "Cada pieza importada muestra sus vistas");
+    check(
+      !/12,4\s?mil vistas|Seguidores en Instagram/.test(v1Views.about),
+      "SOBRE MÍ no muestra cifras: ni las del perfil ni las vistas de cada pieza",
+    );
     const v1Belleza = await fetch(`${BASE}/p/${v1Slug}/belleza`);
     check(v1Belleza.status === 200, "Sus links de la v1 por nicho siguen abriendo (/belleza)");
     const v1Read = await call("GET", `/api/portfolios/${v1Slug}`);
@@ -329,13 +360,12 @@ try {
     );
     const custom = await fetch(`${BASE}/p/${customSlug}/cocina-saludable`);
     const customHtml = await custom.text();
-    const customPills = pills(customHtml);
     check(
-      custom.status === 200 && customPills.map((pill) => pill.label).join() === "Todo,Fitness,Cocina saludable",
-      "Nichos propios detectados por la IA: sus píldoras y sus links (/cocina-saludable)",
-      customPills,
+      custom.status === 200 && filterNiches(customHtml).join() === "fitness,cocina-saludable",
+      "Nichos propios detectados por la IA: sus links (/cocina-saludable) filtran",
+      filterNiches(customHtml),
     );
-    check(customPills.find((pill) => pill.current)?.label === "Cocina saludable", "El link del nicho propio abre con su píldora activa");
+    check(activeNiche(customHtml) === "cocina-saludable", "El link del nicho propio abre ya filtrado");
     const customBelleza = await fetch(`${BASE}/p/${customSlug}/belleza`);
     check(customBelleza.status === 404, "Con nichos propios, los de la v1 no existen (/belleza → 404)");
   } else {
@@ -428,15 +458,26 @@ try {
     "Instagram va con su logo oficial (con aria-label) en vez de la palabra",
   );
   const electricSpan = visible.match(/<span[^>]*data-electric[^>]*>/)?.[0] ?? "";
-  const electricSvg = visible.match(/<span[^>]*data-electric[^>]*>superpoderes(<svg[\s\S]*?<\/svg>)<\/span>/)?.[1] ?? "";
+  const electricSvg = visible.match(/<span[^>]*data-electric[^>]*>superpoderes((?:<svg[\s\S]*?<\/svg>)+)<\/span>/)?.[1] ?? "";
+  const arcLayers = electricSvg.match(/<svg[^>]*class="electric-arcs electric-arcs--[a-z0-9]+"[^>]*aria-hidden="true"/g) ?? [];
   check(
     /\belectric-word\b/.test(electricSpan) &&
       /whitespace-nowrap/.test(electricSpan) &&
-      /class="electric-bolts"[^>]*aria-hidden="true"/.test(electricSvg) &&
-      ["a", "b", "c"].every((id) => electricSvg.includes(`class="bolt bolt--${id}"`)) &&
-      /<feGaussianBlur/.test(electricSvg) &&
+      arcLayers.length === 4 &&
+      (electricSvg.match(/<feTurbulence/g) ?? []).length === 4 &&
+      /<feDisplacementMap/.test(electricSvg) &&
+      new Set([...electricSvg.matchAll(/seed="(\d+)"/g)].map((m) => m[1])).size >= 3 &&
       !/<img|<image|\.png|\.gif/.test(electricSvg),
-    "\"superpoderes\" lleva su rayo SVG propio: 3 variantes con glow, sin imágenes y sin partir la palabra",
+    "\"superpoderes\": arcos eléctricos en SVG con turbulencia (3 dentados + glow), sin imágenes ni partir la palabra",
+  );
+  const morph = visible.match(/<div[^>]*data-hero-morph[\s\S]*?<\/div><\/div><\/div>/)?.[0] ?? visible;
+  const morphStates = [...visible.matchAll(/class="hero-morph__layer"[^>]*data-state="([a-z]+):([a-z]+)"/g)].map((m) => [m[1], m[2]]);
+  check(
+    morphStates.length >= 4 &&
+      new Set(morphStates.map(([template]) => template)).size === 4 &&
+      morphStates.every(([template, palette]) => ["creator", "bio", "minimal", "editorial"].includes(template) && ["crema", "terracota", "salvia", "rosa", "grafito"].includes(palette)) &&
+      /<div[^>]*class="hero-morph"[^>]*role="img"[^>]*aria-label="[^"]+"/.test(morph),
+    `Hero: el mock muta entre las 4 plantillas y paletas reales (${morphStates.map((s) => s.join("/")).join(", ")})`,
   );
   check(
     !/data-brush-underline/.test(visible) && (visible.match(/data-electric/g) ?? []).length === 1 && /web profesional, listo/.test(visible),
@@ -490,7 +531,8 @@ try {
   );
   check(
     /prefers-reduced-motion:\s*reduce\)\s*\{\s*\.mascot-traveler\s*\{\s*display:\s*none/.test(landingCss.replace(/\s+/g, " ")) &&
-      /prefers-reduced-motion:\s*no-preference/.test(mascotCss) && /bolt-strike-a/.test(landingCss) && /mock-carousel/.test(landingCss),
+      /prefers-reduced-motion:\s*no-preference/.test(mascotCss) && /arcs-flicker-1/.test(landingCss) && /hero-morph/.test(landingCss) &&
+      /prefers-reduced-motion:\s*reduce\)\s*\{\s*\.hero-morph__layer:not\(:first-child\)\s*\{\s*display:\s*none/.test(landingCss.replace(/\s+/g, " ")),
     "Con \"reducir movimiento\" todo queda quieto: sin viajera, sin parpadeo, rayos y carrusel sin animar",
   );
   const assetOf = (selector) => {
@@ -550,6 +592,10 @@ try {
   const badEmail = await pilot({ email: "no-es-un-correo" });
   check(badEmail.status === 400, `Piloto: un correo inválido se rechaza: "${badEmail.data?.error?.issues?.[0]?.message}"`);
   const pilotEmail = `smoke.${Date.now()}@ejemplo.com`;
+  check(
+    /--landing-ember:\s*var\(--color-ink\)/.test(landingCss) && /\.landing-ember\s*\{[^}]*background:\s*var\(--landing-ember\)/.test(landingCss),
+    "La tarjeta «Únete al programa piloto» es negra (la tinta), no vino",
+  );
   const joined = await pilot({ email: `  ${pilotEmail.toUpperCase()} ` });
   const again = await pilot({ email: pilotEmail });
   check(joined.status === 201 && again.status === 200 && again.data?.alreadySignedUp === true, "Piloto: anotarse guarda el correo (201) y repetirlo no duplica (200)", { joined, again });
@@ -560,6 +606,18 @@ try {
     const id = createHash("sha256").update(pilotEmail).digest("hex").slice(0, 32);
     const saved = JSON.parse(await readFile(path.join(process.cwd(), ".data", "pilot-signups", `${id}.json`), "utf8").catch(() => "null"));
     check(saved?.email === pilotEmail && saved?.source === "landing", "Piloto: el correo queda en pilot-signups/ (normalizado, en minúsculas)", saved);
+    // 8.4: sin Sheet configurado en este entorno, el submit va al MODO MOCK, claramente marcado.
+    const sheetConfigured = Boolean(process.env.GOOGLE_SHEETS_SPREADSHEET_ID && process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL);
+    const row = JSON.parse(await readFile(path.join(process.cwd(), ".data", "pilot-sheet-mock", `${id}.json`), "utf8").catch(() => "null"));
+    check(
+      sheetConfigured
+        ? joined.data?.sink === "sheet"
+        : joined.data?.sink === "mock" && joined.headers?.get?.("x-pilot-sink") !== "sheet" && row?.email === pilotEmail && row?.mock === true && /MODO MOCK/.test(row?.note ?? ""),
+      sheetConfigured
+        ? "Piloto → Google Sheets: el correo llegó al Sheet (sink «sheet»; verifica la fila con npm run test:sheet)"
+        : "Piloto → Google Sheets en MODO MOCK (sin Sheet configurado): la fila queda en pilot-sheet-mock/, marcada como mock",
+      { sink: joined.data?.sink, row },
+    );
   }
 
   // Chispa: las 6 expresiones en un lienzo cuadrado común, centradas por su tinta, con aire y a la misma escala.
@@ -849,16 +907,28 @@ try {
     check(again.status === 200 && again.data?.slug === draftSlug, "Confirmar dos veces devuelve el mismo portafolio (no duplica)", again.data);
 
     const bioPage = await pageOf(draftSlug);
-    const bioPills = pills(bioPage.html);
     check(
-      bioPage.html.includes('data-template="bio"') &&
-        JSON.stringify(bioPills.map((p) => p.label)) === JSON.stringify(["Todo", "Negocios", "Finanzas personales"]),
-      "La página usa Bio y las píldoras salen de los nichos confirmados (los que tienen piezas)",
-      bioPills,
+      bioPage.html.includes('data-template="bio"') && filterNiches(bioPage.html).join() === "negocios,finanzas-personales",
+      "La página usa Bio y sus nichos salen de los confirmados (los que tienen piezas)",
+      filterNiches(bioPage.html),
+    );
+    const bioViews = panelsOf(bioPage.html);
+    check(
+      /10,7\s%/.test(bioViews.kit) && bioViews.kit.includes("Engagement Rate") && bioViews.kit.includes("(me gusta + comentarios) ÷ vistas · 2 reels") &&
+        !bioViews.about.includes("Engagement Rate"),
+      "El ER (10,7 %) vive en el MEDIA KIT, con su base etiquetada, y no en SOBRE MÍ",
+    );
+    const kitMetrics = [...bioViews.kit.matchAll(/data-metric="([a-zA-Z]+)"/g)].map((m) => m[1]);
+    check(
+      JSON.stringify(kitMetrics) === JSON.stringify(["followers", "avgInteractions", "engagementRate"]) &&
+        /48,2\s?mil/.test(bioViews.kit) && bioViews.kit.includes("Interacciones promedio"),
+      "Media Kit: Seguidores (48,2 mil), Interacciones promedio y ER, en ese orden",
+      kitMetrics,
     );
     check(
-      /10,7\s%/.test(bioPage.html) && bioPage.html.includes("Engagement Rate") && bioPage.html.includes("(me gusta + comentarios) ÷ vistas · 2 reels"),
-      "La página muestra el ER (10,7 %) con la base del cálculo etiquetada",
+      /data-media-kit/.test(bioViews.kit) && bioViews.kit.includes("Plataformas") && bioViews.kit.includes("Piezas destacadas") &&
+        bioViews.kit.includes("Sobre mí") && /data-mk-contact[^>]*>Trabaja conmigo|Trabaja conmigo/.test(bioViews.kit),
+      "Media Kit: cabecera, plataformas, piezas destacadas, Sobre mí y «Trabaja conmigo»",
     );
     const autoBg = bioPage.html.match(/--pf-bg:(#[0-9a-f]{6})/)?.[1];
     check(
@@ -867,7 +937,7 @@ try {
     );
     const deep = await pageOf(draftSlug, "finanzas-personales");
     check(
-      deep.status === 200 && pills(deep.html).find((p) => p.current)?.label === "Finanzas personales",
+      deep.status === 200 && activeNiche(deep.html) === "finanzas-personales",
       "El nicho agregado por el creador tiene su propio link",
     );
     const dropped = await pageOf(draftSlug, "cocina-saludable");
@@ -919,6 +989,98 @@ try {
     check(old.status === 410, `Un borrador de hace más de 24 h pide volver a importar (410): "${old.data?.error?.message}"`);
     const noKey = await call("POST", "/api/import/confirm", { json: confirmInput, withKey: false });
     check(noKey.status === 401, "Generar sin clave responde 401");
+
+    // ── Ronda 30/09 · 7.1: chips. Piezas elegidas en orden, incluida una "De tu perfil" que la IA no eligió ──
+    const { createHash } = await import("node:crypto");
+    const chipsId = await writeDraft();
+    const profileId = `ig-${createHash("sha256").update(`${chipsId}:post-4`).digest("hex").slice(0, 24)}`;
+    const pending = await call("GET", `/api/import/status?draftId=${chipsId}`);
+    check(pending.status === 200 && pending.data?.state === "pending", "Estado consultable: un borrador sin confirmar está «pending»", pending.data);
+    const tooFew = await confirm({ draftId: chipsId, niches: [{ label: "Fitness" }], selection: [{ id: "pieza-1", niche: null }], design: confirmInput.design });
+    check(tooFew.status === 400 && tooFew.data?.error?.issues?.[0]?.path === "selection", `Chips: pide al menos 3 piezas: "${tooFew.data?.error?.issues?.[0]?.message}"`);
+    const chips = await confirm({
+      draftId: chipsId,
+      niches: [{ label: "Fitness" }, { label: "Viajes" }],
+      selection: [
+        { id: profileId, niche: "viajes" },
+        { id: "pieza-3", niche: "fitness" },
+        { id: "pieza-1", niche: null },
+      ],
+      design: { template: "creator", palette: "crema" },
+    });
+    const chipPieces = chips.data?.resolved?.pieces ?? [];
+    check(
+      chips.status === 201 &&
+        JSON.stringify(chipPieces.map((piece) => piece.sourcePostId)) === JSON.stringify(["post-4", "post-3", "post-1"]) &&
+        chipPieces[0]?.title === "Publicación 4" &&
+        JSON.stringify(chipPieces.map((piece) => piece.niche)) === JSON.stringify(["viajes", "fitness", null]),
+      "Chips: las piezas quedan en el orden elegido, con su nicho, incluida una «De tu perfil»",
+      chipPieces.map((piece) => [piece.sourcePostId, piece.niche]),
+    );
+    const done = await call("GET", `/api/import/status?draftId=${chipsId}`);
+    check(done.data?.state === "done" && done.data?.slug === chips.data?.slug, "Estado consultable: el borrador confirmado queda «done» con su link", done.data);
+
+    // ── 7.4: el 409 ya no es eterno ──
+    const busyId = await writeDraft({ claim: { at: new Date().toISOString(), slug: null } });
+    const busy = await confirm({ ...confirmInput, draftId: busyId });
+    const retryAtMs = Date.parse(busy.data?.error?.retryAt ?? "");
+    check(
+      busy.status === 409 && retryAtMs > Date.now() && retryAtMs - Date.now() <= 76_000,
+      `409 solo mientras otra petición genera, con un retryAt acotado (≤ 75 s): ${busy.data?.error?.retryAt}`,
+      busy.data,
+    );
+    const generating = await call("GET", `/api/import/status?draftId=${busyId}`);
+    check(generating.data?.state === "generating", "Estado consultable: «generating» mientras dura el candado", generating.data);
+    // Un candado que quedó colgado (la ejecución murió) y una generación que lanza una excepción: estado FALLIDO.
+    const stuckId = await writeDraft({
+      claim: { at: new Date(Date.now() - 10 * 60 * 1000).toISOString(), slug: null },
+      pieces: base.pieces.slice(0, 2), // el portafolio necesita 3 piezas: createPortfolio falla
+    });
+    const stuckInput = { draftId: stuckId, niches: confirmInput.niches, pieceNiches: {}, design: confirmInput.design };
+    const firstFail = await confirm(stuckInput);
+    check(
+      firstFail.status === 500 && firstFail.data?.error?.code === "generation_failed" && firstFail.data?.error?.message,
+      `Si la generación lanza una excepción: error terminal, no 409 → "${firstFail.data?.error?.message}"`,
+      firstFail.data,
+    );
+    const failedStatus = await call("GET", `/api/import/status?draftId=${stuckId}`);
+    check(
+      failedStatus.data?.state === "failed" && failedStatus.data?.failure?.code === "create_failed" && failedStatus.data?.failure?.at,
+      "Estado consultable: el borrador queda «failed» con su causa y hora",
+      failedStatus.data,
+    );
+    const againFail = await confirm(stuckInput);
+    check(
+      againFail.status === 500 && againFail.data?.error?.code === "generation_failed",
+      "Reintentar sin pedirlo no vuelve al 409: sigue siendo el error terminal",
+      againFail.data,
+    );
+    const explicitRetry = await confirm({ ...stuckInput, retry: true });
+    check(
+      explicitRetry.status === 500 && explicitRetry.data?.error?.code === "generation_failed" && Date.parse(explicitRetry.data?.error?.failedAt) > Date.parse(failedStatus.data?.failure?.at),
+      "«Inténtalo de nuevo» (retry) hace otro intento real y, si vuelve a fallar, registra el nuevo fallo",
+      explicitRetry.data,
+    );
+    // El cliente: con un 409 eterno, la misma política de components/import-review.tsx corta con un error < 60 s.
+    const policy = await import(new URL("../lib/import/confirm-retry.ts", import.meta.url));
+    let clock = 0;
+    let attempt = 0;
+    const requestMs = 1_500; // cada respuesta 409 tarda esto
+    for (;;) {
+      clock += requestMs;
+      const delay = policy.nextConfirmRetry(attempt, 0, clock, Date.now() + 10 * 60 * 1000);
+      if (delay === null) break;
+      clock += delay;
+      attempt += 1;
+    }
+    check(
+      clock < 60_000 && attempt <= policy.CONFIRM_RETRY_DELAYS_MS.length && policy.CONFIRM_DEADLINE_MS < 60_000,
+      `Cliente ante un 409 eterno: ${attempt} reintentos y error terminal a los ${(clock / 1000).toFixed(1)} s (< 60 s)`,
+    );
+    check(
+      policy.confirmRequestTimeout(0, policy.CONFIRM_DEADLINE_MS) === 0 && policy.confirmRequestTimeout(0, 0) <= policy.CONFIRM_DEADLINE_MS,
+      "Cliente: ninguna petición colgada pasa el plazo global (se corta)",
+    );
   } else {
     console.log("· (se omiten las pruebas del borrador de importación: no es almacenamiento local)");
   }
