@@ -410,9 +410,12 @@ try {
     `Hero con el copy aprobado, sin eyebrow ("${h1}")`,
     { h1, heroSub, first: heroCopy?.[2] },
   );
+  const h1Html = visible.match(/<h1[^>]*>[\s\S]*?<\/h1>/)?.[0] ?? "";
   check(
-    /<h1[^>]*class="[^"]*\blanding-h1\b/.test(visible) && (visible.match(/landing-h1/g) ?? []).length === 1,
-    "El H1 (y solo el H1) usa la fuente TMJ",
+    /<h1[^>]*class="[^"]*\blanding-h1\b/.test(visible) &&
+      (visible.match(/landing-tmj/g) ?? []).length === 1 &&
+      /<span[^>]*class="[^"]*\blanding-tmj\b[^"]*"[^>]*>superpoderes/.test(h1Html),
+    "El H1 va en Inter Tight y TMJ solo en \"superpoderes\"",
   );
   check(
     /\btext-center\b/.test(heroCopy?.[1] ?? "") && /\bmd:text-left\b/.test(heroCopy?.[1] ?? ""),
@@ -625,8 +628,8 @@ try {
 
   const landingFontLinks = landingHtml.match(/<link[^>]+as="font"[^>]*>/g) ?? [];
   check(
-    landingFontLinks.length === 2 && landingFontLinks.some((link) => /TMJ/.test(link)) && !/--font-anton|studio min-h-dvh/.test(visible),
-    `La landing precarga solo sus 2 fuentes (Inter y la TMJ del H1: ${landingFontLinks.length}) y no el sistema del studio`,
+    landingFontLinks.length === 3 && landingFontLinks.some((link) => /TMJ/.test(link)) && !/--font-anton|studio min-h-dvh/.test(visible),
+    `La landing precarga solo sus 3 fuentes (Inter, Inter Tight del H1 y TMJ de "superpoderes": ${landingFontLinks.length}) y no el sistema del studio`,
   );
 
   // Contraste de los tokens del studio, leídos del CSS que se sirve.

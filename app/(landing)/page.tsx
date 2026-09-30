@@ -9,7 +9,7 @@ import { PilotFloat } from "@/components/landing/pilot-float";
 import { PilotSignup } from "@/components/landing/pilot-signup";
 import { Chispa, type Expression } from "@/components/mascot/chispa";
 import { MascotTraveler } from "@/components/mascot/mascot-traveler";
-import { fontTmj } from "@/lib/fonts/landing";
+import { fontTmj, interTight } from "@/lib/fonts/landing";
 
 /*
  * Landing pública "/" (v2 · M4-rev r2). Tres bloques: hero → roadmap de producto ("For you page") → cierre con la
@@ -95,8 +95,10 @@ export default function LandingPage() {
         <section className={`${container} landing-hero pt-18 pb-11 md:pt-28 md:pb-18 lg:pb-22`} data-hero>
           {/* En el celular el stack de texto va centrado bajo la cara; desde tablet, a la izquierda. */}
           <div className="landing-hero__copy text-center md:text-left">
-            <h1 className={`${fontTmj.variable} landing-h1 text-[2.375rem] leading-[1.06] font-medium tracking-[-0.03em] sm:text-5xl lg:text-[3.75rem]`}>
-              Dale <ElectricWord>superpoderes</ElectricWord> a tu marca personal
+            <h1
+              className={`${interTight.variable} ${fontTmj.variable} landing-h1 text-[2.375rem] leading-[1.06] font-semibold tracking-[-0.03em] sm:text-5xl lg:text-[3.75rem]`}
+            >
+              Dale <ElectricWord className="landing-tmj">superpoderes</ElectricWord> a tu marca personal
             </h1>
             <p className="mx-auto mt-5 max-w-xl text-[1.0625rem] leading-relaxed text-muted md:mx-0 md:mt-6">
               Convierte tu <InstagramGlyph /> en un portafolio web profesional, listo para enviar a las marcas

@@ -20,9 +20,17 @@ html:has(.landing) {
     scroll-behavior: smooth;
   }
 }
-/* H1 del hero en TMJ (D2): la variable la pone next/font (lib/fonts/landing.ts) solo en ese titular. */
+/* H1 del hero (r3 · 3): Inter Tight SemiBold, y TMJ SOLO en "superpoderes". Las variables las pone next/font
+ * (lib/fonts/landing.ts) solo en ese titular. TMJ es más angosta y liviana: a 1,22 em su altura de x
+ * y su peso visual calzan con la línea (verificado con capturas en escritorio y celular). */
 .landing-h1 {
-  font-family: var(--font-tmj), var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-inter-tight), var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+}
+.landing-h1 .landing-tmj {
+  font-family: var(--font-tmj), var(--font-inter-tight), ui-sans-serif, system-ui, sans-serif;
+  font-size: 1.22em;
+  font-weight: 400;
+  letter-spacing: 0;
 }
 .landing :focus-visible {
   outline: 2px solid var(--color-accent);

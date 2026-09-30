@@ -19,9 +19,9 @@ const BOLTS = [
   { className: "electric-bolt--d", viewBox: "0 0 14 14", d: "M2 12.2l4.1-4.6-2.4-.8 6.4-5.1M9.6 11.4l2.8-1.9" },
 ] as const;
 
-export function ElectricWord({ children }: { children: ReactNode }) {
+export function ElectricWord({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
-    <span className="relative inline-block whitespace-nowrap text-ink" data-electric>
+    <span className={`relative inline-block whitespace-nowrap text-ink ${className}`} data-electric>
       {children}
       {BOLTS.map((bolt) => (
         <svg key={bolt.className} viewBox={bolt.viewBox} className={`electric-bolt ${bolt.className}`} aria-hidden="true" focusable="false">

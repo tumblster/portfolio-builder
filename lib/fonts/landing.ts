@@ -1,4 +1,4 @@
-import { Inter } from "next/font/google";
+import { Inter, Inter_Tight } from "next/font/google";
 import localFont from "next/font/local";
 
 /*
@@ -13,7 +13,18 @@ export const landingSans = Inter({
 });
 
 /*
- * TMJ (r2, D2): fuente manuscrita de un solo peso, SOLO para el H1 de la landing (no para el resto del sitio).
+ * Inter Tight SemiBold (r3 · 3): titulares. En la landing, el H1 (salvo "superpoderes", que va en TMJ); en /crear,
+ * sus títulos. Un solo peso (600). Combina con TMJ y tiene una altura de x parecida (0,55 em contra 0,57 em).
+ */
+export const interTight = Inter_Tight({
+  subsets: ["latin"],
+  weight: "600",
+  display: "swap",
+  variable: "--font-inter-tight",
+});
+
+/*
+ * TMJ (r2, D2; r3 · 3): fuente manuscrita de un solo peso, SOLO para la palabra "superpoderes" del H1 de la landing.
  * Se importa desde la página "/" y no desde el layout, así /acceso no la precarga. next/font la precarga en "/"
  * y genera un fallback con métricas ajustadas: sin saltos de layout.
  * Pendiente: confirmar que su licencia permite uso web comercial (el archivo no trae datos de licencia).
