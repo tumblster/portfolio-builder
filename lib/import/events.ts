@@ -3,7 +3,15 @@ import type { ResolvedPortfolio } from "@/lib/portfolio/resolve";
 import type { CreatorMetric } from "@/lib/portfolio/metrics";
 import type { EngagementRate, StoredImage } from "@/lib/portfolio/schema";
 
-export type DraftPiece = { id: string; title: string; image: StoredImage | null; niche: string | null; isVideo: boolean };
+export type DraftPiece = {
+  id: string;
+  title: string;
+  image: StoredImage | null;
+  niche: string | null;
+  isVideo: boolean;
+  /** Su video, para verlo en línea (ajuste 5); null si es una foto. */
+  video: { platform: "tiktok" | "instagram" | "youtube"; url: string } | null;
+};
 
 /*
  * Contrato entre POST /api/import y la pantalla de importación.

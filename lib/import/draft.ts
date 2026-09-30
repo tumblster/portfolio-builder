@@ -125,10 +125,11 @@ function toPreview(draft: StoredDraft): DraftPreview {
       image: piece.image,
       niche: piece.niche,
       isVideo: piece.video !== null,
+      video: piece.video,
     })),
     profilePosts: [...piecePool(draft).values()]
       .filter((piece) => !selectedIds.has(piece.id))
-      .map((piece) => ({ id: piece.id, title: piece.title, image: piece.image, niche: null, isVideo: piece.video !== null })),
+      .map((piece) => ({ id: piece.id, title: piece.title, image: piece.image, niche: null, isVideo: piece.video !== null, video: piece.video })),
     engagementRate,
     metrics: creatorMetrics(snapshot, engagementRate),
     pieceLimits: { min: LIMITS.minPieces, max: LIMITS.maxPieces },
