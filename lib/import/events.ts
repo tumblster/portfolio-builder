@@ -9,6 +9,8 @@ export type DraftPiece = {
   image: StoredImage | null;
   niche: string | null;
   isVideo: boolean;
+  /** Qué es en Instagram (10.2): el visor lo aclara en los carruseles (se importa su portada). */
+  kind: "video" | "image" | "carousel";
   /** Su video, para verlo en línea (ajuste 5); null si es una foto. */
   video: { platform: "tiktok" | "instagram" | "youtube"; url: string } | null;
 };

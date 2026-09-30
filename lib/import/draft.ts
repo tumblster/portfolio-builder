@@ -111,6 +111,9 @@ function toPreview(draft: StoredDraft): DraftPreview {
   const { snapshot, generated, pieces } = draft;
   const used = new Set(pieces.map((piece) => piece.niche));
   const selectedIds = new Set(pieces.map((piece) => piece.id));
+  const postType = new Map(snapshot.posts.map((post) => [post.id, post.type]));
+  const kindOf = (piece: Piece): "video" | "image" | "carousel" =>
+    piece.video ? "video" : piece.sourcePostId && postType.get(piece.sourcePostId) === "carousel" ? "carousel" : "image";
   const engagementRate = computeEngagementRate(snapshot);
   return {
     draftId: draft.id,
@@ -125,11 +128,12 @@ function toPreview(draft: StoredDraft): DraftPreview {
       image: piece.image,
       niche: piece.niche,
       isVideo: piece.video !== null,
+      kind: kindOf(piece),
       video: piece.video,
     })),
     profilePosts: [...piecePool(draft).values()]
       .filter((piece) => !selectedIds.has(piece.id))
-      .map((piece) => ({ id: piece.id, title: piece.title, image: piece.image, niche: null, isVideo: piece.video !== null, video: piece.video })),
+      .map((piece) => ({ id: piece.id, title: piece.title, image: piece.image, niche: null, isVideo: piece.video !== null, kind: kindOf(piece), video: piece.video })),
     engagementRate,
     metrics: creatorMetrics(snapshot, engagementRate),
     pieceLimits: { min: LIMITS.minPieces, max: LIMITS.maxPieces },

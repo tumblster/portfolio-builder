@@ -26,6 +26,9 @@ function setActive(id: string | null) {
   activeId = id;
   listeners.forEach((listener) => listener());
 }
+/** Cierra el reel abierto, si hay (p. ej. al abrir el visor de una foto): nunca dos visores a la vez. */
+export const closeActiveReel = () => setActive(null);
+
 function subscribe(listener: () => void) {
   listeners.add(listener);
   return () => {

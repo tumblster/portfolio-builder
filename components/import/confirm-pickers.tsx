@@ -8,6 +8,9 @@ import type { DraftPiece } from "@/lib/import/events";
 import { MAX_NICHES, nicheFromLabel } from "@/lib/portfolio/niches";
 import { NICHE_TAXONOMY, foldText } from "@/lib/portfolio/niche-taxonomy";
 import { InlineReel } from "@/components/reel/inline-reel";
+import { ImageLightbox } from "@/components/viewer/image-lightbox";
+import { viewerFor } from "@/lib/import/piece-viewer";
+import { embedFor } from "@/lib/portfolio/embed";
 
 /*
  * Pantalla "Confirma sus nichos y sus piezas" (ronda 30/09 · 7.1): dos selectores con chips.
@@ -34,6 +37,34 @@ export function Thumb({ piece, size = 48 }: { piece: DraftPiece; size?: number }
     />
   ) : (
     <span aria-hidden="true" className="shrink-0 rounded-lg bg-sand" style={{ width: size, height: size }} />
+  );
+}
+
+/** Marca de la miniatura: play (video), ampliar (foto) o varias (carrusel). Decorativa: la acción la dice el botón. */
+function TileBadge({ kind }: { kind: "video" | "image" | "carousel" }) {
+  return (
+    <span
+      className="pointer-events-none absolute bottom-2 left-2 z-[1] inline-flex size-7 items-center justify-center rounded-full bg-paper/95 text-ink shadow"
+      aria-hidden="true"
+      data-tile-badge={kind}
+    >
+      {kind === "video" ? (
+        <svg viewBox="0 0 10 10" className="size-3 fill-current">
+          <path d="M3 2v6l5-3z" />
+        </svg>
+      ) : (
+        <svg viewBox="0 0 16 16" className="size-3.5" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round">
+          {kind === "carousel" ? (
+            <>
+              <rect x="2.5" y="4.5" width="8" height="9" rx="1.5" />
+              <path d="M5.5 2.5h6.5a1.5 1.5 0 0 1 1.5 1.5v7" />
+            </>
+          ) : (
+            <path d="M9.5 2.5h4v4M6.5 13.5h-4v-4M13.5 2.5 9 7M2.5 13.5 7 9" />
+          )}
+        </svg>
+      )}
+    </span>
   );
 }
 
@@ -294,26 +325,31 @@ export function PiecePicker(props: {
           const added = chosen.has(piece.id);
           return (
             <li key={piece.id} className="flex min-w-0 flex-col gap-2 rounded-2xl border border-line bg-paper p-2" data-profile-piece={piece.id}>
-              {/* Spec 7.1: si es un reel, tap o clic lo abre ahí mismo (play manual, uno a la vez). */}
-              {piece.video ? (
+              {/* Spec 10.2: TODA pieza se ve con tap o clic, esté o no agregada: los reels ahí mismo (play manual,
+                  uno a la vez) y las fotos y carruseles en un visor dentro de la página. Nunca hover. */}
+              {viewerFor(piece, (video) => embedFor(video) !== null) === "reel" && piece.video ? (
                 <InlineReel link={piece.video} title={piece.title} className="block aspect-square overflow-hidden rounded-xl bg-sand">
                   <span className="absolute inset-0" data-reel-media>
                     {piece.image && (
                       <Image src={piece.image.url} alt="" fill sizes="(min-width: 640px) 160px, 45vw" className="object-cover" />
                     )}
                   </span>
-                  <span className="pointer-events-none absolute bottom-2 left-2 z-[1] inline-flex size-7 items-center justify-center rounded-full bg-paper/95 text-ink shadow" aria-hidden="true">
-                    <svg viewBox="0 0 10 10" className="size-3 fill-current">
-                      <path d="M3 2v6l5-3z" />
-                    </svg>
-                  </span>
+                  <TileBadge kind="video" />
                 </InlineReel>
-              ) : (
-                <span className="relative block aspect-square overflow-hidden rounded-xl bg-sand">
-                  {piece.image && (
+              ) : piece.image ? (
+                <ImageLightbox
+                  image={piece.image}
+                  title={piece.title}
+                  note={piece.kind === "carousel" ? "Carrusel: se ve su portada, que es lo que se importa." : undefined}
+                  className="block aspect-square overflow-hidden rounded-xl bg-sand"
+                >
+                  <span className="absolute inset-0">
                     <Image src={piece.image.url} alt="" fill sizes="(min-width: 640px) 160px, 45vw" className="object-cover" />
-                  )}
-                </span>
+                  </span>
+                  <TileBadge kind={piece.kind === "carousel" ? "carousel" : "image"} />
+                </ImageLightbox>
+              ) : (
+                <span className="relative block aspect-square overflow-hidden rounded-xl bg-sand" />
               )}
               <span className="line-clamp-2 min-h-[2.5em] text-xs leading-snug break-words">{piece.title}</span>
               <button

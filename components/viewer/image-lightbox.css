@@ -1,0 +1,66 @@
+/* Visor de imagen (spec 10.2): modal nativo, foto a pantalla (sin recortar) y leyenda; tinta sobre crema. */
+.lightbox {
+  width: min(36rem, calc(100vw - 1.5rem));
+  max-height: calc(100dvh - 1.5rem);
+  margin: auto;
+  padding: 0;
+  overflow: auto;
+  border: 0;
+  border-radius: 1.25rem;
+  background: var(--color-cream, #f5f5e7);
+  color: var(--color-ink, #0e110b);
+}
+.lightbox::backdrop {
+  background: rgb(14 17 11 / 0.72);
+}
+.lightbox__figure {
+  margin: 0;
+}
+.lightbox__img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: calc(100dvh - 7rem);
+  object-fit: contain;
+  background: #0e110b;
+}
+.lightbox__caption {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.875rem 1rem 1rem;
+  font-weight: 600;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+.lightbox__caption small {
+  color: var(--color-muted, #4b4e44);
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+.lightbox__close {
+  position: absolute;
+  top: 0.625rem;
+  right: 0.625rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.94);
+  color: #0e110b;
+  box-shadow: 0 4px 12px -4px rgb(14 17 11 / 0.5);
+}
+.lightbox__close svg {
+  width: 0.8125rem;
+  height: 0.8125rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+}
+.lightbox__close:focus-visible {
+  outline: 3px solid #fc3300;
+  outline-offset: 2px;
+}
