@@ -1,125 +1,55 @@
 /*
- * Arcos eléctricos sobre una palabra (ronda 30/09 · 8.2). Cuatro SVG apilados sobre la palabra (115 % de su ancho,
- * centrados): el glow y tres capas de arcos con distinto dentado (semilla de turbulencia). Solo se anima la
- * OPACIDAD de cada SVG, en pasos (steps) irregulares: sin tocar filtros ni layout, compuesto en la GPU.
- * Color: el azul eléctrico de la referencia (se cambia en --arc*). Núcleo claro "incandescente" sobre cada lazo.
+ * Electricidad sobre una palabra (ajuste 1; components/electric-word.tsx genera los arcos y su ritmo).
+ * 7 SVG apilados sobre la palabra (115 % de su ancho, centrados), cada uno un fotograma de la descarga, y un
+ * resplandor ambiente detrás de las letras. Solo se anima la OPACIDAD (pasos, sin interpolar): nada de layout ni
+ * de filtros animados, compuesto en la GPU. Brasa #FC3300 con núcleo incandescente.
  */
 .electric-word {
-  --arc: #1d4ed8;
-  --arc-core: #dbe8ff;
-  --arc-glow: #3b82f6;
+  --arc: #fc3300;
+  --arc-core: #fff4ee;
+  isolation: isolate;
 }
-.electric-arcs {
+.electric-arcs__frame {
   position: absolute;
   top: 50%;
   left: 50%;
   width: 115%;
   height: auto;
-  aspect-ratio: 460 / 140;
+  aspect-ratio: 460 / 150;
   overflow: visible;
-  transform: translate(-50%, -50%);
+  transform: translate(-50%, -52%);
   pointer-events: none;
+  opacity: 0;
 }
-.electric-arcs path {
+.electric-arcs__frame path {
   fill: none;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
-.arcs-glow path {
-  stroke: var(--arc-glow);
-  stroke-width: 7;
-}
-.electric-arcs--glow {
-  opacity: 0.4;
-}
-.arcs-ribbon path {
+.electric-arcs__glow path {
   stroke: var(--arc);
-  stroke-width: 2.8;
+  stroke-width: 7px;
+  opacity: 0.7;
 }
-.arcs-thread path {
+.electric-arcs__bolt path {
   stroke: var(--arc);
-  stroke-width: 1.2;
+  stroke-width: 1.6px;
 }
-.arcs-core path {
+.electric-arcs__core path {
   stroke: var(--arc-core);
-  stroke-width: 0.8;
+  stroke-width: 0.7px;
 }
-
-/* Quieto (reducir movimiento): una sola capa de arcos, con su glow. */
-.electric-arcs--2,
-.electric-arcs--3 {
-  opacity: 0;
+/* Resplandor ambiente detrás de las letras: la palabra "se ilumina" con cada ráfaga. */
+.electric-glow {
+  position: absolute;
+  z-index: -1;
+  inset: -18% -8%;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgb(252 51 0 / 0.28), rgb(252 51 0 / 0));
+  opacity: 0.35;
+  pointer-events: none;
 }
-
-@media (prefers-reduced-motion: no-preference) {
-  .electric-arcs--1 {
-    animation: arcs-flicker-1 2.3s steps(1, end) infinite;
-  }
-  .electric-arcs--2 {
-    animation: arcs-flicker-2 2.3s steps(1, end) infinite;
-  }
-  .electric-arcs--3 {
-    animation: arcs-flicker-3 2.3s steps(1, end) infinite;
-  }
-  .electric-arcs--glow {
-    animation: arcs-glow 1.7s steps(1, end) infinite;
-  }
-}
-/* Turnos irregulares: 1 → 2 → 1 → 3 (con un apagón corto) → 1 → 2 → 1 → 3. Nunca un loop mecánico parejo. */
-@keyframes arcs-flicker-1 {
-  0% {
-    opacity: 1;
-  }
-  12%,
-  41%,
-  70%,
-  90% {
-    opacity: 0;
-  }
-  30%,
-  58%,
-  84% {
-    opacity: 1;
-  }
-}
-@keyframes arcs-flicker-2 {
-  0%,
-  30%,
-  84% {
-    opacity: 0;
-  }
-  12%,
-  70% {
-    opacity: 1;
-  }
-}
-@keyframes arcs-flicker-3 {
-  0%,
-  58% {
-    opacity: 0;
-  }
-  41%,
-  53% {
-    opacity: 1;
-  }
-  49% {
-    opacity: 0.25;
-  }
-  90% {
-    opacity: 1;
-  }
-}
-@keyframes arcs-glow {
-  0%,
-  37%,
-  81% {
-    opacity: 0.45;
-  }
-  22%,
-  64% {
-    opacity: 0.2;
-  }
-  93% {
-    opacity: 0.6;
-  }
+/* Quieto (reducir movimiento): el primer fotograma, visible y sin parpadeo. */
+.electric-arcs__frame--0 {
+  opacity: 1;
 }
