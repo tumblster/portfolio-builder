@@ -173,8 +173,13 @@ export const TemplateMockup = memo(function TemplateMockup({
   );
 });
 
+/*
+ * Base de toda opción (plantilla o paleta), r3 · 8: autolayout real. Nunca más angosta que su contenido
+ * (min-w-0 + textos que parten palabra si hace falta), padding interno parejo y alto mínimo: si el texto es
+ * largo, la opción crece hacia abajo en vez de desbordarse.
+ */
 const optionBase =
-  "relative flex cursor-pointer flex-col rounded-card border-2 p-2.5 transition-[translate,box-shadow,background-color] duration-150 has-[:focus-visible]:outline-3 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-accent";
+  "relative flex min-h-tap min-w-0 cursor-pointer flex-col rounded-card border-2 p-2.5 transition-[translate,box-shadow,background-color] duration-150 [overflow-wrap:anywhere] has-[:focus-visible]:outline-3 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-accent";
 const optionState = (checked: boolean) =>
   checked ? "-translate-px border-ink bg-highlight shadow-hard" : "border-ink/25 bg-paper hover:border-ink";
 
@@ -208,10 +213,10 @@ export function TemplatePicker({
               className="sr-only"
             />
             <TemplateMockup template={template} palette={palette} className="block h-auto w-full" />
-            <span className="mt-2.5 flex flex-wrap items-center gap-x-2 gap-y-1">
-              <span className="font-bold">{info.name}</span>
+            <span className="mt-2.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+              <span className="min-w-0 leading-snug font-bold">{info.name}</span>
               {template === RECOMMENDED_TEMPLATE && (
-                <span className="rounded-full bg-ink px-2 py-0.5 text-xs font-semibold text-cream">Recomendada</span>
+                <span className="max-w-full rounded-full bg-ink px-2 py-0.5 text-xs leading-snug font-semibold text-cream">Recomendada</span>
               )}
             </span>
             {!compact && <span className="mt-1 text-sm leading-snug text-muted">{info.description}</span>}
@@ -262,10 +267,10 @@ export function TemplateList({
               onChange={() => onChange(template)}
               className="sr-only"
             />
-            <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-              <span className="font-bold">{info.name}</span>
+            <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+              <span className="min-w-0 leading-snug font-bold">{info.name}</span>
               {template === RECOMMENDED_TEMPLATE && (
-                <span className="rounded-full bg-ink px-2 py-0.5 text-xs font-semibold text-cream">Recomendada</span>
+                <span className="max-w-full rounded-full bg-ink px-2 py-0.5 text-xs leading-snug font-semibold text-cream">Recomendada</span>
               )}
             </span>
             <span className="mt-1 text-sm leading-snug text-muted">{firstSentence(info.description)}</span>
@@ -298,23 +303,25 @@ export function PalettePicker({
 }) {
   const options = paletteOptions(photo);
   return (
-    <div role="radiogroup" aria-label="Paleta" className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+    // Columnas automáticas de al menos 9,5 rem (la fila de muestras + el padding): en una columna angosta hay
+    // menos tarjetas por fila, nunca tarjetas más chicas que su contenido.
+    <div role="radiogroup" aria-label="Paleta" className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,9.5rem),1fr))] gap-3">
       {options.map((palette) => {
         const checked = value === palette.id;
         return (
-          <label key={palette.id} className={`${optionBase} ${optionState(checked)} px-3 py-3`} data-palette-option={palette.id}>
+          <label key={palette.id} className={`${optionBase} ${optionState(checked)} min-h-24 px-4 py-3`} data-palette-option={palette.id}>
             <input type="radio" name={name} value={palette.id} checked={checked} onChange={() => onChange(palette.id)} className="sr-only" />
-            <span className="flex" aria-hidden="true">
+            <span className="flex flex-wrap" aria-hidden="true">
               {[palette.bg, palette.soft, palette.accent, palette.band, palette.deep].map((color, index) => (
                 <span
                   key={index}
-                  className="-ml-1.5 size-7 rounded-full border-2 border-ink first:ml-0"
+                  className="-ml-1 size-6 shrink-0 rounded-full border-2 border-ink first:ml-0"
                   style={{ backgroundColor: color }}
                 />
               ))}
             </span>
-            <span className="mt-2.5 font-bold">{palette.name}</span>
-            {palette.id === "auto" && <span className="text-sm text-muted">Recomendada · sale de su foto</span>}
+            <span className="mt-2.5 leading-snug font-bold">{palette.name}</span>
+            {palette.id === "auto" && <span className="mt-0.5 text-sm leading-snug text-muted">Recomendada · sale de su foto</span>}
           </label>
         );
       })}
