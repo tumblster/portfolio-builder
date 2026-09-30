@@ -1,5 +1,6 @@
 import { DEFAULT_DESIGN, type Design } from "./design";
 import { computeEngagementRate } from "./engagement";
+import { creatorMetrics, type CreatorMetric } from "./metrics";
 import { resolveNiches, type NicheDef } from "./niches";
 import type { Contact, EngagementRate, Piece, Portfolio, Service, StoredImage, VideoLink } from "./schema";
 import { pieceMetrics, profileStats, type PieceMetrics, type ProfileStat } from "./stats";
@@ -25,6 +26,8 @@ export type ResolvedPortfolio = {
   stats: ProfileStat[];
   /** Métrica principal (v2 · M2), con la base de su cálculo; null si no hay datos suficientes. */
   engagementRate: EngagementRate | null;
+  /** Seguidores, Interacciones promedio y ER, listos para mostrar (ronda 30/09 · 7.2). Solo en el Media Kit. */
+  metrics: CreatorMetric[];
   /** Plantilla y paleta (v2 · M2). */
   design: Design;
   pieces: ResolvedPiece[];
@@ -59,6 +62,7 @@ export function resolvePortfolio(doc: Portfolio): ResolvedPortfolio {
     };
   });
 
+  const engagementRate = doc.insights ? doc.insights.engagementRate : computeEngagementRate(ig);
   return {
     slug: doc.slug,
     name: manual.name ?? (ig?.fullName || ig?.username || ""),
@@ -69,7 +73,8 @@ export function resolvePortfolio(doc: Portfolio): ResolvedPortfolio {
     niches: resolveNiches(doc),
     services: manual.services ?? doc.generated?.services ?? [],
     stats: profileStats(ig),
-    engagementRate: doc.insights ? doc.insights.engagementRate : computeEngagementRate(ig),
+    engagementRate,
+    metrics: creatorMetrics(ig, engagementRate),
     design: doc.design ?? DEFAULT_DESIGN,
     pieces,
   };

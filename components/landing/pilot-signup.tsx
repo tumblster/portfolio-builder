@@ -4,7 +4,7 @@ import { useState, type FormEvent } from "react";
 
 /*
  * Captura de correo del programa piloto (cierre de la landing). Va sobre el bloque de color: textos en crema
- * (≥ 8,3:1 en todo el degradado) y campo blanco con tinta, de 56 px (r2, B7), con foco en el acento (B9).
+ * (17,7:1 sobre el negro del bloque) y campo blanco con tinta, de 56 px (r2, B7), con foco en el acento (B9).
  * El botón lleva el borde 3D de los primarios. Los mensajes se anuncian a lectores de pantalla.
  */
 export function PilotSignup() {

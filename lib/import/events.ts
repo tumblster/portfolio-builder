@@ -1,6 +1,9 @@
 import type { NicheDef } from "@/lib/portfolio/niches";
 import type { ResolvedPortfolio } from "@/lib/portfolio/resolve";
+import type { CreatorMetric } from "@/lib/portfolio/metrics";
 import type { EngagementRate, StoredImage } from "@/lib/portfolio/schema";
+
+export type DraftPiece = { id: string; title: string; image: StoredImage | null; niche: string | null; isVideo: boolean };
 
 /*
  * Contrato entre POST /api/import y la pantalla de importación.
@@ -54,8 +57,15 @@ export type DraftPreview = {
   photo: StoredImage | null;
   /** Nichos que sugirió la IA, cada uno con al menos una pieza: los chips pre-marcados. */
   suggestedNiches: NicheDef[];
-  pieces: { id: string; title: string; image: StoredImage | null; niche: string | null; isVideo: boolean }[];
+  /** Las que eligió la IA, en su orden: los chips iniciales de piezas. */
+  pieces: DraftPiece[];
+  /** Ronda 30/09 · 7.1: el resto de sus publicaciones con imagen ("De tu perfil"), para sumarlas como chips. */
+  profilePosts: DraftPiece[];
   engagementRate: EngagementRate | null;
+  /** Seguidores, Interacciones promedio y ER, listos para mostrar (7.2). */
+  metrics: CreatorMetric[];
+  /** Cuántas piezas puede tener el portafolio (LIMITS): el selector lo respeta sin cargar el esquema completo. */
+  pieceLimits: { min: number; max: number };
   aiWritten: boolean;
   warnings: string[];
 };

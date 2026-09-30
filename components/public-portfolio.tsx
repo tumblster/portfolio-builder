@@ -2,9 +2,13 @@ import { BioTemplate } from "@/components/portfolio/bio-template";
 import { CreatorTemplate } from "@/components/portfolio/creator-template";
 import { EditorialTemplate } from "@/components/portfolio/editorial-template";
 import { MinimalTemplate } from "@/components/portfolio/minimal-template";
+import { MediaKit } from "@/components/portfolio/media-kit";
+import { PortfolioViews } from "@/components/portfolio/portfolio-views";
 import type { NicheFilter, TemplateProps } from "@/components/portfolio/template-kit";
+import { paletteStyle, resolvePalette } from "@/lib/palette/palettes";
 import type { TemplateId } from "@/lib/portfolio/design";
 import type { ResolvedPortfolio } from "@/lib/portfolio/resolve";
+import { NO_METRICS } from "@/lib/portfolio/stats";
 import { publicPath } from "@/lib/portfolio/slug";
 
 /*
@@ -15,7 +19,22 @@ import { publicPath } from "@/lib/portfolio/slug";
  * Todas las piezas llegan siempre; el nicho activo solo decide cuáles se ven:
  *  - página: sale de la URL, y las píldoras la cambian sin recargar;
  *  - vista previa: lo maneja el editor (`niche` + `onNicheChange`).
+ *
+ * Ronda 30/09 · 7.3: la página tiene dos vistas con un toggle arriba (components/portfolio/portfolio-views.tsx):
+ *  - SOBRE MÍ (por defecto): la plantilla de siempre, SIN métricas (ni cifras del perfil, ni ER, ni las de cada
+ *    pieza) y sin el selector de nichos (ese queda para la vista previa del studio);
+ *  - MEDIA KIT: components/portfolio/media-kit.tsx, con las 3 métricas. Link directo: /p/<slug>#media-kit.
  */
+
+/** "Sobre mí" no lleva métricas: el ER y las cifras viven en el Media Kit. */
+function withoutMetrics(portfolio: ResolvedPortfolio): ResolvedPortfolio {
+  return {
+    ...portfolio,
+    stats: [],
+    engagementRate: null,
+    pieces: portfolio.pieces.map((piece) => ({ ...piece, metrics: NO_METRICS })),
+  };
+}
 
 const TEMPLATE_COMPONENTS: Record<TemplateId, (props: TemplateProps) => React.ReactNode> = {
   creator: CreatorTemplate,
@@ -41,5 +60,14 @@ export function PublicPortfolio(props: PublicPortfolioProps) {
     props.variant === "preview"
       ? { mode: "controlled", value: props.niche, onChange: props.onNicheChange }
       : { mode: "route", basePath: publicPath(portfolio.slug) };
-  return <Template portfolio={portfolio} variant={props.variant ?? "page"} filter={filter} />;
+  const about = <Template portfolio={withoutMetrics(portfolio)} variant={props.variant ?? "page"} filter={filter} />;
+  if (props.variant === "preview") return about;
+  const palette = resolvePalette(portfolio.design.palette, portfolio.photo);
+  return (
+    <PortfolioViews
+      style={paletteStyle(palette) as React.CSSProperties}
+      about={about}
+      kit={<MediaKit portfolio={portfolio} />}
+    />
+  );
 }

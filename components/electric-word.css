@@ -1,188 +1,125 @@
 /*
- * Rayo sobre una palabra (r3 · 2). SVG propio (components/electric-word.tsx) como overlay absoluto anclado al
- * centro de la palabra: 1,2 em de alto y el ancho de la palabra (lienzo 380 × 100). Sin imágenes ni JS.
- *
- * Capas: glow Brasa ancho y difuminado (filtro estático, nunca se animan sus valores) → borde Brasa → núcleo
- * blanco incandescente, más chispas. Solo se animan opacidad, transform y stroke-dashoffset.
- *
- * Strikes: un ciclo de 7,9 s con 4 apariciones a intervalos irregulares (0 → 1,74 → 3,71 → 5,77 s; vuelve a
- * empezar a los 7,9 s): A, C, B y otra vez A con un recorrido distinto. En cada una el rayo aparece, se dibuja
- * (~280 ms) mientras se desplaza de un punto a otro sobre la palabra (~700 ms) y se apaga rápido (~140 ms).
- * Con "reducir movimiento": solo la variante A, quieta, sobre el final de la palabra.
+ * Arcos eléctricos sobre una palabra (ronda 30/09 · 8.2). Cuatro SVG apilados sobre la palabra (115 % de su ancho,
+ * centrados): el glow y tres capas de arcos con distinto dentado (semilla de turbulencia). Solo se anima la
+ * OPACIDAD de cada SVG, en pasos (steps) irregulares: sin tocar filtros ni layout, compuesto en la GPU.
+ * Color: el azul eléctrico de la referencia (se cambia en --arc*). Núcleo claro "incandescente" sobre cada lazo.
  */
-.electric-bolts {
+.electric-word {
+  --arc: #1d4ed8;
+  --arc-core: #dbe8ff;
+  --arc-glow: #3b82f6;
+}
+.electric-arcs {
   position: absolute;
-  top: calc(50% - 0.6em);
-  left: calc(50% - 2.28em);
-  width: 4.56em;
-  height: 1.2em;
+  top: 50%;
+  left: 50%;
+  width: 115%;
+  height: auto;
+  aspect-ratio: 460 / 140;
   overflow: visible;
+  transform: translate(-50%, -50%);
   pointer-events: none;
 }
-.bolt path {
+.electric-arcs path {
   fill: none;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
-.bolt__glow {
-  opacity: 0.55;
+.arcs-glow path {
+  stroke: var(--arc-glow);
+  stroke-width: 7;
 }
-.bolt__glow path {
-  stroke: #fc3300;
-  stroke-width: 11;
+.electric-arcs--glow {
+  opacity: 0.4;
 }
-.bolt__edge path {
-  stroke: #fc3300;
-  stroke-width: 5;
+.arcs-ribbon path {
+  stroke: var(--arc);
+  stroke-width: 2.8;
 }
-.bolt__core path {
-  stroke: #ffffff;
-  stroke-width: 1.8;
-}
-.bolt__sparks circle {
-  fill: #ffffff;
-  stroke: #fc3300;
+.arcs-thread path {
+  stroke: var(--arc);
   stroke-width: 1.2;
 }
-
-/* Estático (reducir movimiento): una sola variante, corrida hacia el final de la palabra. */
-.bolt--b,
-.bolt--c {
-  display: none;
+.arcs-core path {
+  stroke: var(--arc-core);
+  stroke-width: 0.8;
 }
-.bolt--a {
-  transform: translate(118px, -4px);
+
+/* Quieto (reducir movimiento): una sola capa de arcos, con su glow. */
+.electric-arcs--2,
+.electric-arcs--3 {
+  opacity: 0;
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .bolt--b,
-  .bolt--c {
-    display: inline;
+  .electric-arcs--1 {
+    animation: arcs-flicker-1 2.3s steps(1, end) infinite;
   }
-  /* Shorthand completo (con nombre) en cada regla: el minificador convierte un "animation" sin nombre en
-   * "animation: none" y descarta la duración. */
-  .bolt {
-    opacity: 0;
-    will-change: transform, opacity;
+  .electric-arcs--2 {
+    animation: arcs-flicker-2 2.3s steps(1, end) infinite;
   }
-  .bolt--a {
-    animation: bolt-strike-a 7.9s linear infinite;
+  .electric-arcs--3 {
+    animation: arcs-flicker-3 2.3s steps(1, end) infinite;
   }
-  .bolt--b {
-    animation: bolt-strike-b 7.9s linear infinite;
-  }
-  .bolt--c {
-    animation: bolt-strike-c 7.9s linear infinite;
-  }
-  .bolt path {
-    stroke-dasharray: 1;
-  }
-  .bolt--a path {
-    animation: bolt-draw-a 7.9s ease-out infinite;
-  }
-  .bolt--b path {
-    animation: bolt-draw-b 7.9s ease-out infinite;
-  }
-  .bolt--c path {
-    animation: bolt-draw-c 7.9s ease-out infinite;
+  .electric-arcs--glow {
+    animation: arcs-glow 1.7s steps(1, end) infinite;
   }
 }
-
-/* A: dos strikes por ciclo. 1º de izquierda a derecha subiendo; 2º de derecha a izquierda bajando. */
-@keyframes bolt-strike-a {
+/* Turnos irregulares: 1 → 2 → 1 → 3 (con un apagón corto) → 1 → 2 → 1 → 3. Nunca un loop mecánico parejo. */
+@keyframes arcs-flicker-1 {
   0% {
-    opacity: 0;
-    transform: translate(-72px, 6px);
-  }
-  0.6%,
-  7.2% {
     opacity: 1;
   }
-  9% {
+  12%,
+  41%,
+  70%,
+  90% {
     opacity: 0;
-    transform: translate(58px, -5px);
   }
-  72.9% {
-    opacity: 0;
-    transform: translate(70px, -4px);
-  }
-  73.6%,
-  80.2% {
+  30%,
+  58%,
+  84% {
     opacity: 1;
   }
-  82%,
-  100% {
-    opacity: 0;
-    transform: translate(-46px, 5px);
-  }
 }
-@keyframes bolt-draw-a {
-  0% {
-    stroke-dashoffset: 1;
-  }
-  3.6%,
-  72.9% {
-    stroke-dashoffset: 0;
-  }
-  73% {
-    stroke-dashoffset: 1;
-  }
-  76.6%,
-  100% {
-    stroke-dashoffset: 0;
-  }
-}
-/* C: en diagonal, de abajo a la izquierda hacia arriba a la derecha. */
-@keyframes bolt-strike-c {
+@keyframes arcs-flicker-2 {
   0%,
-  21.9% {
+  30%,
+  84% {
     opacity: 0;
-    transform: translate(-58px, 8px);
   }
-  22.6%,
-  29.2% {
+  12%,
+  70% {
     opacity: 1;
   }
-  31%,
-  100% {
-    opacity: 0;
-    transform: translate(66px, -7px);
-  }
 }
-@keyframes bolt-draw-c {
+@keyframes arcs-flicker-3 {
   0%,
-  22% {
-    stroke-dashoffset: 1;
-  }
-  25.6%,
-  100% {
-    stroke-dashoffset: 0;
-  }
-}
-/* B: de derecha a izquierda, casi horizontal. */
-@keyframes bolt-strike-b {
-  0%,
-  46.9% {
+  58% {
     opacity: 0;
-    transform: translate(62px, -3px);
   }
-  47.6%,
-  53.7% {
+  41%,
+  53% {
     opacity: 1;
   }
-  55.5%,
-  100% {
-    opacity: 0;
-    transform: translate(-60px, 4px);
+  49% {
+    opacity: 0.25;
+  }
+  90% {
+    opacity: 1;
   }
 }
-@keyframes bolt-draw-b {
+@keyframes arcs-glow {
   0%,
-  47% {
-    stroke-dashoffset: 1;
+  37%,
+  81% {
+    opacity: 0.45;
   }
-  50.6%,
-  100% {
-    stroke-dashoffset: 0;
+  22%,
+  64% {
+    opacity: 0.2;
+  }
+  93% {
+    opacity: 0.6;
   }
 }
