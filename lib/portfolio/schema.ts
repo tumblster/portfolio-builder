@@ -486,8 +486,18 @@ export const confirmImportInputSchema = z.object({
       }),
     )
     .max(MAX_NICHES, { error: `Puedes tener hasta ${MAX_NICHES} nichos.` }),
-  /** Nicho de cada pieza, por id de pieza del borrador; null = solo en "Todo". */
-  pieceNiches: z.record(z.string().max(100), nicheSlugSchema.nullable()),
+  /** Nicho de cada pieza, por id de pieza del borrador; null = solo en "Todo". (Clientes anteriores a la ronda 30/09.) */
+  pieceNiches: z.record(z.string().max(100), nicheSlugSchema.nullable()).optional(),
+  /**
+   * Ronda 30/09 · 7.1: las piezas elegidas, en el orden de los chips (ids del borrador o de "De tu perfil"), cada una
+   * con su nicho. Si viene, manda sobre pieceNiches.
+   */
+  selection: z
+    .array(z.object({ id: z.string().min(1).max(64), niche: nicheSlugSchema.nullable() }))
+    .max(LIMITS.instagramPosts)
+    .optional(),
+  /** Reintentar a propósito un borrador que quedó fallido (7.4 b). */
+  retry: z.boolean().optional(),
   design: designSchema,
 });
 export type ConfirmImportInput = z.output<typeof confirmImportInputSchema>;

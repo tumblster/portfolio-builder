@@ -1,3 +1,4 @@
+import type { CreatorMetric } from "@/lib/portfolio/metrics";
 import type { ManualPrefill } from "@/lib/import/events";
 import { recommendedPalette } from "@/components/design/design-pickers";
 import { DEFAULT_DESIGN, type Design } from "@/lib/portfolio/design";
@@ -72,8 +73,10 @@ export type PreviewExtras = {
   stats: ProfileStat[];
   metrics: Record<string, PieceMetrics>;
   engagementRate: EngagementRate | null;
+  /** Seguidores, Interacciones promedio y ER (ronda 30/09 · 7.2). */
+  creatorMetrics: CreatorMetric[];
 };
-export const NO_EXTRAS: PreviewExtras = { stats: [], metrics: {}, engagementRate: null };
+export const NO_EXTRAS: PreviewExtras = { stats: [], metrics: {}, engagementRate: null, creatorMetrics: [] };
 
 /** Lo que estaba guardado al abrir (o al último guardado): para saber qué cambió. */
 export type Baseline = { slug: string; revision: number; form: FormState; manual: ManualData; extras: PreviewExtras };
@@ -163,6 +166,7 @@ export function extrasFromPortfolio(resolved: ResolvedPortfolio): PreviewExtras 
     stats: resolved.stats,
     metrics: Object.fromEntries(resolved.pieces.map((piece) => [piece.id, piece.metrics])),
     engagementRate: resolved.engagementRate,
+    creatorMetrics: resolved.metrics,
   };
 }
 
@@ -282,6 +286,7 @@ export function toPreview(form: FormState, extras: PreviewExtras = NO_EXTRAS): R
       .map((service) => ({ title: service.title.trim(), description: service.description.trim() })),
     stats: extras.stats,
     engagementRate: extras.engagementRate,
+    metrics: extras.creatorMetrics,
     design: form.design,
     pieces: form.pieces.map((piece, index) => {
       const video = piece.videoUrl.trim() ? parseVideoLink(piece.videoUrl) : null;

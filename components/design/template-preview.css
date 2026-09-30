@@ -506,3 +506,52 @@
 .tpv-ed-num {
   color: var(--pv-deep-muted);
 }
+
+/* Miniatura real de la pieza (ronda 30/09): la imagen cubre el 16:9 y el play queda encima. */
+.tpv-video[style] {
+  background-position: center;
+  background-size: cover;
+}
+
+/* Media Kit (ronda 30/09 · 7.3) */
+.tpv-mk-badge {
+  padding: 0.1875rem 0.625rem;
+  border-radius: 999px;
+  background: var(--pv-accent-soft);
+  font-size: 0.5625rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.tpv-mk-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.3125rem;
+  width: 100%;
+}
+.tpv-mk-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  min-width: 0;
+  padding: 0.4375rem 0.25rem;
+  border: 1px solid var(--pv-line);
+  border-radius: 0.625rem;
+  background: #ffffff;
+}
+.tpv-mk-metric b {
+  font-size: 0.875rem;
+  letter-spacing: -0.02em;
+}
+.tpv-mk-metric small {
+  color: var(--pv-muted);
+  font-size: 0.5rem;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+.tpv-mk-platform {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-weight: 600;
+}

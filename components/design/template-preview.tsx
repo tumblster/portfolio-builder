@@ -1,13 +1,18 @@
+"use client";
+
 import { memo, useState, type CSSProperties } from "react";
 import type { Palette } from "@/lib/palette/palettes";
 import type { TemplateId } from "@/lib/portfolio/design";
 import "./template-preview.css";
 
 /*
- * Vista previa grande de una plantilla (v2 · M4-rev r2, C1 + C4). Se usa al importar, en los pasos Plantilla y
- * Paleta. Es la parte de arriba del portafolio en un celular, dibujada con HTML: la estructura de cada plantilla,
- * los datos reales de la creadora (nombre, nichos, Engagement Rate como métrica principal), miniaturas de video
- * 16:9 con play y los textos largos como skeleton (barras con brillo).
+ * Vista previa grande de una plantilla (v2 · M4-rev r2, C1 + C4). Se usa al importar (pasos Plantilla y Paleta y el
+ * modal "Preview") y en el hero de la landing. Es la parte de arriba del portafolio en un celular, dibujada con HTML:
+ * la estructura de cada plantilla, los datos reales de la creadora (nombre, nichos, miniaturas de sus piezas),
+ * videos 16:9 con play y los textos largos como skeleton (barras con brillo).
+ *
+ * Ronda 30/09 · 7.3: es la vista "Sobre mí", que ya no lleva métricas (el ER vive en el Media Kit). El Media Kit
+ * tiene su propia vista previa (MediaKitPreview).
  *
  * La paleta se aplica con los MISMOS roles que usan las plantillas reales (app/portfolio*.css), así lo que se ve
  * es lo que sale: fondo, tinta del texto y de los botones (el acento nunca lleva texto: regla 7:1), bloques
@@ -20,8 +25,10 @@ export type PreviewData = {
   handle: string;
   /** Nichos confirmados (nombres), en orden. */
   niches: string[];
-  /** Engagement Rate ya formateado ("6,2 %"), o null si no hay. */
-  er: string | null;
+  /** Miniaturas de sus piezas, en orden (url o null); sin ellas, rectángulos del color de la paleta. */
+  thumbs?: (string | null)[];
+  /** Seguidores, Interacciones promedio y ER, ya formateados: solo los usa el Media Kit. */
+  metrics?: { label: string; display: string }[];
 };
 
 function previewStyle(p: Palette): CSSProperties {
@@ -46,9 +53,9 @@ function Line({ width, tone }: { width: string; tone?: "light" }) {
   return <span className="tpv-sk" data-tone={tone} style={{ width }} />;
 }
 
-function Video({ tone }: { tone?: "deep" }) {
+function Video({ tone, src }: { tone?: "deep"; src?: string | null }) {
   return (
-    <span className="tpv-video" data-tone={tone}>
+    <span className="tpv-video" data-tone={tone} style={src ? { backgroundImage: `url("${src}")` } : undefined}>
       <span className="tpv-play">
         <svg viewBox="0 0 10 10" focusable="false">
           <path d="M3.4 2.3v5.4L8 5z" />
@@ -81,20 +88,10 @@ function Pills({ niches }: { niches: string[] }) {
   );
 }
 
-function Er({ value, tone }: { value: string; tone?: "light" }) {
-  return (
-    <span className="tpv-er" data-tone={tone}>
-      <span className="tpv-er__value">{value}</span>
-      <span className="tpv-er__label">
-        <i className="tpv-dot" />
-        Engagement Rate
-      </span>
-    </span>
-  );
-}
 
 function Body({ template, data }: { template: TemplateId; data: PreviewData }) {
-  const { name, handle, niches, er } = data;
+  const { name, handle, niches } = data;
+  const thumb = (index: number) => data.thumbs?.[index] ?? null;
   const firstName = name.split(/\s+/)[0] || name;
   const kicker = ["Creadora UGC", ...niches].join(" · ");
   switch (template) {
@@ -132,12 +129,11 @@ function Body({ template, data }: { template: TemplateId; data: PreviewData }) {
               Ver mi trabajo
             </span>
           </span>
-          {er && <Er value={er} />}
           <div className="tpv-block" data-tone="deep">
             <span className="tpv-block__title">Trabajo seleccionado</span>
             <span className="tpv-grid2">
-              <Video tone="deep" />
-              <Video tone="deep" />
+              <Video tone="deep" src={thumb(0)} />
+              <Video tone="deep" src={thumb(1)} />
             </span>
             <Line width="60%" tone="light" />
           </div>
@@ -158,12 +154,6 @@ function Body({ template, data }: { template: TemplateId; data: PreviewData }) {
             {name}
           </p>
           <p className="tpv-handle">{handle}</p>
-          {er && (
-            <span className="tpv-chip">
-              <i className="tpv-dot" />
-              <b>{er}</b> ER
-            </span>
-          )}
           <span className="tpv-links">
             <span className="tpv-link" data-kind="solid">
               Trabajemos juntos
@@ -174,7 +164,7 @@ function Body({ template, data }: { template: TemplateId; data: PreviewData }) {
           </span>
           {[0, 1].map((row) => (
             <span key={row} className="tpv-row">
-              <Video />
+              <Video src={thumb(row)} />
               <span className="tpv-row__text">
                 <Line width="90%" />
                 <Line width="55%" />
@@ -204,17 +194,11 @@ function Body({ template, data }: { template: TemplateId; data: PreviewData }) {
               Escríbeme
             </span>
           </span>
-          {er && (
-            <span className="tpv-rule">
-              <Er value={er} />
-            </span>
-          )}
           <Pills niches={niches} />
           <span className="tpv-grid2" data-gap="tight">
-            <Video />
-            <Video />
-            <Video />
-            <Video />
+            {[0, 1, 2, 3].map((index) => (
+              <Video key={index} src={thumb(index)} />
+            ))}
           </span>
         </div>
       );
@@ -232,21 +216,64 @@ function Body({ template, data }: { template: TemplateId; data: PreviewData }) {
           <p className="tpv-ed-display">{name}</p>
           <Line width="86%" tone="light" />
           <Line width="60%" tone="light" />
-          {er && <Er value={er} tone="light" />}
-          {["01", "02", "03"].map((number) => (
+          {["01", "02", "03"].map((number, index) => (
             <span key={number} className="tpv-ed-row">
               <span className="tpv-ed-num">{number}</span>
               <span className="tpv-row__text">
                 <Line width="92%" tone="light" />
                 <Line width="48%" tone="light" />
               </span>
-              <Video tone="deep" />
+              <Video tone="deep" src={thumb(index)} />
             </span>
           ))}
         </div>
       );
   }
 }
+
+/**
+ * Vista previa del Media Kit (ronda 30/09 · 7.3), con la misma paleta: cabecera (avatar, nombre, nicho), las 3
+ * métricas, plataformas, piezas destacadas, el párrafo "Sobre mí" y "Trabaja conmigo".
+ */
+export const MediaKitPreview = memo(function MediaKitPreview({ palette, data }: { palette: Palette; data: PreviewData }) {
+  const metrics = data.metrics ?? [];
+  return (
+    <div className="tpv" data-template="mediakit" style={previewStyle(palette)} aria-hidden="true">
+      <div className="tpv-page" data-center="">
+        <span className="tpv-mk-badge">Media kit</span>
+        <Avatar name={data.name} size="lg" />
+        <p className="tpv-h1" data-size="md">
+          {data.name}
+        </p>
+        {data.niches[0] && <span className="tpv-pill" data-on="">{data.niches[0]}</span>}
+        {metrics.length > 0 && (
+          <span className="tpv-mk-metrics">
+            {metrics.map((metric) => (
+              <span key={metric.label} className="tpv-mk-metric">
+                <b>{metric.display}</b>
+                <small>{metric.label}</small>
+              </span>
+            ))}
+          </span>
+        )}
+        <span className="tpv-mk-platform">
+          <i className="tpv-dot" />
+          Instagram · {data.handle}
+        </span>
+        <span className="tpv-grid2" data-gap="tight">
+          {[0, 1].map((index) => (
+            <Video key={index} src={data.thumbs?.[index] ?? null} />
+          ))}
+        </span>
+        <Line width="92%" />
+        <Line width="70%" />
+        <span className="tpv-btn" data-kind="solid">
+          Trabaja conmigo
+        </span>
+      </div>
+    </div>
+  );
+});
 
 /** Una plantilla con una paleta, sin transición. Memoizada: solo se vuelve a dibujar si cambia algo. */
 export const TemplatePreview = memo(function TemplatePreview({
