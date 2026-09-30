@@ -9,7 +9,8 @@ import { PilotFloat } from "@/components/landing/pilot-float";
 import { PilotSignup } from "@/components/landing/pilot-signup";
 import { Chispa, type Expression } from "@/components/mascot/chispa";
 import { MascotTraveler } from "@/components/mascot/mascot-traveler";
-import { fontTmj, interTight } from "@/lib/fonts/landing";
+import { interTight } from "@/lib/fonts/inter-tight";
+import { fontTmj } from "@/lib/fonts/tmj";
 
 /*
  * Landing pública "/" (v2 · M4-rev r2). Tres bloques: hero → roadmap de producto ("For you page") → cierre con la

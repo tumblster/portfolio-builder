@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { notFoundFontClasses } from "@/lib/fonts/studio";
+import { notFoundFontClasses } from "@/lib/fonts/not-found";
 
 export const metadata: Metadata = {
   title: "No encontrado",

@@ -40,12 +40,3 @@ export const dmSansPreview = DM_Sans({
 });
 
 export const studioFontClasses = `${anton.variable} ${inter.variable} ${fragmentMono.variable} ${dmSansPreview.variable}`;
-
-/*
- * Para la 404 raíz (app/not-found.tsx): las mismas Anton e Inter, pero SIN precarga. La 404 raíz forma parte del
- * árbol de todas las rutas, así que lo que ella importe con precarga se precargaba en todas las páginas
- * (landing y portafolios públicos incluidos). Así solo se descargan cuando de verdad se muestra la 404.
- */
-const antonLazy = Anton({ subsets: ["latin"], weight: "400", display: "swap", preload: false, variable: "--font-anton" });
-const interLazy = Inter({ subsets: ["latin"], display: "swap", preload: false, variable: "--font-inter" });
-export const notFoundFontClasses = `${antonLazy.variable} ${interLazy.variable}`;

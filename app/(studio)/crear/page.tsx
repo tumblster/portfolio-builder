@@ -6,7 +6,7 @@ import { LandingFooter, LandingHeader } from "@/components/landing/landing-chrom
 import { LogoutButton } from "@/components/logout-button";
 import { Chispa } from "@/components/mascot/chispa";
 import { getCreatorAccess } from "@/lib/auth";
-import { interTight } from "@/lib/fonts/landing";
+import { interTight } from "@/lib/fonts/inter-tight";
 import "@/components/crear-brand.css";
 
 // Depende de la cookie de sesión: se decide en cada visita.
