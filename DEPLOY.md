@@ -41,8 +41,17 @@ Así, lo que pruebes en un deploy de prueba nunca toca los portafolios reales.
 | `APIFY_TOKEN`        | tu token                             | el mismo (o vacío si no vas a importar en pruebas) |
 | `GROQ_API_KEY`       | tu key                               | la misma                                       |
 | `BLOB_*`             | la pone el store de producción       | la pone el store de preview                    |
+| `GOOGLE_SHEETS_SPREADSHEET_ID` | el Sheet del piloto (§4.1)   | el mismo, u otro de pruebas                    |
+| `GOOGLE_SERVICE_ACCOUNT_EMAIL` | la cuenta de servicio (§4.1) | la misma                                       |
+| `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY` | su clave privada (§4.1) | la misma                                      |
+| `GOOGLE_SHEETS_RANGE` (opcional) | `Piloto!A:C` si no está    | igual                                          |
 
 No crees `STORAGE_DRIVER` en Vercel: allá usa Blob solo.
+
+**Ojo con Preview (ronda 30/09 · 7.4 c):** la generación (`/api/import/confirm`) usa exactamente las mismas variables
+que la importación: `CREATOR_ACCESS_KEY` y el Blob (`BLOB_READ_WRITE_TOKEN`, o el par `PREV_BLOB_READ_WRITE_TOKEN` +
+`PREV_BLOB_STORE_ID` en Preview / `PROD_BLOB_*` en Producción). No usa Apify ni Groq. Para verificar qué ve cada
+deployment, abre **`/api/import/health`** con la sesión iniciada (§4.2).
 
 **Opcionales desde el M4** (landing del studio; se fijan en el build, así que después de cambiarlas hay que
 volver a desplegar):
@@ -52,6 +61,42 @@ volver a desplegar):
   que explica que durante el piloto se entra con clave.
 - `NEXT_PUBLIC_EXAMPLE_PORTFOLIO_URL`: un portafolio real ya publicado (`https://…/p/<slug>`). Si está, la
   sección de plantillas de la landing muestra "Ver un portafolio real ›".
+
+### 4.1 Correos del piloto → Google Sheets (ronda 30/09 · 8.4)
+
+Los correos de "Únete al programa piloto" van a un Google Sheet (una fila por correo: fecha UTC, correo, origen).
+Sin estas variables el sitio funciona igual en **modo mock**: la fila queda en el Blob store, carpeta
+`pilot-sheet-mock/` (con `mock: true`), y la respuesta lo dice (`sink: "mock"`, cabecera `X-Pilot-Sink: mock`).
+
+1. **Google Cloud** (console.cloud.google.com) → un proyecto → **APIs y servicios → Biblioteca** → habilita
+   **Google Sheets API**.
+2. **IAM y administración → Cuentas de servicio → Crear** (sin roles). En la cuenta: **Claves → Agregar clave →
+   JSON**. Del JSON salen `client_email` → `GOOGLE_SERVICE_ACCOUNT_EMAIL` y `private_key` →
+   `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY` (pégala tal cual, con sus `\n`; el código los convierte).
+3. **El Sheet:** crea una hoja nueva, nombra la pestaña **`Piloto`** y pon en la fila 1: `Fecha | Correo | Origen`.
+   Compártela con el `client_email` como **Editor**. El id es la parte de la URL entre `/d/` y `/edit` →
+   `GOOGLE_SHEETS_SPREADSHEET_ID`.
+4. Carga las 3 variables en Vercel (Production y Preview) y **vuelve a desplegar**.
+5. Prueba: `BASE=https://<tu-preview>.vercel.app npm run test:sheet` (con las mismas 3 variables en tu `.env.local`):
+   envía un correo de prueba y verifica que la fila llegó al Sheet. Sin variables, verifica el modo mock.
+
+Si Google rechaza la fila, el visitante ve "No pudimos guardar tu correo. Intenta de nuevo en un momento." (502) y
+el correo **no** se marca como anotado: puede volver a intentarlo. En los logs: `"scope":"pilot.sheet"`.
+
+### 4.2 Diagnóstico de la generación (ronda 30/09 · 7.4)
+
+- **`GET /api/import/health`** (con sesión): por fase (sesión, importación, generación, Sheet del piloto), qué
+  variables ve ESTE deployment (solo `true`/`false`, nunca los valores) y `missing` con lo que falta. Ábrelo en el
+  Preview y en Producción y compáralos.
+- **`GET /api/import/status?draftId=<id>`** (con sesión): estado del borrador — `pending`, `generating`, `stale`,
+  `done` (con su link) o `failed` (con causa y hora). El `draftId` sale en los logs (`"scope":"import.confirm"`).
+- **Qué cambió:** si la generación lanza una excepción, el borrador queda `failed` y el servidor responde un error
+  terminal (`generation_failed`), nunca más 409. Si la escritura condicional del candado falla sin que otra petición
+  lo haya tomado (el almacenamiento no respeta el etag: era la forma de tener un 409 eterno), queda `failed` con
+  causa `storage_conflict`. El cliente reintenta los 409 a lo más 6 veces y corta a los 50 s con un error claro.
+  "Generar portafolio" otra vez pide un reintento explícito.
+- **Si ves `storage_conflict` en Preview:** es el almacenamiento, no el código ni una variable: revisa que el Blob
+  store de Preview sea **privado** y esté conectado a Preview, y mándame el log de ese `draftId`.
 
 ## 5. Primer deploy y prueba
 
@@ -321,6 +366,27 @@ Qué se verificó en desarrollo:
 Rendimiento de la landing (360 px, Slow 4G, CPU 4×, 5 corridas en frío): **784 ms** de mediana (768–908 ms),
 una sola fuente (47,4 KB), CSS 16,8 KB, JS 135 KB, HTML 10,3 KB.
 
+### Verificación ronda 30/09 (secciones 7 y 8)
+
+Hecho en local (build de producción con Turbopack + prueba de humo 154/154 + Chromium en 390 px y escritorio):
+
+- **7.1 Chips:** autocompletado con la coincidencia resaltada; Enter agrega sin cerrar la lista; Backspace con el
+  campo vacío quita el último chip; la × devuelve el foco al campo; Alt + flechas mueve el chip con foco (el foco lo
+  acompaña); arrastre con el asa (mouse y toque); "De tu perfil" suma piezas como chips; el orden elegido llega
+  tal cual al portafolio; botón flotante "Preview" → modal con "Sobre mí" y "Media kit" (cierra con Esc).
+- **7.2 Métricas:** Seguidores, Interacciones promedio y ER, con su base, en la revisión y en el Media Kit.
+- **7.3 Toggle:** SOBRE MÍ por defecto (sin métricas ni selector de nichos); MEDIA KIT con cabecera, las 3 métricas,
+  plataformas, piezas destacadas, Sobre mí y "Trabaja conmigo"; `#media-kit` abre directo; los links por nicho
+  siguen filtrando.
+- **7.4 Bugfix:** con un 409 eterno simulado, el error terminal aparece a los 41 s (< 60 s); un fallo de generación
+  deja el borrador `failed` y consultable; nunca más 409 para ese borrador salvo reintento explícito.
+- **8.1–8.4:** hero que muta entre las 4 plantillas y 5 paletas; arcos eléctricos con turbulencia y flicker; tarjeta
+  CTA negra; correo → Sheet (probado en modo mock; el modo real se prueba con `npm run test:sheet`).
+
+**Para probar en el Preview (E2):** importar → chips (quita, agrega de "De tu perfil", reordena) → Preview →
+plantilla → paleta → generar → modal; abrir el portafolio y cambiar a MEDIA KIT; `/api/import/health` sin
+`missing`; y, con el Sheet creado, anotar un correo en la landing y verlo en el Sheet.
+
 ## 11. Deudas aceptadas
 
 Ítems del checklist de arquitectura que se decidió no cubrir en el piloto. Son decisiones conscientes, no
@@ -376,3 +442,13 @@ descuidos: cada una dice qué riesgo implica y cuándo hay que volver a revisarl
   espacio y ruido en la lista).
 - **Cuándo revisarla:** si aparecen altas que no parecen personas. Solución prevista: límite por IP o
   Vercel Firewall.
+
+### ⚠ Deuda aceptada: las filas del modo mock del piloto se copian a mano
+
+- **Qué es:** mientras el Sheet no esté configurado, los correos quedan en `pilot-sheet-mock/` del Blob store.
+- **Cuándo revisarla:** al configurar el Sheet (§4.1), copia esas filas una vez y bórralas del store.
+
+### ⚠ Deuda aceptada: los registros de fallos de borradores no se borran solos
+
+- **Qué es:** cada borrador fallido deja `drafts/<id>.failure.json` (se usa para el estado consultable).
+- **Riesgo concreto:** ninguno más allá de espacio; son pocos bytes. Se limpian junto con los borradores viejos.
