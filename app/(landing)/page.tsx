@@ -91,7 +91,8 @@ export default function LandingPage() {
 
       <main className="overflow-x-clip">
         {/* 1 · Hero: copy, Chispa protagonista y la mini-mock */}
-        <section className={`${container} landing-hero pt-20 pb-20 md:pt-40 md:pb-32 lg:pb-40`} data-hero>
+        {/* r3 · 4: ~45 % menos de aire (arriba se descuentan los 64 px de la navegación fija). */}
+        <section className={`${container} landing-hero pt-18 pb-11 md:pt-28 md:pb-18 lg:pb-22`} data-hero>
           {/* En el celular el stack de texto va centrado bajo la cara; desde tablet, a la izquierda. */}
           <div className="landing-hero__copy text-center md:text-left">
             <h1 className={`${fontTmj.variable} landing-h1 text-[2.375rem] leading-[1.06] font-medium tracking-[-0.03em] sm:text-5xl lg:text-[3.75rem]`}>
