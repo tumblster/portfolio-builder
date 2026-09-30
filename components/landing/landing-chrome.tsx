@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { SupercreadorMark } from "@/components/brand/supercreador-mark";
 import "./brand.css";
 
@@ -23,11 +24,18 @@ export function LandingLogo({ mascotTarget = false }: { mascotTarget?: boolean }
   );
 }
 
-export function LandingHeader({ base = "" }: { base?: "" | "/" }) {
+/**
+ * `nav`: reemplaza la navegación de la landing (anclas + CTA del piloto) por otra, p. ej. en /crear, donde quien
+ * entra ya es del piloto y solo necesita "Salir".
+ */
+export function LandingHeader({ base = "", nav }: { base?: "" | "/"; nav?: ReactNode }) {
   return (
     <header className="landing-glass fixed inset-x-0 top-0 z-40">
       <div className={`${landingContainer} flex h-16 items-center justify-between gap-4`}>
         <LandingLogo />
+        {nav !== undefined ? (
+          nav
+        ) : (
         <nav aria-label="Principal" className="flex items-center gap-1 md:gap-2">
           {[
             [`${base}#como-funciona`, "Roadmap"],
@@ -44,6 +52,7 @@ export function LandingHeader({ base = "" }: { base?: "" | "/" }) {
             Únete al<span className="hidden sm:inline">&nbsp;programa</span>&nbsp;piloto
           </a>
         </nav>
+        )}
       </div>
     </header>
   );

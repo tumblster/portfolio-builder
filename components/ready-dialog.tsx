@@ -12,7 +12,7 @@ import { nichesWithPieces } from "@/lib/portfolio/niches";
 import type { ResolvedPortfolio } from "@/lib/portfolio/resolve";
 import { Avatar } from "./avatar";
 import { CopyButton } from "./copy-button";
-import { errorText, fieldLabel, pillButton, primaryButton } from "./ui";
+import { errorText, fieldLabel, pillButton, primaryButton } from "./brand-ui";
 
 /**
  * "Portafolio listo" (v2 · M1; diseño editable desde el M2): modal centrado con el link, copiar, abrir, editar y crear otro.

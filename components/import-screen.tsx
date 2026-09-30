@@ -16,7 +16,7 @@ import { parseInstagramUsername } from "@/lib/instagram/username";
 import { ImportReview } from "./import-review";
 import { PrefillSummary } from "./prefill-summary";
 import { ReadyDialog } from "./ready-dialog";
-import { errorText, fieldLabel, pillButton, primaryButton, textInput } from "./ui";
+import { errorText, fieldLabel, pillButton, primaryButton, textInput } from "./brand-ui";
 
 /*
  * Flujo principal: pegar el perfil de Instagram → portafolio con link.

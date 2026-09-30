@@ -12,7 +12,7 @@ import { DEFAULT_DESIGN, TEMPLATE_INFO, type PaletteId, type TemplateId } from "
 import { describeEngagementRate } from "@/lib/portfolio/engagement";
 import { MAX_NICHES, NICHE_LABEL_MAX, nicheFromLabel } from "@/lib/portfolio/niches";
 import { Avatar } from "./avatar";
-import { compactSelect, errorText, pillButton, primaryButton, textInput, textLink } from "./ui";
+import { compactSelect, errorText, pillButton, primaryButton, textInput, textLink } from "./brand-ui";
 
 /*
  * Antes de generar (v2 · M2): el creador corrige lo que sugirió la IA y elige cómo se ve.
@@ -297,7 +297,8 @@ export function ImportReview({ draft, onGenerated, onStartOver, onUnauthorized }
               type="button"
               onClick={() => (index <= step || validateNiches() ? goTo(index) : undefined)}
               aria-current={index === step ? "step" : undefined}
-              className={`w-full rounded-full border-2 px-2 py-2 text-[0.8125rem] font-semibold transition sm:px-3 sm:text-sm ${
+              data-step-pill
+              className={`min-h-tap w-full rounded-full border-2 px-2 py-2 text-[0.8125rem] leading-tight font-semibold [overflow-wrap:anywhere] transition sm:px-3 sm:text-sm ${
                 index === step ? "border-ink bg-highlight text-ink" : "border-line text-muted hover:text-ink"
               }`}
             >
