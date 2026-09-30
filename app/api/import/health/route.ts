@@ -1,12 +1,16 @@
 import type { NextRequest } from "next/server";
 import { requireCreator } from "@/lib/auth";
 import { jsonResponse } from "@/lib/errors";
+import { storageRoundTrip } from "@/lib/storage/self-test";
 
 /*
  * Diagnóstico de configuración (ronda 30/09 · 7.4 c): qué variables de entorno ve ESTE deployment en cada fase del
  * flujo. Solo dice si existen (true/false), nunca su valor. Requiere la clave. Abrirlo en el Preview y en
  * Producción muestra al tiro si a uno le falta algo (ver DEPLOY.md).
  * GET /api/import/health
+ * GET /api/import/health?roundtrip=1 → además prueba de verdad el almacenamiento de ESTE deployment (spec 10.1):
+ *   leer → escritura condicional → leer (roundtrip) y, en Blob, compara el etag de head() con el de get() y prueba
+ *   ifMatch con cada uno (blobEtags). Escribe solo en health/.
  */
 
 const has = (name: string) => Boolean(process.env[name]?.trim());
@@ -44,8 +48,16 @@ export async function GET(request: NextRequest) {
   const missing = Object.entries(phases).flatMap(([phase, vars]) =>
     phase === "pilotSheet" ? [] : Object.entries(vars).flatMap(([name, ok]) => (ok ? [] : [`${phase}.${name}`])),
   );
+  let checks: Record<string, unknown> | undefined;
+  if (request.nextUrl.searchParams.get("roundtrip") === "1") {
+    checks = { roundtrip: await storageRoundTrip().catch((error) => ({ ok: false, error: String(error) })) };
+    if (driver === "blob") {
+      const { diagnoseBlobEtags } = await import("@/lib/storage/blob");
+      checks.blobEtags = await diagnoseBlobEtags().catch((error) => ({ error: String(error) }));
+    }
+  }
   return jsonResponse(
-    { vercelEnv, storage: { driver, ...(driver === "blob" ? { blob } : {}) }, phases, missing, ok: missing.length === 0 },
+    { vercelEnv, storage: { driver, ...(driver === "blob" ? { blob } : {}) }, phases, missing, ok: missing.length === 0, ...(checks ? { checks } : {}) },
     { headers: { "Cache-Control": "no-store" } },
   );
 }
