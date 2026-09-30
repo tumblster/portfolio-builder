@@ -376,10 +376,10 @@ try {
   const landing = await fetch(BASE + "/", { redirect: "manual" });
   const landingHtml = await landing.text();
   const visible = landingHtml.replace(/<(script|style|title)[^>]*>[\s\S]*?<\/\1>/g, " ");
-  // El glyph de Instagram (B4) se lee como la palabra, igual que para un lector de pantalla (aria-label).
+  // El logo de Instagram (r3 · 1) se lee como la palabra, igual que para un lector de pantalla (aria-label).
   const textOf = (html) =>
     html
-      .replace(/<svg[^>]*aria-label="Instagram"[\s\S]*?<\/svg>/g, "Instagram")
+      .replace(/<span[^>]*role="img"[^>]*aria-label="Instagram"[^>]*>\s*<\/span>/g, "Instagram")
       .replace(/<svg[\s\S]*?<\/svg>/g, "")
       .replace(/<[^>]+>/g, "")
       .replace(/\s+/g, " ")
@@ -423,8 +423,9 @@ try {
   );
   const heroSubHtml = landingHtml.match(/<\/h1>\s*<p[^>]*>([\s\S]*?)<\/p>/)?.[1] ?? "";
   check(
-    /<svg[^>]*role="img"[^>]*aria-label="Instagram"/.test(heroSubHtml) && !/Instagram/.test(heroSubHtml.replace(/<svg[\s\S]*?<\/svg>/g, "")),
-    "Instagram va como glyph (la cámara, con aria-label) en vez de la palabra",
+    /<span[^>]*role="img"[^>]*aria-label="Instagram"[^>]*class="instagram-logo"/.test(heroSubHtml) &&
+      !/Instagram/.test(heroSubHtml.replace(/<span[^>]*aria-label="Instagram"[^>]*>\s*<\/span>/g, "")),
+    "Instagram va con su logo oficial (con aria-label) en vez de la palabra",
   );
   const electric = visible.match(/<span[^>]*data-electric[^>]*>superpoderes([\s\S]*?)<\/span>/)?.[1] ?? "";
   const bolts = [...electric.matchAll(/<svg[^>]*class="electric-bolt [^"]*"[^>]*>/g)].map((m) => m[0]);
