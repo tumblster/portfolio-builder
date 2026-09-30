@@ -20,33 +20,33 @@
   opacity: 0.85;
 }
 .electric-bolt--a {
-  top: -0.46em;
-  left: -0.36em;
-  width: 0.3em;
-  height: 0.45em;
+  top: -0.56em;
+  left: -0.42em;
+  width: 0.38em;
+  height: 0.56em;
 }
 .electric-bolt--b {
-  top: -0.5em;
-  left: -0.02em;
-  width: 0.2em;
-  height: 0.17em;
+  top: -0.6em;
+  left: 0em;
+  width: 0.25em;
+  height: 0.21em;
 }
 .electric-bolt--c {
-  top: -0.48em;
-  right: -0.4em;
-  width: 0.33em;
-  height: 0.45em;
+  top: -0.58em;
+  right: -0.46em;
+  width: 0.41em;
+  height: 0.56em;
 }
 .electric-bolt--d {
-  top: -0.5em;
+  top: -0.6em;
   right: 0em;
-  width: 0.2em;
-  height: 0.2em;
+  width: 0.25em;
+  height: 0.25em;
 }
 
 @media (prefers-reduced-motion: no-preference) {
   .electric-bolt path {
-    opacity: 0.32;
+    opacity: 0.45;
     stroke-dasharray: 1;
     animation: electric-discharge 5.2s linear infinite;
   }
@@ -69,7 +69,7 @@
   0%,
   88% {
     stroke-dashoffset: 0;
-    opacity: 0.32;
+    opacity: 0.45;
   }
   88.5% {
     stroke-dashoffset: 1;
@@ -87,6 +87,6 @@
   }
   100% {
     stroke-dashoffset: 0;
-    opacity: 0.32;
+    opacity: 0.45;
   }
 }

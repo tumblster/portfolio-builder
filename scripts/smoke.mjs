@@ -411,6 +411,10 @@ try {
     { h1, heroSub, first: heroCopy?.[2] },
   );
   check(
+    /<h1[^>]*class="[^"]*\blanding-h1\b/.test(visible) && (visible.match(/landing-h1/g) ?? []).length === 1,
+    "El H1 (y solo el H1) usa la fuente TMJ",
+  );
+  check(
     /\btext-center\b/.test(heroCopy?.[1] ?? "") && /\bmd:text-left\b/.test(heroCopy?.[1] ?? ""),
     "Hero: el stack de texto va centrado en el celular y a la izquierda desde tablet",
   );
@@ -467,8 +471,10 @@ try {
   const mascotSvgs = [...visible.matchAll(/<svg[^>]*\sdata-mascot="[\s\S]*?<\/svg>/g)].map((m) => m[0]);
   const mascotBytes = mascotSvgs.reduce((sum, svg) => sum + Buffer.byteLength(svg), 0) + Buffer.byteLength(mascotCss);
   check(
-    mascotSvgs.length === 6 && mascotBytes < 10_000,
-    `Chispa pesa ${(mascotBytes / 1024).toFixed(1)} KB en la página: ${mascotSvgs.length} caras (hero + 5 de la viajera) y su CSS (< 10 KB)`,
+    // 11 KB (antes 10): la viajera lleva su propia carcajada (no un <use> del hero) para dejar de "respirar" y
+    // calzar exacto con el logo del footer.
+    mascotSvgs.length === 6 && mascotBytes < 11_000,
+    `Chispa pesa ${(mascotBytes / 1024).toFixed(1)} KB (${mascotBytes} B) en la página: ${mascotSvgs.length} caras (hero + 5 de la viajera) y su CSS (< 11 KB)`,
   );
   check(
     /prefers-reduced-motion:\s*reduce\)\s*\{\s*\.mascot-traveler\s*\{\s*display:\s*none/.test(landingCss.replace(/\s+/g, " ")) &&
@@ -617,8 +623,11 @@ try {
     `Avatar de la marca (app/apple-icon.png): 180 × 180 px`,
   );
 
-  const landingFonts = (landingHtml.match(/<link[^>]+as="font"/g) ?? []).length;
-  check(landingFonts === 1 && !/--font-anton|studio min-h-dvh/.test(visible), `La landing carga una sola fuente (${landingFonts}) y no el sistema del studio`);
+  const landingFontLinks = landingHtml.match(/<link[^>]+as="font"[^>]*>/g) ?? [];
+  check(
+    landingFontLinks.length === 2 && landingFontLinks.some((link) => /TMJ/.test(link)) && !/--font-anton|studio min-h-dvh/.test(visible),
+    `La landing precarga solo sus 2 fuentes (Inter y la TMJ del H1: ${landingFontLinks.length}) y no el sistema del studio`,
+  );
 
   // Contraste de los tokens del studio, leídos del CSS que se sirve.
   const cssHrefs = [...landingHtml.matchAll(/<link[^>]+href="([^"]+\.css[^"]*)"/g)].map((m) => m[1]);
