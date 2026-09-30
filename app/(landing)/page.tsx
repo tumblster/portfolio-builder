@@ -112,6 +112,14 @@ export default function LandingPage() {
                 Ver el roadmap <Chevron />
               </a>
             </div>
+            <p className="mt-3 text-[0.9375rem] text-muted md:mt-4" data-hero-access>
+              <Link
+                href="/acceso"
+                className="font-medium text-ink underline decoration-accent decoration-2 underline-offset-4 hover:text-accent-ink"
+              >
+                ¿Tienes un código? Accede aquí
+              </Link>
+            </p>
           </div>
           <div className="landing-hero__face" data-hero-mascot>
             <Chispa expression="carcajada" id="chispa-hero" className="block h-auto w-full text-ink" />

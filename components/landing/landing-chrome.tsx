@@ -15,11 +15,13 @@ export const landingPrimary =
   "landing-btn-3d inline-flex h-12 items-center justify-center rounded-full bg-ink px-6 text-[0.9375rem] font-medium text-cream transition-colors hover:bg-[#2a2e24]";
 
 /** Lockup: la sonrisa (30 px de alto) + el wordmark, separados por más de un diente (15 px a esta escala). */
-export function LandingLogo({ mascotTarget = false }: { mascotTarget?: boolean }) {
+export function LandingLogo({ mascotTarget = false, compact = false }: { mascotTarget?: boolean; compact?: boolean }) {
   return (
-    <Link href="/" className="flex min-h-11 items-center gap-4 text-[1.0625rem] font-semibold tracking-[-0.02em]">
+    <Link href="/" className="flex min-h-11 shrink-0 items-center gap-4 text-[1.0625rem] font-semibold tracking-[-0.02em]">
       <SupercreadorMark className="h-[30px] w-auto text-ink" mascotTarget={mascotTarget} />
-      Supercreador
+      {/* Header en pantallas de menos de 400 px (compact): solo la sonrisa, para que quepan "Acceso" y el CTA; el
+          nombre sigue ahí para lectores de pantalla. */}
+      <span className={compact ? "max-[399px]:sr-only" : undefined}>Supercreador</span>
     </Link>
   );
 }
@@ -28,11 +30,11 @@ export function LandingLogo({ mascotTarget = false }: { mascotTarget?: boolean }
  * `nav`: reemplaza la navegación de la landing (anclas + CTA del piloto) por otra, p. ej. en /crear, donde quien
  * entra ya es del piloto y solo necesita "Salir".
  */
-export function LandingHeader({ base = "", nav }: { base?: "" | "/"; nav?: ReactNode }) {
+export function LandingHeader({ base = "", nav, below }: { base?: "" | "/"; nav?: ReactNode; below?: ReactNode }) {
   return (
     <header className="landing-glass fixed inset-x-0 top-0 z-40">
-      <div className={`${landingContainer} flex h-16 items-center justify-between gap-4`}>
-        <LandingLogo />
+      <div className={`${landingContainer} flex h-16 items-center justify-between gap-2 sm:gap-4`}>
+        <LandingLogo compact />
         {nav !== undefined ? (
           nav
         ) : (
@@ -45,6 +47,13 @@ export function LandingHeader({ base = "", nav }: { base?: "" | "/"; nav?: React
               {label}
             </a>
           ))}
+          <Link
+            href="/acceso"
+            className="flex min-h-11 items-center rounded-full px-2.5 text-sm font-medium hover:bg-ink/5 sm:px-3"
+            data-nav-access
+          >
+            Acceso
+          </Link>
           <a
             href={`${base}#piloto`}
             className="landing-btn-3d ml-1 inline-flex h-11 items-center rounded-full bg-ink px-4 text-sm font-medium whitespace-nowrap text-cream transition-colors hover:bg-[#2a2e24] md:ml-3 md:px-5"
@@ -54,6 +63,7 @@ export function LandingHeader({ base = "", nav }: { base?: "" | "/"; nav?: React
         </nav>
         )}
       </div>
+      {below}
     </header>
   );
 }
