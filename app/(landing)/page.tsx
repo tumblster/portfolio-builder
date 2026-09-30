@@ -105,7 +105,7 @@ export default function LandingPage() {
                 Únete al programa piloto
               </a>
               <a href="#como-funciona" className={`${textLink} text-[0.9375rem]`}>
-                Ver cómo funciona <Chevron />
+                Ver el roadmap <Chevron />
               </a>
             </div>
           </div>

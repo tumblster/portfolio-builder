@@ -29,7 +29,7 @@ export function LandingHeader({ base = "" }: { base?: "" | "/" }) {
         <LandingLogo />
         <nav aria-label="Principal" className="flex items-center gap-1 md:gap-2">
           {[
-            [`${base}#como-funciona`, "Cómo funciona"],
+            [`${base}#como-funciona`, "Roadmap"],
             [`${base}#piloto`, "Piloto"],
           ].map(([href, label]) => (
             <a key={href} href={href} className="hidden min-h-11 items-center rounded-full px-3 text-sm font-medium hover:bg-ink/5 md:flex">
