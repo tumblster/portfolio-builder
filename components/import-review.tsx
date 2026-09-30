@@ -5,13 +5,14 @@ import { startTransition, useEffect, useId, useMemo, useRef, useState } from "re
 import { PalettePicker, TemplateList, recommendedPalette } from "@/components/design/design-pickers";
 import { TemplatePreviewStage, type PreviewData } from "@/components/design/template-preview";
 import { ChispaLoader } from "@/components/mascot/chispa-loader";
+import { SUPPORT_FORM_URL } from "@/lib/site";
 import type { DraftPreview, ImportResult } from "@/lib/import/events";
 import { resolvePalette } from "@/lib/palette/palettes";
 import { DEFAULT_DESIGN, TEMPLATE_INFO, type PaletteId, type TemplateId } from "@/lib/portfolio/design";
 import { describeEngagementRate } from "@/lib/portfolio/engagement";
 import { MAX_NICHES, NICHE_LABEL_MAX, nicheFromLabel } from "@/lib/portfolio/niches";
 import { Avatar } from "./avatar";
-import { compactSelect, errorText, pillButton, primaryButton, textInput } from "./ui";
+import { compactSelect, errorText, pillButton, primaryButton, textInput, textLink } from "./ui";
 
 /*
  * Antes de generar (v2 · M2): el creador corrige lo que sugirió la IA y elige cómo se ve.
@@ -51,6 +52,19 @@ function nextRetryDelay(retry: number, retryAt: number): number | null {
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+/** r3 · 9: si generar lleva esto sin terminar (reintentos incluidos), se ofrece el formulario de soporte. */
+const SLOW_AFTER_MS = 60_000;
+
+/** Link al formulario de soporte: pestaña nueva, flecha decorativa y aviso para lectores de pantalla. */
+function SupportLink({ children }: { children: string }) {
+  return (
+    <a href={SUPPORT_FORM_URL} target="_blank" rel="noopener noreferrer" className={textLink}>
+      {children} <span aria-hidden="true">→</span>
+      <span className="sr-only"> (se abre en una pestaña nueva)</span>
+    </a>
+  );
+}
+
 type Props = {
   draft: DraftPreview;
   onGenerated: (result: ImportResult) => void;
@@ -76,6 +90,14 @@ export function ImportReview({ draft, onGenerated, onStartOver, onUnauthorized }
   const [expired, setExpired] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [retrying, setRetrying] = useState(false);
+  // r3 · 9: generar tarda de más (≥ 60 s) o falló sin remedio → vía de escape al formulario de soporte.
+  const [slow, setSlow] = useState(false);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    if (!generating) return;
+    const timer = setTimeout(() => setSlow(true), SLOW_AFTER_MS);
+    return () => clearTimeout(timer);
+  }, [generating]);
   const stepHeading = useRef<HTMLHeadingElement>(null);
   const focusHeading = useRef(false);
   // Si la pantalla se desmonta (Empezar de nuevo) mientras espera un reintento, no se sigue.
@@ -171,6 +193,8 @@ export function ImportReview({ draft, onGenerated, onStartOver, onUnauthorized }
     }
     setGenerating(true);
     setRetrying(false);
+    setSlow(false);
+    setFailed(false);
     setFormError(null);
     const slugOf = (key: string | null) => {
       const row = key ? active.find((candidate) => candidate.key === key) : null;
@@ -203,6 +227,7 @@ export function ImportReview({ draft, onGenerated, onStartOver, onUnauthorized }
             if (!mounted.current) return;
             continue;
           }
+          setFailed(true);
           if (Number.isNaN(retryAt)) {
             // El candado no se cura solo: lo único que sirve es importar de nuevo.
             setExpired(true);
@@ -223,6 +248,7 @@ export function ImportReview({ draft, onGenerated, onStartOver, onUnauthorized }
           goTo(0);
         } else {
           if (response.status === 404 || response.status === 410) setExpired(true);
+          setFailed(true);
           setFormError(issue?.message ?? data?.error?.message ?? "No pudimos generar el portafolio. Intenta de nuevo.");
         }
         return;
@@ -412,6 +438,12 @@ export function ImportReview({ draft, onGenerated, onStartOver, onUnauthorized }
             <div>
               <p className="text-lg font-semibold">Armando tu portafolio…</p>
               {retrying && <p className="mt-1 text-sm text-muted">Reintentando…</p>}
+              {/* No corta los reintentos: es solo una salida visible si tarda de más. */}
+              {slow && (
+                <p className="mt-2 text-sm" data-generating-slow>
+                  ¿Tarda demasiado? <SupportLink>Cuéntanos qué pasó</SupportLink>
+                </p>
+              )}
             </div>
           </div>
         )}
@@ -420,6 +452,11 @@ export function ImportReview({ draft, onGenerated, onStartOver, onUnauthorized }
       {formError && (
         <div role="alert" className="mt-6">
           <p className={errorText}>{formError}</p>
+          {failed && (
+            <p className="mt-2 text-sm" data-generating-failed>
+              Algo no funcionó. <SupportLink>Reporta el problema</SupportLink>
+            </p>
+          )}
           {expired && (
             <button type="button" onClick={onStartOver} className={`${pillButton} mt-3`}>
               Volver a importar

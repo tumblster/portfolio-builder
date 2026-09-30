@@ -16,3 +16,10 @@ function safeUrl(raw: string | undefined): string | null {
 /** A dónde lleva "Únete al programa piloto": un formulario, un WhatsApp (https://wa.me/…) o un mailto:. */
 export const PILOT_URL = safeUrl(process.env.NEXT_PUBLIC_PILOT_URL);
 
+
+/**
+ * Formulario de soporte (r3 · 9): la vía de escape del cargador de "Generar portafolio" cuando tarda más de
+ * 60 s o falla sin remedio. Se abre en una pestaña nueva.
+ */
+export const SUPPORT_FORM_URL =
+  "https://docs.google.com/forms/d/e/1FAIpQLSfTLIBuVWSNB1-Ws_MUXOjS4zcrWQzpxiAPTj7K6SzwY-04Zw/viewform";
