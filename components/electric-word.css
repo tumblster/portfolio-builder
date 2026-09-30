@@ -1,92 +1,188 @@
 /*
- * Rayos alrededor de una palabra (v2 · M4-rev r2, B2). Trazo en la tinta del sistema con glow del acento
- * (drop-shadow: no cuesta layout). Reposo: tenues y quietos. Descarga: el rayo se vuelve a dibujar
- * (stroke-dashoffset 1 → 0 con pathLength=1) y parpadea a opacidad plena, ~600 ms, cada 4–6 s según el rayo.
- * Van en las esquinas de arriba, por encima de la altura de las minúsculas: no tocan las palabras vecinas ni se
- * leen como tildes. Con "reducir movimiento": visibles y completamente quietos.
+ * Rayo sobre una palabra (r3 · 2). SVG propio (components/electric-word.tsx) como overlay absoluto anclado al
+ * centro de la palabra: 1,2 em de alto y el ancho de la palabra (lienzo 380 × 100). Sin imágenes ni JS.
+ *
+ * Capas: glow Brasa ancho y difuminado (filtro estático, nunca se animan sus valores) → borde Brasa → núcleo
+ * blanco incandescente, más chispas. Solo se animan opacidad, transform y stroke-dashoffset.
+ *
+ * Strikes: un ciclo de 7,9 s con 4 apariciones a intervalos irregulares (0 → 1,74 → 3,71 → 5,77 s; vuelve a
+ * empezar a los 7,9 s): A, C, B y otra vez A con un recorrido distinto. En cada una el rayo aparece, se dibuja
+ * (~280 ms) mientras se desplaza de un punto a otro sobre la palabra (~700 ms) y se apaga rápido (~140 ms).
+ * Con "reducir movimiento": solo la variante A, quieta, sobre el final de la palabra.
  */
-.electric-bolt {
+.electric-bolts {
   position: absolute;
+  top: calc(50% - 0.6em);
+  left: calc(50% - 2.28em);
+  width: 4.56em;
+  height: 1.2em;
   overflow: visible;
   pointer-events: none;
-  filter: drop-shadow(0 0 0.045em rgb(252 51 0 / 0.65));
 }
-.electric-bolt path {
+.bolt path {
   fill: none;
-  stroke: currentColor;
-  stroke-width: 2.3;
   stroke-linecap: round;
   stroke-linejoin: round;
-  opacity: 0.85;
 }
-.electric-bolt--a {
-  top: -0.56em;
-  left: -0.42em;
-  width: 0.38em;
-  height: 0.56em;
+.bolt__glow {
+  opacity: 0.55;
 }
-.electric-bolt--b {
-  top: -0.6em;
-  left: 0em;
-  width: 0.25em;
-  height: 0.21em;
+.bolt__glow path {
+  stroke: #fc3300;
+  stroke-width: 11;
 }
-.electric-bolt--c {
-  top: -0.58em;
-  right: -0.46em;
-  width: 0.41em;
-  height: 0.56em;
+.bolt__edge path {
+  stroke: #fc3300;
+  stroke-width: 5;
 }
-.electric-bolt--d {
-  top: -0.6em;
-  right: 0em;
-  width: 0.25em;
-  height: 0.25em;
+.bolt__core path {
+  stroke: #ffffff;
+  stroke-width: 1.8;
+}
+.bolt__sparks circle {
+  fill: #ffffff;
+  stroke: #fc3300;
+  stroke-width: 1.2;
+}
+
+/* Estático (reducir movimiento): una sola variante, corrida hacia el final de la palabra. */
+.bolt--b,
+.bolt--c {
+  display: none;
+}
+.bolt--a {
+  transform: translate(118px, -4px);
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .electric-bolt path {
-    opacity: 0.45;
+  .bolt--b,
+  .bolt--c {
+    display: inline;
+  }
+  /* Shorthand completo (con nombre) en cada regla: el minificador convierte un "animation" sin nombre en
+   * "animation: none" y descarta la duración. */
+  .bolt {
+    opacity: 0;
+    will-change: transform, opacity;
+  }
+  .bolt--a {
+    animation: bolt-strike-a 7.9s linear infinite;
+  }
+  .bolt--b {
+    animation: bolt-strike-b 7.9s linear infinite;
+  }
+  .bolt--c {
+    animation: bolt-strike-c 7.9s linear infinite;
+  }
+  .bolt path {
     stroke-dasharray: 1;
-    animation: electric-discharge 5.2s linear infinite;
   }
-  /* Cada rayo a su ritmo (4–6 s) y desfasado: las descargas se ven de a una, nunca todas juntas. */
-  .electric-bolt--b path {
-    animation-duration: 4.4s;
-    animation-delay: 1.3s;
+  .bolt--a path {
+    animation: bolt-draw-a 7.9s ease-out infinite;
   }
-  .electric-bolt--c path {
-    animation-duration: 5.8s;
-    animation-delay: 2.6s;
+  .bolt--b path {
+    animation: bolt-draw-b 7.9s ease-out infinite;
   }
-  .electric-bolt--d path {
-    animation-duration: 4.8s;
-    animation-delay: 3.7s;
+  .bolt--c path {
+    animation: bolt-draw-c 7.9s ease-out infinite;
   }
 }
-/* La descarga ocupa los últimos ~600 ms del ciclo: se dibuja rápido y parpadea antes de volver a reposo. */
-@keyframes electric-discharge {
-  0%,
-  88% {
-    stroke-dashoffset: 0;
-    opacity: 0.45;
+
+/* A: dos strikes por ciclo. 1º de izquierda a derecha subiendo; 2º de derecha a izquierda bajando. */
+@keyframes bolt-strike-a {
+  0% {
+    opacity: 0;
+    transform: translate(-72px, 6px);
   }
-  88.5% {
+  0.6%,
+  7.2% {
+    opacity: 1;
+  }
+  9% {
+    opacity: 0;
+    transform: translate(58px, -5px);
+  }
+  72.9% {
+    opacity: 0;
+    transform: translate(70px, -4px);
+  }
+  73.6%,
+  80.2% {
+    opacity: 1;
+  }
+  82%,
+  100% {
+    opacity: 0;
+    transform: translate(-46px, 5px);
+  }
+}
+@keyframes bolt-draw-a {
+  0% {
     stroke-dashoffset: 1;
-    opacity: 1;
   }
-  93% {
+  3.6%,
+  72.9% {
     stroke-dashoffset: 0;
-    opacity: 1;
   }
-  95% {
-    opacity: 0.2;
+  73% {
+    stroke-dashoffset: 1;
   }
-  97% {
-    opacity: 1;
-  }
+  76.6%,
   100% {
     stroke-dashoffset: 0;
-    opacity: 0.45;
+  }
+}
+/* C: en diagonal, de abajo a la izquierda hacia arriba a la derecha. */
+@keyframes bolt-strike-c {
+  0%,
+  21.9% {
+    opacity: 0;
+    transform: translate(-58px, 8px);
+  }
+  22.6%,
+  29.2% {
+    opacity: 1;
+  }
+  31%,
+  100% {
+    opacity: 0;
+    transform: translate(66px, -7px);
+  }
+}
+@keyframes bolt-draw-c {
+  0%,
+  22% {
+    stroke-dashoffset: 1;
+  }
+  25.6%,
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+/* B: de derecha a izquierda, casi horizontal. */
+@keyframes bolt-strike-b {
+  0%,
+  46.9% {
+    opacity: 0;
+    transform: translate(62px, -3px);
+  }
+  47.6%,
+  53.7% {
+    opacity: 1;
+  }
+  55.5%,
+  100% {
+    opacity: 0;
+    transform: translate(-60px, 4px);
+  }
+}
+@keyframes bolt-draw-b {
+  0%,
+  47% {
+    stroke-dashoffset: 1;
+  }
+  50.6%,
+  100% {
+    stroke-dashoffset: 0;
   }
 }

@@ -397,8 +397,8 @@ try {
     "Sin las secciones quitadas: tira de nichos, plantillas y bloque del Engagement Rate",
   );
   check(
-    /<header class="fixed/.test(landingHtml) && ["#como-funciona", "#piloto"].every((href) => landingHtml.includes(`href="${href}"`)),
-    "Navegación fija con Cómo funciona y Piloto",
+    /<header class="[^"]*\bfixed\b/.test(landingHtml) && ["#como-funciona", "#piloto"].every((href) => landingHtml.includes(`href="${href}"`)),
+    "Navegación fija con Roadmap y Piloto",
   );
   const h1 = textOf(landingHtml.match(/<h1[^>]*>([\s\S]*?)<\/h1>/)?.[1] ?? "");
   const heroSub = textOf(landingHtml.match(/<\/h1>\s*<p[^>]*>([\s\S]*?)<\/p>/)?.[1] ?? "");
@@ -427,14 +427,16 @@ try {
       !/Instagram/.test(heroSubHtml.replace(/<span[^>]*aria-label="Instagram"[^>]*>\s*<\/span>/g, "")),
     "Instagram va con su logo oficial (con aria-label) en vez de la palabra",
   );
-  const electric = visible.match(/<span[^>]*data-electric[^>]*>superpoderes([\s\S]*?)<\/span>/)?.[1] ?? "";
-  const bolts = [...electric.matchAll(/<svg[^>]*class="electric-bolt [^"]*"[^>]*>/g)].map((m) => m[0]);
+  const electricSpan = visible.match(/<span[^>]*data-electric[^>]*>/)?.[0] ?? "";
+  const electricSvg = visible.match(/<span[^>]*data-electric[^>]*>superpoderes(<svg[\s\S]*?<\/svg>)<\/span>/)?.[1] ?? "";
   check(
-    bolts.length === 4 &&
-      bolts.every((bolt) => /aria-hidden="true"/.test(bolt)) &&
-      (electric.match(/pathLength="1"/g) ?? []).length === 4 &&
-      /whitespace-nowrap/.test(visible.match(/<span[^>]*data-electric[^>]*>/)?.[0] ?? ""),
-    "\"superpoderes\" tiene sus 4 rayos dentados (decorativos, dibujables con dashoffset, sin partir la palabra)",
+    /\belectric-word\b/.test(electricSpan) &&
+      /whitespace-nowrap/.test(electricSpan) &&
+      /class="electric-bolts"[^>]*aria-hidden="true"/.test(electricSvg) &&
+      ["a", "b", "c"].every((id) => electricSvg.includes(`class="bolt bolt--${id}"`)) &&
+      /<feGaussianBlur/.test(electricSvg) &&
+      !/<img|<image|\.png|\.gif/.test(electricSvg),
+    "\"superpoderes\" lleva su rayo SVG propio: 3 variantes con glow, sin imágenes y sin partir la palabra",
   );
   check(
     !/data-brush-underline/.test(visible) && (visible.match(/data-electric/g) ?? []).length === 1 && /web profesional, listo/.test(visible),
@@ -442,8 +444,8 @@ try {
   );
   const hero = landingHtml.slice(landingHtml.indexOf("<h1"), landingHtml.indexOf("data-hero-mascot"));
   check(
-    (hero.match(/rounded-full bg-ink/g) ?? []).length === 1 && hero.includes("Ver cómo funciona") && /href="#piloto"/.test(hero),
-    "Hero: un solo botón sólido (lleva a la captura del piloto) y \"Ver cómo funciona ›\" como link",
+    (hero.match(/rounded-full bg-ink/g) ?? []).length === 1 && hero.includes("Ver el roadmap") && /href="#piloto"/.test(hero),
+    "Hero: un solo botón sólido (lleva a la captura del piloto) y \"Ver el roadmap ›\" como link",
   );
   // Chispa: la de los dientes (carcajada) en el hero y las 5 del recorrido al bajar.
   const heroMascot = visible.match(/data-hero-mascot[^>]*>\s*<svg[^>]*>/)?.[0] ?? "";
@@ -466,7 +468,13 @@ try {
   );
   const cssLinks = [...landingHtml.matchAll(/<link[^>]+href="([^"]+\.css[^"]*)"/g)].map((m) => m[1]);
   let landingCss = "";
-  for (const href of cssLinks) landingCss += await (await fetch(new URL(href, BASE))).text();
+  const landingSheets = [];
+  for (const href of cssLinks) {
+    const sheetUrl = new URL(href, BASE).toString();
+    const text = await (await fetch(sheetUrl)).text();
+    landingSheets.push([sheetUrl, text]);
+    landingCss += text;
+  }
   const mascotCss = [
     ...(landingCss.replace(/@(keyframes|media)[^{]*\{(?:[^{}]*\{[^{}]*\})*[^{}]*\}/g, "").match(/[^{}]*\.mascot[^{}]*\{[^{}]*\}/g) ?? []),
     ...(landingCss.match(/@(?:keyframes|media)[^{]*\{(?:[^{}]*\{[^{}]*\})*[^{}]*\}/g) ?? []).filter((block) => block.includes("mascot")),
@@ -482,9 +490,26 @@ try {
   );
   check(
     /prefers-reduced-motion:\s*reduce\)\s*\{\s*\.mascot-traveler\s*\{\s*display:\s*none/.test(landingCss.replace(/\s+/g, " ")) &&
-      /prefers-reduced-motion:\s*no-preference/.test(mascotCss) && /electric-discharge/.test(landingCss) && /mock-carousel/.test(landingCss),
+      /prefers-reduced-motion:\s*no-preference/.test(mascotCss) && /bolt-strike-a/.test(landingCss) && /mock-carousel/.test(landingCss),
     "Con \"reducir movimiento\" todo queda quieto: sin viajera, sin parpadeo, rayos y carrusel sin animar",
   );
+  const assetOf = (selector) => {
+    for (const [sheetUrl, text] of landingSheets) {
+      const rule = text.match(new RegExp(`${selector}[^{]*\\{[^}]*url\\(([^)]+\\.png)\\)`))?.[1]?.replace(/["']/g, "");
+      if (rule) return new URL(rule, sheetUrl).toString();
+    }
+    return null;
+  };
+  for (const [selector, label, maxBytes] of [["\\.instagram-logo", "El logo de Instagram", 15_000]]) {
+    const url = assetOf(selector);
+    const png = url ? await fetch(url) : null;
+    const bytes = png?.ok ? (await png.arrayBuffer()).byteLength : 0;
+    check(
+      png?.ok && /image\/png/.test(png.headers.get("content-type") ?? "") && bytes > 0 && bytes < maxBytes,
+      `${label}: PNG incluido en el build y servido (${(bytes / 1024).toFixed(1)} KB, < ${maxBytes / 1000} KB)`,
+      url,
+    );
+  }
   const roadmap = visible.slice(visible.indexOf('id="como-funciona"'), visible.indexOf('id="piloto"'));
   check(
     /For you page/i.test(roadmap) &&
@@ -512,7 +537,7 @@ try {
   check(
     accessPage.status === 200 &&
       /class="[^"]*\blanding\b/.test(accessHtml) &&
-      /<header class="fixed/.test(accessHtml) &&
+      /<header class="[^"]*\bfixed\b/.test(accessHtml) &&
       /<footer/.test(accessHtml) &&
       /id="clave"/.test(accessHtml) &&
       /landing-btn-3d/.test(accessHtml) &&
