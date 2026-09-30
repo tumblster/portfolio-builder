@@ -10,6 +10,7 @@ import { LIMITS } from "@/lib/portfolio/schema";
 import { SUGGESTED_SERVICES } from "@/lib/portfolio/services";
 import { Avatar } from "../avatar";
 import { PublicPortfolio } from "../public-portfolio";
+import { CoverEditButton } from "./cover-edit-button";
 import { errorText, fieldLabel, pillButton, primaryButton, textInput } from "../ui";
 import {
   CONTACT_KEYS,
@@ -558,6 +559,12 @@ function EditorForm({ initial, initialBaseline }: { initial: FormState; initialB
               variant="preview"
               niche={activePreviewNiche}
               onNicheChange={setPreviewNiche}
+              // Ajuste 7: al editar un portafolio generado, el lápiz del banner del hero.
+              coverEdit={
+                isEdit ? (
+                  <CoverEditButton hasCover={form.cover !== null} onUploaded={(cover) => edit({ cover })} onPending={trackPending} />
+                ) : undefined
+              }
             />
           </div>
         </aside>

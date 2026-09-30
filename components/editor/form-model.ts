@@ -56,6 +56,8 @@ export type FormState = {
   bio: string;
   valueProp: string;
   photo: StoredImage | null;
+  /** Foto del banner del hero (ajuste 7). */
+  cover: StoredImage | null;
   contact: ContactDraft;
   /** Nichos disponibles para las piezas (no se editan en M1). */
   niches: NicheDef[];
@@ -104,6 +106,7 @@ export function emptyForm(): FormState {
     bio: "",
     valueProp: "",
     photo: null,
+    cover: null,
     contact: emptyContact(),
     niches: LEGACY_NICHES.map((niche) => ({ ...niche })),
     services: [],
@@ -127,6 +130,7 @@ export function formFromPrefill(prefill: ManualPrefill): FormState {
     bio: prefill.bio,
     valueProp: "",
     photo: prefill.photo,
+    cover: null,
     contact: { ...emptyContact(), instagram: prefill.contact.instagram, website: prefill.contact.website ?? "" },
     niches: LEGACY_NICHES.map((niche) => ({ ...niche })),
     services: [],
@@ -142,6 +146,7 @@ export function formFromPortfolio(resolved: ResolvedPortfolio): FormState {
     bio: resolved.bio,
     valueProp: resolved.valueProp,
     photo: resolved.photo,
+    cover: resolved.cover,
     contact: { ...emptyContact(), ...resolved.contact },
     niches: resolved.niches.map((niche) => ({ ...niche })),
     // Claves deterministas (servidor y navegador iguales): el índice basta para los guardados.
@@ -219,6 +224,11 @@ export function toUpdatePayload(form: FormState, baseline: Baseline) {
     bio: text("bio"),
     valueProp: text("valueProp"),
     photo: sameImage(form.photo, baseline.form.photo) ? baseline.manual.photo : form.photo,
+    ...(sameImage(form.cover, baseline.form.cover)
+      ? baseline.manual.cover !== undefined
+        ? { cover: baseline.manual.cover }
+        : {}
+      : { cover: form.cover }),
     ...(Object.keys(contact).length > 0 ? { contact } : {}),
     // Los nichos no se editan en M1: se conservan tal como estaban guardados.
     ...(baseline.manual.niches !== undefined ? { niches: baseline.manual.niches } : {}),
@@ -278,6 +288,7 @@ export function toPreview(form: FormState, extras: PreviewExtras = NO_EXTRAS): R
     name: form.name.trim() || "Nombre de tu clienta",
     bio: form.bio.trim(),
     photo: form.photo,
+    cover: form.cover,
     valueProp: form.valueProp.trim(),
     contact,
     niches: form.niches,
