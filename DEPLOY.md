@@ -387,6 +387,31 @@ Hecho en local (build de producción con Turbopack + prueba de humo 154/154 + Ch
 plantilla → paleta → generar → modal; abrir el portafolio y cambiar a MEDIA KIT; `/api/import/health` sin
 `missing`; y, con el Sheet creado, anotar un correo en la landing y verlo en el Sheet.
 
+### Verificación ronda de feedback 2 (30/09 · spec 9.1–9.7, reels en línea y rayo)
+
+Sin cambios de deploy (ninguna variable nueva). Hecho en local (build de producción con Turbopack, prueba de humo
+159/159 y Chromium en 320–1280 px):
+
+- **9.1** "¿Tienes un código? Accede aquí" bajo el botón del hero y "Acceso" en el navbar (a `/acceso`); sin
+  desborde del navbar en 320, 360, 390, 768 y 1280 px (bajo 400 px el logo del header muestra solo la sonrisa).
+- **9.2** El paso "Nichos y piezas" ya no tiene las fórmulas de las métricas ni la descripción de arriba.
+- **9.3** Selector de nichos en orden alfabético con "Otro" al final: habilita un cuadro de texto al lado (misma
+  fila), que agrega el nicho con Enter o "Agregar".
+- **9.4** Barra de progreso de los pasos 1-2-3 en el navbar de `/crear` (Paso 1 de 3… Paso 2 de 3…).
+- **9.5** Al editar un portafolio generado, lápiz en círculo blanco arriba a la derecha del banner: sube la foto,
+  el banner cambia al instante, se guarda y la página pública la muestra (Creator, Editorial y Bio).
+- **9.6** El botón dice "Elegir plantilla". **9.7** Plantilla y Paleta: el switch "Sobre mí | Media kit" cambia la
+  vista previa en vivo.
+- **Reels en línea (3.1 / 7.1):** hover en web y tap en móvil reproducen ahí mismo; al pasar a otro, el anterior
+  se cierra (nunca dos a la vez); el segundo tap cae en el reproductor oficial, que pausa; la × o un toque fuera lo
+  cierran; sin iframes en la carga inicial. **Instagram no permite autoplay en su embed:** se abre ahí y se toca
+  para reproducir (TikTok y YouTube sí arrancan solos).
+- **SOBRE MÍ** muestra las vistas de cada pieza; las cifras del perfil y el ER siguen en el Media Kit.
+- **8.2** Electricidad en Brasa: 7 fotogramas de rayos quebrados con ramas, en ráfagas irregulares, con glow.
+
+**Para probar en el Preview:** un reel de Instagram real (el embed se carga y se toca para reproducir), uno de TikTok
+o YouTube si hay (arrancan solos, YouTube en silencio al hover), y subir una foto al banner desde `/editar/<slug>`.
+
 ## 11. Deudas aceptadas
 
 Ítems del checklist de arquitectura que se decidió no cubrir en el piloto. Son decisiones conscientes, no
