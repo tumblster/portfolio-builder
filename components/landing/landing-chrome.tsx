@@ -54,7 +54,7 @@ export function LandingFooter({ mascotTarget = false }: { mascotTarget?: boolean
     <footer>
       <div className={`${landingContainer} flex flex-col gap-4 py-10 sm:flex-row sm:items-center sm:justify-between`}>
         <LandingLogo mascotTarget={mascotTarget} />
-        <p className="text-sm text-muted">Portafolios web para creadoras UGC · Programa piloto</p>
+        <p className="text-sm text-muted">El hub para creadores de contenido</p>
         <Link
           href="/acceso"
           className="flex min-h-11 items-center text-sm font-medium hover:underline hover:decoration-accent hover:decoration-2 hover:underline-offset-4"

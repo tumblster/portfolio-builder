@@ -19,7 +19,7 @@ import { fontTmj } from "@/lib/fonts/landing";
  */
 
 export const metadata: Metadata = {
-  title: "Supercreador · Portafolios web para creadoras UGC",
+  title: "Supercreador · El hub para creadores de contenido",
   description:
     "Convierte tu Instagram en un portafolio con link propio, uno por nicho y tu Engagement Rate a la vista.",
   robots: { index: false, follow: false },
