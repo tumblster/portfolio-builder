@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { SupercreadorMark } from "@/components/brand/supercreador-mark";
+import "./brand.css";
 
 /*
  * Header y footer de la landing (v2 · M4-rev r2). Los comparten "/" y "/acceso" (B8): mismo sistema visual.
@@ -24,7 +25,7 @@ export function LandingLogo({ mascotTarget = false }: { mascotTarget?: boolean }
 
 export function LandingHeader({ base = "" }: { base?: "" | "/" }) {
   return (
-    <header className="fixed inset-x-0 top-0 z-40 border-b border-line bg-cream/85 backdrop-blur-md">
+    <header className="landing-glass fixed inset-x-0 top-0 z-40">
       <div className={`${landingContainer} flex h-16 items-center justify-between gap-4`}>
         <LandingLogo />
         <nav aria-label="Principal" className="flex items-center gap-1 md:gap-2">

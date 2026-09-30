@@ -216,19 +216,7 @@ html[data-mascot-hide-mark] [data-mascot-target] {
   }
 }
 
-/* ── Botones primarios con profundidad (B9) ────────────────────────────
- * Borde 3D en el acento; al presionar se hunden 2 px. Solo box-shadow y transform: nada se mueve de lugar. */
-.landing-btn-3d {
-  box-shadow: 0 4px 0 var(--color-accent);
-  transition:
-    background-color 150ms ease,
-    transform 90ms ease,
-    box-shadow 90ms ease;
-}
-.landing-btn-3d:active:not(:disabled) {
-  transform: translateY(2px);
-  box-shadow: 0 2px 0 var(--color-accent);
-}
+/* Botones primarios con profundidad (B9): viven en components/landing/brand.css (también los usa /crear). */
 
 /* ── Cierre del piloto (B9): base oscura con degradado hacia un rojo más vivo y detalles en el acento ─── */
 .landing-ember {
