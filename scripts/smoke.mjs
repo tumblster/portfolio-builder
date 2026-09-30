@@ -211,6 +211,16 @@ try {
     json: { revision: 1, manual: read.data.portfolio.manual },
   });
   check(stale.status === 409, "No deja guardar encima de una versión vieja (409)", stale.data);
+  // Ajuste 7: foto propia para el banner del hero.
+  const beforeCover = (await call("GET", `/api/portfolios/${slug}`)).data.portfolio;
+  const covered = await call("PATCH", `/api/portfolios/${slug}`, {
+    json: { revision: beforeCover.revision, manual: { ...beforeCover.manual, cover: image } },
+  });
+  check(
+    covered.status === 200 && covered.data?.resolved?.cover?.url === image?.url,
+    "Banner del hero: se guarda una foto propia (manual.cover)",
+    covered.data,
+  );
 
   // ── Página pública (sin clave): plantilla Creator ──
   const publicPage = await fetch(`${BASE}/p/${slug}`);
@@ -221,8 +231,28 @@ try {
   check(html.includes('<meta name="theme-color" content="#faf7f2"'), "La barra del navegador toma el crema de la página (theme-color)");
   check(html.includes('data-template="creator"') && html.includes('data-pf-filter="todo"'), 'Se dibuja con la plantilla Creator, en "Todo"');
   check(text.includes(`Hola, soy ${name}.`), "El titular presenta a la creadora");
+  check(
+    html.includes(`alt="Portada de ${name}"`) && html.includes(encodeURIComponent(image.url).slice(0, 20)) ,
+    "El banner del hero usa la foto propia (ajuste 7)",
+  );
   check(html.includes("Videos que venden sin parecer anuncio."), "Muestra al instante el cambio recién guardado (el caché se invalida)");
-  check(html.includes("https://www.tiktok.com/@prueba/video/"), "La pieza de video lleva a su original");
+  check(html.includes("https://www.tiktok.com/@prueba/video/"), "La pieza de video conoce su original");
+  // Ajuste 5 (spec 3.1): reels en línea con facade. Sin iframes ni JS de las plataformas en la carga inicial.
+  check(
+    /data-inline-reel="tiktok"/.test(html) && /<button[^>]*class="reel-hit"[^>]*aria-label="Reproducir «[^"]+»"/.test(html) && !/<iframe/i.test(html),
+    "Reels en línea: el video se reproduce ahí mismo (tap / hover); la carga inicial no trae ningún iframe (facade)",
+  );
+  const embed = await import(new URL("../lib/portfolio/embed.ts", import.meta.url));
+  const embeds = [
+    ["instagram", "https://www.instagram.com/reel/C9xYz123/", "https://www.instagram.com/p/C9xYz123/embed/"],
+    ["tiktok", "https://www.tiktok.com/@prueba/video/7312345678901234567", "https://www.tiktok.com/player/v1/7312345678901234567?"],
+    ["youtube", "https://youtu.be/dQw4w9WgXcQ", "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ?"],
+  ];
+  check(
+    embeds.every(([platform, url, prefix]) => embed.embedFor({ platform, url })?.src.startsWith(prefix)) &&
+      embed.embedFor({ platform: "instagram", url: "https://www.instagram.com/prueba/" }) === null,
+    "Reels en línea: cada link va a su embed oficial (Instagram, TikTok, YouTube); lo que no es un video, no",
+  );
   check(html.includes("Formas de colaborar") && html.includes("Videos UGC para anuncios"), "Muestra los servicios");
   check(html.includes('href="mailto:hola@prueba.pe"') && html.includes("Hablemos"), 'Cierra con "Hablemos" y el correo a la vista');
   check(!/sugerid[oa]s por la IA/i.test(html), "Sin textos sobre la herramienta ni la IA en la página");
@@ -334,8 +364,8 @@ try {
       "Sus cifras reales de Instagram (seguidores e interacciones promedio) están en el Media Kit",
     );
     check(
-      !/12,4\s?mil vistas|Seguidores en Instagram/.test(v1Views.about),
-      "SOBRE MÍ no muestra cifras: ni las del perfil ni las vistas de cada pieza",
+      /12,4\s?mil vistas/.test(v1Views.about) && !/Seguidores en Instagram|Engagement Rate/.test(v1Views.about),
+      "SOBRE MÍ muestra las vistas de cada pieza (ajuste 10), pero no las cifras del perfil ni el ER",
     );
     const v1Belleza = await fetch(`${BASE}/p/${v1Slug}/belleza`);
     check(v1Belleza.status === 200, "Sus links de la v1 por nicho siguen abriendo (/belleza)");
@@ -458,17 +488,26 @@ try {
     "Instagram va con su logo oficial (con aria-label) en vez de la palabra",
   );
   const electricSpan = visible.match(/<span[^>]*data-electric[^>]*>/)?.[0] ?? "";
-  const electricSvg = visible.match(/<span[^>]*data-electric[^>]*>superpoderes((?:<svg[\s\S]*?<\/svg>)+)<\/span>/)?.[1] ?? "";
-  const arcLayers = electricSvg.match(/<svg[^>]*class="electric-arcs electric-arcs--[a-z0-9]+"[^>]*aria-hidden="true"/g) ?? [];
+  // Ajuste 1: electricidad real en Brasa. 7 fotogramas de rayos (desplazamiento de punto medio) que se turnan en ráfagas.
+  const electricHtml = visible.slice(visible.indexOf("data-electric"), visible.indexOf("</h1>"));
+  const arcFrames = electricHtml.match(/<svg[^>]*class="electric-arcs__frame electric-arcs__frame--\d"[^>]*aria-hidden="true"/g) ?? [];
+  const arcPaths = [...electricHtml.matchAll(/<path d="([^"]+)"/g)].map((m) => m[1]);
   check(
     /\belectric-word\b/.test(electricSpan) &&
       /whitespace-nowrap/.test(electricSpan) &&
-      arcLayers.length === 4 &&
-      (electricSvg.match(/<feTurbulence/g) ?? []).length === 4 &&
-      /<feDisplacementMap/.test(electricSvg) &&
-      new Set([...electricSvg.matchAll(/seed="(\d+)"/g)].map((m) => m[1])).size >= 3 &&
-      !/<img|<image|\.png|\.gif/.test(electricSvg),
-    "\"superpoderes\": arcos eléctricos en SVG con turbulencia (3 dentados + glow), sin imágenes ni partir la palabra",
+      arcFrames.length === 7 &&
+      arcPaths.length >= 42 &&
+      arcPaths.every((d) => (d.match(/L/g) ?? []).length >= 8) &&
+      /vector-effect="non-scaling-stroke"/.test(electricHtml) &&
+      /@keyframes arc-f0/.test(landingHtml) &&
+      !/<style/.test(landingHtml.match(/<h1[\s\S]*?<\/h1>/)?.[0] ?? "<style") &&
+      !/<img|<image|\.png|\.gif/.test(electricHtml),
+    `"superpoderes": electricidad en Brasa, ${arcFrames.length} fotogramas de rayos quebrados (${arcPaths.length} trazos), sin imágenes ni partir la palabra`,
+  );
+  check(
+    [...visible.matchAll(/<a([^>]*)>¿Tienes un código\? Accede aquí<\/a>/g)].some((m) => /href="\/acceso"/.test(m[1])) &&
+      [...visible.matchAll(/<a([^>]*)>Acceso<\/a>/g)].some((m) => /href="\/acceso"/.test(m[1]) && /data-nav-access/.test(m[1])),
+    "Acceso: «¿Tienes un código? Accede aquí» bajo el botón del hero y «Acceso» en el navbar (a /acceso)",
   );
   const morph = visible.match(/<div[^>]*data-hero-morph[\s\S]*?<\/div><\/div><\/div>/)?.[0] ?? visible;
   const morphStates = [...visible.matchAll(/class="hero-morph__layer"[^>]*data-state="([a-z]+):([a-z]+)"/g)].map((m) => [m[1], m[2]]);
@@ -531,7 +570,9 @@ try {
   );
   check(
     /prefers-reduced-motion:\s*reduce\)\s*\{\s*\.mascot-traveler\s*\{\s*display:\s*none/.test(landingCss.replace(/\s+/g, " ")) &&
-      /prefers-reduced-motion:\s*no-preference/.test(mascotCss) && /arcs-flicker-1/.test(landingCss) && /hero-morph/.test(landingCss) &&
+      /prefers-reduced-motion:\s*no-preference/.test(mascotCss) && /\.electric-arcs__frame--0\s*\{\s*opacity:\s*1/.test(landingCss.replace(/\s+/g, " ")) &&
+      /--arc:\s*#fc3300/i.test(landingCss) &&
+      /prefers-reduced-motion:no-preference\)\{@keyframes arc-f0/.test(landingHtml) && /hero-morph/.test(landingCss) &&
       /prefers-reduced-motion:\s*reduce\)\s*\{\s*\.hero-morph__layer:not\(:first-child\)\s*\{\s*display:\s*none/.test(landingCss.replace(/\s+/g, " ")),
     "Con \"reducir movimiento\" todo queda quieto: sin viajera, sin parpadeo, rayos y carrusel sin animar",
   );
@@ -688,8 +729,15 @@ try {
     "La marca (header y footer) es la sonrisa de la carcajada con el mismo path, en tinta; se fue el símbolo circular",
     marks.map((m) => m[0].slice(0, 80)),
   );
-  const lockup = visible.match(/<a[^>]*href="\/"[^>]*>(<svg[^>]*data-brand-mark[\s\S]*?<\/svg>)Supercreador<\/a>/);
-  check(Boolean(lockup) && /h-\[30px\]/.test(lockup?.[1] ?? ""), "Lockup del header: marca de 30 px de alto + wordmark \"Supercreador\"");
+  // El nombre va en un span: bajo 400 px el header lo oculta a la vista (sigue para lectores de pantalla), el footer no.
+  const lockups = [...visible.matchAll(/<a[^>]*href="\/"[^>]*>(<svg[^>]*data-brand-mark[\s\S]*?<\/svg>)<span( class="([^"]*)")?>Supercreador<\/span><\/a>/g)];
+  check(
+    lockups.length === 2 &&
+      lockups.every((m) => /h-\[30px\]/.test(m[1])) &&
+      /max-\[399px\]:sr-only/.test(lockups[0][3] ?? "") &&
+      !lockups[1][2],
+    "Lockup: marca de 30 px + wordmark \"Supercreador\" (en el header, solo la sonrisa bajo 400 px; el footer siempre completo)",
+  );
   const iconLink = landingHtml.match(/<link rel="icon" href="([^"]+)"[^>]*type="image\/svg\+xml"/);
   const iconRes = iconLink ? await fetch(new URL(iconLink[1], BASE)) : null;
   const iconSvg = iconRes ? await iconRes.text() : "";
