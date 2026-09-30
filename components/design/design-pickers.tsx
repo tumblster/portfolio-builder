@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { CURATED_PALETTES, resolvePalette, type Palette } from "@/lib/palette/palettes";
 import { RECOMMENDED_TEMPLATE, TEMPLATES, TEMPLATE_INFO, type PaletteId, type TemplateId } from "@/lib/portfolio/design";
 import type { StoredImage } from "@/lib/portfolio/schema";
@@ -150,8 +151,19 @@ function MockupBody({ template, p }: { template: TemplateId; p: Palette }) {
   }
 }
 
-/** "Cómo se vería" una plantilla, en miniatura. Decorativo: el nombre va en el texto del botón. */
-export function TemplateMockup({ template, palette, className }: { template: TemplateId; palette: Palette; className?: string }) {
+/**
+ * "Cómo se vería" una plantilla, en miniatura. Decorativo: el nombre va en el texto del botón.
+ * Memoizado (r2, C3): con la misma plantilla y paleta no se vuelve a dibujar al cambiar otra cosa.
+ */
+export const TemplateMockup = memo(function TemplateMockup({
+  template,
+  palette,
+  className,
+}: {
+  template: TemplateId;
+  palette: Palette;
+  className?: string;
+}) {
   return (
     <svg viewBox="0 0 120 200" className={className} aria-hidden="true" focusable="false">
       <rect x={1} y={1} width={118} height={198} rx={15} fill={palette.bg} />
@@ -159,7 +171,7 @@ export function TemplateMockup({ template, palette, className }: { template: Tem
       <rect x={1} y={1} width={118} height={198} rx={15} fill="none" stroke="#000000" strokeOpacity={0.12} strokeWidth={1} />
     </svg>
   );
-}
+});
 
 const optionBase =
   "relative flex cursor-pointer flex-col rounded-card border-2 p-2.5 transition-[translate,box-shadow,background-color] duration-150 has-[:focus-visible]:outline-3 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-accent";
@@ -203,6 +215,60 @@ export function TemplatePicker({
               )}
             </span>
             {!compact && <span className="mt-1 text-sm leading-snug text-muted">{info.description}</span>}
+          </label>
+        );
+      })}
+    </div>
+  );
+}
+
+/** La primera oración de la descripción: la línea que acompaña al nombre en la lista compacta. */
+const firstSentence = (text: string) => text.match(/^[^.]*\./)?.[0] ?? text;
+
+/**
+ * Lista compacta de plantillas (r2, C1) para el paso Plantilla al importar: radio cards con el nombre y una línea.
+ * Vertical en escritorio (a la izquierda de la vista previa grande); en el celular, una fila horizontal con
+ * scroll sobre la vista previa. Sin mockups: la vista previa grande muestra la elegida.
+ */
+export function TemplateList({
+  value,
+  onChange,
+  name = "plantilla",
+}: {
+  value: TemplateId;
+  onChange: (template: TemplateId) => void;
+  name?: string;
+}) {
+  return (
+    <div
+      role="radiogroup"
+      aria-label="Plantilla"
+      className="-mx-1 flex snap-x gap-3 overflow-x-auto px-1 pt-1 pb-3 md:mx-0 md:flex-col md:overflow-visible md:p-0"
+    >
+      {TEMPLATES.map((template) => {
+        const checked = value === template;
+        const info = TEMPLATE_INFO[template];
+        return (
+          <label
+            key={template}
+            className={`${optionBase} ${optionState(checked)} w-52 shrink-0 snap-start px-4 py-3 md:w-auto`}
+            data-template-option={template}
+          >
+            <input
+              type="radio"
+              name={name}
+              value={template}
+              checked={checked}
+              onChange={() => onChange(template)}
+              className="sr-only"
+            />
+            <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <span className="font-bold">{info.name}</span>
+              {template === RECOMMENDED_TEMPLATE && (
+                <span className="rounded-full bg-ink px-2 py-0.5 text-xs font-semibold text-cream">Recomendada</span>
+              )}
+            </span>
+            <span className="mt-1 text-sm leading-snug text-muted">{firstSentence(info.description)}</span>
           </label>
         );
       })}

@@ -1,8 +1,10 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useId, useRef, useState } from "react";
-import { PalettePicker, TemplatePicker, TemplateMockup, recommendedPalette } from "@/components/design/design-pickers";
+import { startTransition, useEffect, useId, useMemo, useRef, useState } from "react";
+import { PalettePicker, TemplateList, recommendedPalette } from "@/components/design/design-pickers";
+import { TemplatePreviewStage, type PreviewData } from "@/components/design/template-preview";
+import { ChispaLoader } from "@/components/mascot/chispa-loader";
 import type { DraftPreview, ImportResult } from "@/lib/import/events";
 import { resolvePalette } from "@/lib/palette/palettes";
 import { DEFAULT_DESIGN, TEMPLATE_INFO, type PaletteId, type TemplateId } from "@/lib/portfolio/design";
@@ -16,9 +18,12 @@ import { compactSelect, errorText, pillButton, primaryButton, textInput } from "
  *   1. Nichos: chips pre-marcados con lo que sugirió la IA; se desmarcan, se renombran o se
  *      agregan (hasta 3), y cada pieza se puede mover de nicho. Esto manda sobre la IA: arma las
  *      píldoras y los links /p/<slug>/<nicho>.
- *   2. Plantilla: galería de mockups estáticos.
- *   3. Paleta: la de su foto (recomendada) o una de las curadas.
- * Generar llama a /api/import/confirm con esas decisiones.
+ *   2. Plantilla: lista compacta + vista previa grande y fiel, con sus datos reales (r2, C1).
+ *   3. Paleta: la de su foto (recomendada) o una de las curadas, con la misma vista previa (C4).
+ * Generar llama a /api/import/confirm con esas decisiones; mientras tanto, Chispa acompaña (C5).
+ *
+ * Rendimiento (C3): cambiar de paso o de plantilla va en startTransition (el clic pinta al instante y el dibujo
+ * nuevo no bloquea), la vista previa está memoizada y el paso Plantilla ya no dibuja 4 mockups a la vez.
  */
 
 type NicheRow = { key: string; label: string; on: boolean };
@@ -72,6 +77,7 @@ export function ImportReview({ draft, onGenerated, onStartOver, onUnauthorized }
   const [generating, setGenerating] = useState(false);
   const [retrying, setRetrying] = useState(false);
   const stepHeading = useRef<HTMLHeadingElement>(null);
+  const focusHeading = useRef(false);
   // Si la pantalla se desmonta (Empezar de nuevo) mientras espera un reintento, no se sigue.
   const mounted = useRef(true);
   useEffect(() => {
@@ -82,6 +88,10 @@ export function ImportReview({ draft, onGenerated, onStartOver, onUnauthorized }
   }, []);
 
   const active = rows.filter((row) => row.on);
+  const previewNiches = rows
+    .filter((row) => row.on && row.label.trim())
+    .map((row) => row.label.trim())
+    .join("\n");
   const canAdd = active.length < MAX_NICHES;
   const colors = resolvePalette(palette, draft.photo);
   const er = draft.engagementRate ? describeEngagementRate(draft.engagementRate) : null;
@@ -90,10 +100,32 @@ export function ImportReview({ draft, onGenerated, onStartOver, onUnauthorized }
     return key && active.some((row) => row.key === key) ? key : null;
   };
 
+  // Datos reales de la creadora para la vista previa. Estable entre renders (la vista previa está memoizada).
+  const preview = useMemo<PreviewData>(
+    () => ({
+      name: draft.name,
+      handle: `@${draft.username}`,
+      niches: previewNiches ? previewNiches.split("\n") : [],
+      er: er?.value ?? null,
+    }),
+    [draft.name, draft.username, previewNiches, er?.value],
+  );
+
+  // El foco va al título del paso nuevo cuando ya está en pantalla (después del commit de la transición).
+  useEffect(() => {
+    if (!focusHeading.current) return;
+    focusHeading.current = false;
+    stepHeading.current?.focus();
+  }, [step]);
+
   function goTo(next: number) {
-    setStep(next);
     setFormError(null);
-    requestAnimationFrame(() => stepHeading.current?.focus());
+    focusHeading.current = true;
+    startTransition(() => setStep(next));
+  }
+
+  function chooseTemplate(next: TemplateId) {
+    startTransition(() => setTemplate(next));
   }
 
   /** Revisa los nichos antes de seguir. Devuelve true si están bien. */
@@ -341,7 +373,15 @@ export function ImportReview({ draft, onGenerated, onStartOver, onUnauthorized }
               Elige la plantilla
             </h2>
             <p className="mt-2 mb-5 text-sm text-muted">Mismos datos, otra piel. Se puede cambiar después sin perder nada.</p>
-            <TemplatePicker value={template} onChange={setTemplate} palette={colors} name={`${uid}-plantilla`} />
+            <div className="grid gap-5 md:grid-cols-[minmax(0,15rem)_minmax(0,1fr)] md:items-start md:gap-8">
+              <TemplateList value={template} onChange={chooseTemplate} name={`${uid}-plantilla`} />
+              <TemplatePreviewStage
+                template={template}
+                palette={colors}
+                data={preview}
+                caption={`${TEMPLATE_INFO[template].name} · ${colors.name}`}
+              />
+            </div>
           </section>
         )}
 
@@ -351,16 +391,29 @@ export function ImportReview({ draft, onGenerated, onStartOver, onUnauthorized }
               Elige la paleta
             </h2>
             <p className="mt-2 mb-5 text-sm text-muted">Todas cuidan que los textos se lean bien. También se puede cambiar después.</p>
-            <div className="grid gap-5 sm:grid-cols-[1fr_11rem] sm:items-start">
+            <div className="grid gap-5 md:grid-cols-[minmax(0,1fr)_20rem] md:items-start md:gap-8">
               <PalettePicker value={palette} onChange={setPalette} photo={draft.photo} name={`${uid}-paleta`} />
-              <figure className="mx-auto w-40 sm:w-full">
-                <TemplateMockup template={template} palette={colors} className="block h-auto w-full" />
-                <figcaption className="mt-2 text-center text-sm text-muted">
-                  {TEMPLATE_INFO[template].name} · {colors.name}
-                </figcaption>
-              </figure>
+              <TemplatePreviewStage
+                template={template}
+                palette={colors}
+                data={preview}
+                caption={`${TEMPLATE_INFO[template].name} · ${colors.name}`}
+              />
             </div>
           </section>
+        )}
+      </div>
+
+      {/* Mientras se genera (también durante los reintentos): Chispa y el estado, sin errores técnicos. */}
+      <div aria-live="polite">
+        {generating && (
+          <div className="mt-6 flex items-center gap-4 rounded-card border-2 border-ink bg-highlight p-4 sm:p-5" data-generating>
+            <ChispaLoader />
+            <div>
+              <p className="text-lg font-semibold">Armando tu portafolio…</p>
+              {retrying && <p className="mt-1 text-sm text-muted">Reintentando…</p>}
+            </div>
+          </div>
         )}
       </div>
 
@@ -387,7 +440,7 @@ export function ImportReview({ draft, onGenerated, onStartOver, onUnauthorized }
             onClick={() => (step === 0 && !validateNiches() ? undefined : goTo(step + 1))}
             className={`${primaryButton} flex-1 sm:flex-none sm:px-8`}
           >
-            Siguiente: {STEPS[step + 1].toLowerCase()}
+            {step === 1 ? "Elegir paleta" : `Siguiente: ${STEPS[step + 1].toLowerCase()}`}
           </button>
         ) : (
           <button type="button" onClick={generate} disabled={generating} className={`${primaryButton} flex-1 sm:flex-none sm:px-8`}>
@@ -398,9 +451,6 @@ export function ImportReview({ draft, onGenerated, onStartOver, onUnauthorized }
           Empezar de nuevo
         </button>
       </div>
-      <p className="sr-only" aria-live="polite">
-        {generating ? (retrying ? "Reintentando…" : "Generando el portafolio…") : ""}
-      </p>
     </div>
   );
 }
