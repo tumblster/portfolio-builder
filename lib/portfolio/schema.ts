@@ -342,6 +342,8 @@ export const manualDataSchema = z.object({
     .max(LIMITS.bio, { error: `La bio admite hasta ${LIMITS.bio} caracteres.` })
     .optional(),
   photo: storedImageSchema.nullable().optional(), // null = sin foto
+  /** Foto del banner del hero (ajuste 7). Ausente o null = el banner usa la foto de perfil o la primera pieza. */
+  cover: storedImageSchema.nullable().optional(),
   valueProp: z
     .string()
     .trim()

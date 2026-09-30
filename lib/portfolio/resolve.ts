@@ -16,6 +16,8 @@ export type ResolvedPortfolio = {
   name: string;
   bio: string;
   photo: StoredImage | null;
+  /** Foto propia del banner del hero (ajuste 7), o null. */
+  cover: StoredImage | null;
   valueProp: string;
   /** Solo los canales con valor. */
   contact: Partial<Record<keyof Contact, string>>;
@@ -68,6 +70,7 @@ export function resolvePortfolio(doc: Portfolio): ResolvedPortfolio {
     name: manual.name ?? (ig?.fullName || ig?.username || ""),
     bio: manual.bio ?? ig?.biography ?? "",
     photo: manual.photo !== undefined ? manual.photo : (ig?.profilePhoto ?? null),
+    cover: manual.cover ?? null,
     valueProp: manual.valueProp ?? doc.generated?.valueProp ?? "",
     contact,
     niches: resolveNiches(doc),

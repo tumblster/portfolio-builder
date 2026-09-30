@@ -8,7 +8,6 @@ import type { NicheFilter, TemplateProps } from "@/components/portfolio/template
 import { paletteStyle, resolvePalette } from "@/lib/palette/palettes";
 import type { TemplateId } from "@/lib/portfolio/design";
 import type { ResolvedPortfolio } from "@/lib/portfolio/resolve";
-import { NO_METRICS } from "@/lib/portfolio/stats";
 import { publicPath } from "@/lib/portfolio/slug";
 
 /*
@@ -21,19 +20,14 @@ import { publicPath } from "@/lib/portfolio/slug";
  *  - vista previa: lo maneja el editor (`niche` + `onNicheChange`).
  *
  * Ronda 30/09 · 7.3: la página tiene dos vistas con un toggle arriba (components/portfolio/portfolio-views.tsx):
- *  - SOBRE MÍ (por defecto): la plantilla de siempre, SIN métricas (ni cifras del perfil, ni ER, ni las de cada
- *    pieza) y sin el selector de nichos (ese queda para la vista previa del studio);
+ *  - SOBRE MÍ (por defecto): la plantilla de siempre, sin las cifras del perfil ni el ER (ajuste 10: las vistas de
+ *    cada pieza sí se muestran) y sin el selector de nichos (ese queda para la vista previa del studio);
  *  - MEDIA KIT: components/portfolio/media-kit.tsx, con las 3 métricas. Link directo: /p/<slug>#media-kit.
  */
 
-/** "Sobre mí" no lleva métricas: el ER y las cifras viven en el Media Kit. */
+/** "Sobre mí" no lleva las cifras del perfil ni el ER (viven en el Media Kit); las vistas de cada pieza sí. */
 function withoutMetrics(portfolio: ResolvedPortfolio): ResolvedPortfolio {
-  return {
-    ...portfolio,
-    stats: [],
-    engagementRate: null,
-    pieces: portfolio.pieces.map((piece) => ({ ...piece, metrics: NO_METRICS })),
-  };
+  return { ...portfolio, stats: [], engagementRate: null };
 }
 
 const TEMPLATE_COMPONENTS: Record<TemplateId, (props: TemplateProps) => React.ReactNode> = {
@@ -51,6 +45,8 @@ type PublicPortfolioProps =
       /** Nicho que se está mirando en la vista previa; null = Todo. */
       niche: string | null;
       onNicheChange: (niche: string | null) => void;
+      /** Ajuste 7: el lápiz del banner del hero (solo en el editor). */
+      coverEdit?: React.ReactNode;
     };
 
 export function PublicPortfolio(props: PublicPortfolioProps) {
@@ -60,7 +56,14 @@ export function PublicPortfolio(props: PublicPortfolioProps) {
     props.variant === "preview"
       ? { mode: "controlled", value: props.niche, onChange: props.onNicheChange }
       : { mode: "route", basePath: publicPath(portfolio.slug) };
-  const about = <Template portfolio={withoutMetrics(portfolio)} variant={props.variant ?? "page"} filter={filter} />;
+  const about = (
+    <Template
+      portfolio={withoutMetrics(portfolio)}
+      variant={props.variant ?? "page"}
+      filter={filter}
+      coverEdit={props.variant === "preview" ? props.coverEdit : undefined}
+    />
+  );
   if (props.variant === "preview") return about;
   const palette = resolvePalette(portfolio.design.palette, portfolio.photo);
   return (

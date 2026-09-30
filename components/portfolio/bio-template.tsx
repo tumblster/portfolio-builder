@@ -21,7 +21,7 @@ import {
  * Engagement Rate justo debajo, botones de contacto a todo el ancho, el trabajo como tarjetas
  * (miniatura + título + flecha) y los nichos en una barra flotante abajo, siempre a mano.
  */
-export function BioTemplate({ portfolio, variant, filter }: TemplateProps) {
+export function BioTemplate({ portfolio, variant, filter, coverEdit }: TemplateProps) {
   const { name, bio, valueProp, stats, services, pieces, photo } = portfolio;
   const view = portfolioView(portfolio, variant);
   const { filterable, filterableSlugs, links, hasContact, handle, er, id } = view;
@@ -29,7 +29,10 @@ export function BioTemplate({ portfolio, variant, filter }: TemplateProps) {
 
   return (
     <TemplateFrame view={view} template="bio" variant={variant} filter={filter}>
-      <div className="bio-mesh" aria-hidden="true" />
+      <div className={portfolio.cover ? "bio-mesh bio-mesh--photo" : "bio-mesh"} aria-hidden="true">
+        {portfolio.cover && <Image src={portfolio.cover.url} alt="" fill sizes="(min-width: 768px) 720px, 100vw" preload={view.isPage} />}
+      </div>
+      {coverEdit && <div className="pf-cover-edit-slot--bio">{coverEdit}</div>}
       <div className="pf-body">
         <Root id={id("inicio")} className="bio-col">
           <header className="bio-head">
@@ -78,7 +81,7 @@ export function BioTemplate({ portfolio, variant, filter }: TemplateProps) {
                 return (
                   <li key={piece.id} className="bio-card" data-pf-piece={piece.id} data-pf-show={pieceShow(piece, filterableSlugs)}>
                     <PieceLink piece={piece} className="bio-card__link">
-                      <div className="bio-card__media">
+                      <div className="bio-card__media" data-reel-media>
                         {piece.image ? (
                           <Image src={piece.image.url} alt="" fill sizes="88px" loading="lazy" />
                         ) : (

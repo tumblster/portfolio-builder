@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useState, type CSSProperties } from "react";
+import { memo, useId, useState, type CSSProperties } from "react";
 import type { Palette } from "@/lib/palette/palettes";
 import type { TemplateId } from "@/lib/portfolio/design";
 import "./template-preview.css";
@@ -328,5 +328,67 @@ export function TemplatePreviewStage({
       </div>
       <figcaption className="mt-3 text-center text-sm text-muted">{caption}</figcaption>
     </figure>
+  );
+}
+
+export type PreviewView = "about" | "kit";
+
+/**
+ * Vista previa con el switch "Sobre mí | Media kit" (7.3 y ajuste 9): el mismo toggle del portafolio público, y la
+ * vista previa cambia en vivo. El estado vive en quien la usa, así se mantiene entre pasos y en el modal.
+ */
+export function PreviewViews({
+  template,
+  palette,
+  data,
+  caption,
+  view,
+  onViewChange,
+}: {
+  template: TemplateId;
+  palette: Palette;
+  data: PreviewData;
+  caption: string;
+  view: PreviewView;
+  onViewChange: (view: PreviewView) => void;
+}) {
+  const uid = useId();
+  return (
+    <div data-preview-views={view}>
+      <div role="tablist" aria-label="Vista del portafolio" className="tpv-switch">
+        {(
+          [
+            ["about", "Sobre mí"],
+            ["kit", "Media kit"],
+          ] as const
+        ).map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            role="tab"
+            id={`${uid}-tab-${id}`}
+            aria-selected={view === id}
+            aria-controls={`${uid}-panel`}
+            onClick={() => onViewChange(id)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      <div id={`${uid}-panel`} role="tabpanel" aria-labelledby={`${uid}-tab-${view}`} className="mt-3">
+        {view === "about" ? (
+          <TemplatePreviewStage template={template} palette={palette} data={data} caption={caption} />
+        ) : (
+          <figure className="tpv-stage">
+            <div className="tpv-frame">
+              <div className="tpv-layer" data-enter="">
+                <MediaKitPreview palette={palette} data={data} />
+              </div>
+            </div>
+            <figcaption className="mt-3 text-center text-sm text-muted">Media kit · {palette.name}</figcaption>
+          </figure>
+        )}
+      </div>
+    </div>
   );
 }

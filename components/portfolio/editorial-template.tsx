@@ -20,7 +20,7 @@ import {
  * Rate enorme al lado de la propuesta de valor y el trabajo como una lista numerada de revista
  * (número, título grande, cifra, miniatura). Un solo acento, usado solo para detalles.
  */
-export function EditorialTemplate({ portfolio, variant, filter }: TemplateProps) {
+export function EditorialTemplate({ portfolio, variant, filter, coverEdit }: TemplateProps) {
   const { name, bio, valueProp, stats, services, pieces } = portfolio;
   const view = portfolioView(portfolio, variant);
   const { filterable, filterableSlugs, email, channels, hasContact, cover, er, id } = view;
@@ -66,9 +66,10 @@ export function EditorialTemplate({ portfolio, variant, filter }: TemplateProps)
                   </span>
                 </p>
               )}
-              {cover && (
+              {(cover || coverEdit) && (
                 <div className="ed-hero__photo">
-                  <Image src={cover.image.url} alt={cover.alt} fill sizes="(min-width: 1024px) 320px, 40vw" preload={view.isPage} />
+                  {cover && <Image src={cover.image.url} alt={cover.alt} fill sizes="(min-width: 1024px) 320px, 40vw" preload={view.isPage} />}
+                  {coverEdit}
                 </div>
               )}
             </div>
@@ -112,7 +113,7 @@ export function EditorialTemplate({ portfolio, variant, filter }: TemplateProps)
                           </p>
                         )}
                       </div>
-                      <div className="ed-row__media">
+                      <div className="ed-row__media" data-reel-media>
                         {piece.image ? (
                           <Image src={piece.image.url} alt="" fill sizes="(min-width: 768px) 120px, 72px" loading="lazy" />
                         ) : (

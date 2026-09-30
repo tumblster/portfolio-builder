@@ -10,6 +10,8 @@ import type { StoredImage } from "@/lib/portfolio/schema";
 import type { ProfileStatKind } from "@/lib/portfolio/stats";
 import { ContactIcon, PLATFORM_LABEL } from "./icons";
 import { NicheScope } from "./niche-filter";
+import { InlineReel } from "@/components/reel/inline-reel";
+import { embedFor } from "@/lib/portfolio/embed";
 
 /*
  * Lo que comparten las 4 plantillas (v2 · M2): los datos ya preparados para dibujar, el marco
@@ -26,6 +28,8 @@ export type TemplateProps = {
   /** "preview": dentro del editor (sin <main>, titulares un nivel más abajo, nada fijo a la pantalla). */
   variant: "page" | "preview";
   filter: NicheFilter;
+  /** Solo en el editor (ajuste 7): el lápiz para cambiar la foto del banner del hero. */
+  coverEdit?: ReactNode;
 };
 
 export const STAT_LABEL: Record<ProfileStatKind, string> = {
@@ -39,6 +43,7 @@ const COVER_MIN_WIDTH = 600;
 
 export function heroCover(portfolio: ResolvedPortfolio): { image: StoredImage; alt: string } | null {
   const { photo, name, pieces } = portfolio;
+  if (portfolio.cover) return { image: portfolio.cover, alt: `Portada de ${name}` };
   if (photo && (photo.width ?? 0) >= COVER_MIN_WIDTH) return { image: photo, alt: `Foto de ${name}` };
   const piece = pieces.find((candidate) => candidate.image);
   return piece?.image ? { image: piece.image, alt: piece.title } : null;
@@ -156,7 +161,18 @@ export function pieceMeta(piece: ResolvedPiece): { platform: string | null; meta
 }
 
 /** La pieza lleva a su original (otra pestaña); sin link, solo se muestra. */
+/**
+ * La pieza como enlace. Ajuste 5 (spec 3.1): si es un video con embed oficial, se reproduce AHÍ MISMO (hover en web,
+ * tap en móvil, uno a la vez) en vez de llevar a otra pestaña; si no, abre su original.
+ */
 export function PieceLink({ piece, className, children }: { piece: ResolvedPiece; className: string; children: ReactNode }) {
+  if (piece.video && embedFor(piece.video)) {
+    return (
+      <InlineReel link={piece.video} title={piece.title} className={className}>
+        {children}
+      </InlineReel>
+    );
+  }
   if (!piece.link) return <div className={className}>{children}</div>;
   return (
     <a className={className} href={piece.link.url} target="_blank" rel="noopener noreferrer">

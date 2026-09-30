@@ -1025,3 +1025,12 @@
     }
   }
 }
+
+/* Ajuste 7 · Banner de Bio con foto propia: la foto llena el banner, sin el degradado encima. */
+.bio-mesh--photo::before,
+.bio-mesh--photo::after {
+  display: none;
+}
+.bio-mesh--photo img {
+  object-fit: cover;
+}

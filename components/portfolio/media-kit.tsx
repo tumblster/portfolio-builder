@@ -84,7 +84,7 @@ export function MediaKit({ portfolio }: { portfolio: ResolvedPortfolio }) {
               return (
                 <li key={piece.id}>
                   <PieceLink piece={piece} className="mk-piece">
-                    <span className="mk-piece__media">
+                    <span className="mk-piece__media" data-reel-media>
                       {piece.image && (
                         <Image
                           src={piece.image.url}

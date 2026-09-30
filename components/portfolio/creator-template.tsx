@@ -26,7 +26,7 @@ import {
  * → formas de colaborar → "Hablemos" monumental → footer mínimo. Estilos en app/portfolio.css.
  */
 
-export function CreatorTemplate({ portfolio, variant, filter }: TemplateProps) {
+export function CreatorTemplate({ portfolio, variant, filter, coverEdit }: TemplateProps) {
   const { name, bio, valueProp, stats, services, pieces } = portfolio;
   const view = portfolioView(portfolio, variant);
   const { filterable, filterableSlugs, email, channels, hasContact, cover, handle, firstName, er, isPage, id } = view;
@@ -54,18 +54,21 @@ export function CreatorTemplate({ portfolio, variant, filter }: TemplateProps) {
       <div className="pf-body">
         <Root id={id("inicio")}>
           <section className="pf-hero pf-shell" aria-labelledby={id("nombre")}>
-            <div className="pf-hero__grid" data-solo={cover ? undefined : ""}>
-              {cover && (
+            <div className="pf-hero__grid" data-solo={cover || coverEdit ? undefined : ""}>
+              {(cover || coverEdit) && (
                 <figure className="pf-hero__media">
                   <div className="pf-hero__photo">
-                    <Image
-                      src={cover.image.url}
-                      alt={cover.alt}
-                      fill
-                      sizes="(min-width: 1024px) 540px, 62vw"
-                      preload={isPage}
-                    />
+                    {cover && (
+                      <Image
+                        src={cover.image.url}
+                        alt={cover.alt}
+                        fill
+                        sizes="(min-width: 1024px) 540px, 62vw"
+                        preload={isPage}
+                      />
+                    )}
                   </div>
+                  {coverEdit}
                   <figcaption className="pf-glass">
                     <Avatar photo={portfolio.photo} name={name} size={40} />
                     <span className="pf-glass__who">
@@ -227,7 +230,7 @@ function PieceCard({ piece, Heading }: { piece: ResolvedPiece; Heading: "h3" | "
   const { platform, meta } = pieceMeta(piece);
   return (
     <PieceLink piece={piece} className="pf-card__link">
-      <div className="pf-card__media">
+      <div className="pf-card__media" data-reel-media>
         {piece.image ? (
           <Image src={piece.image.url} alt="" fill sizes="(min-width: 768px) 272px, 62vw" loading="lazy" />
         ) : (

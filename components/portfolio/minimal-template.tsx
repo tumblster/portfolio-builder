@@ -125,7 +125,7 @@ export function MinimalTemplate({ portfolio, variant, filter }: TemplateProps) {
                 return (
                   <li key={piece.id} className="min-item" data-pf-piece={piece.id} data-pf-show={pieceShow(piece, filterableSlugs)}>
                     <PieceLink piece={piece} className="min-item__link">
-                      <div className="min-item__media" style={{ aspectRatio: ratio }}>
+                      <div className="min-item__media" style={{ aspectRatio: ratio }} data-reel-media>
                         {piece.image ? (
                           <Image src={piece.image.url} alt="" fill sizes="(min-width: 1024px) 30vw, 50vw" loading="lazy" />
                         ) : (
