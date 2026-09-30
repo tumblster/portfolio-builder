@@ -25,6 +25,8 @@ type Props = {
   disabled?: boolean;
   describedBy?: string;
   maxShown?: number;
+  /** Opción fija al final de la lista, siempre visible (p. ej. "Otro"); se elige como cualquier otra. */
+  pinnedOption?: ComboOption;
 };
 
 /** Parte el texto en [antes, coincidencia, después] (las tildes no cambian el largo: se compara plegado). */
@@ -47,6 +49,7 @@ export function Combobox({
   disabled,
   describedBy,
   maxShown = 8,
+  pinnedOption,
 }: Props) {
   const uid = useId();
   const listId = `${uid}-list`;
@@ -55,8 +58,9 @@ export function Combobox({
   const [active, setActive] = useState(0);
 
   const q = foldText(query);
-  const matches = options.filter((option) => !q || foldText(option.label).includes(q)).slice(0, maxShown);
-  const canCreate = Boolean(onCreate && q && !options.some((option) => foldText(option.label) === q));
+  const found = options.filter((option) => !q || foldText(option.label).includes(q)).slice(0, maxShown);
+  const matches = pinnedOption ? [...found, pinnedOption] : found;
+  const canCreate = Boolean(onCreate && q && !options.some((option) => foldText(option.label) === q) && found.length === 0);
   const total = matches.length + (canCreate ? 1 : 0);
   const current = total === 0 ? -1 : Math.min(active, total - 1);
   const optionId = (index: number) => `${uid}-opt-${index}`;
@@ -120,7 +124,7 @@ export function Combobox({
       />
       <ul id={listId} role="listbox" aria-labelledby={labelId} className="combo__list" hidden={!expanded}>
         {matches.map((option, index) => {
-          const parts = splitMatch(option.label, query);
+          const parts = option === pinnedOption ? null : splitMatch(option.label, query);
           return (
             <li
               key={option.id}

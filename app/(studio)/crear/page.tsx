@@ -31,6 +31,8 @@ export default async function CreatePage() {
     <div className={`${interTight.variable} crear-brand`}>
       <LandingHeader
         base="/"
+        // Barra de progreso de los pasos 1-2-3 (ajuste 6): la dibuja la revisión aquí, con un portal.
+        below={<div id="crear-progress" />}
         nav={
           access.status === "ok" ? (
             <nav aria-label="Studio" className="flex items-center">

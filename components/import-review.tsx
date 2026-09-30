@@ -1,8 +1,9 @@
 "use client";
 
-import { startTransition, useEffect, useId, useMemo, useRef, useState } from "react";
+import { startTransition, useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { createPortal } from "react-dom";
 import { PalettePicker, TemplateList, recommendedPalette } from "@/components/design/design-pickers";
-import { MediaKitPreview, TemplatePreviewStage, type PreviewData } from "@/components/design/template-preview";
+import { PreviewViews, type PreviewData, type PreviewView } from "@/components/design/template-preview";
 import { NichePicker, PiecePicker, type NicheChip, type PieceChip } from "@/components/import/confirm-pickers";
 import "@/components/import/review.css";
 import { ChispaLoader } from "@/components/mascot/chispa-loader";
@@ -40,6 +41,9 @@ import { errorText, pillButton, primaryButton, textLink } from "./brand-ui";
 const STEPS = ["Nichos y piezas", "Plantilla", "Paleta"] as const;
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+/** El espacio de la barra de progreso no cambia mientras la pantalla vive: no hay nada a qué suscribirse. */
+const noSubscribe = () => () => {};
+
 /** Hora actual. Fuera del componente: solo se usa dentro del manejador de "Generar", nunca al dibujar. */
 const clock = () => Date.now();
 
@@ -102,6 +106,15 @@ export function ImportReview({ draft, onGenerated, onStartOver, onUnauthorized }
   // Tras un fallo de generación, el próximo "Generar" le pide al servidor otro intento a propósito (7.4 b).
   const retryNext = useRef(false);
   const [previewOpen, setPreviewOpen] = useState(false);
+  // Switch "Sobre mí | Media kit" de la vista previa: uno solo para los pasos y el modal (ajuste 9).
+  const [previewView, setPreviewView] = useState<PreviewView>("about");
+  // Espacio de la barra de progreso en el navbar de /crear (ajuste 6). La revisión solo existe en el navegador.
+  // Con useSyncExternalStore: null en el servidor y el elemento real ya en el navegador (sin desajuste al hidratar).
+  const progressSlot = useSyncExternalStore(
+    noSubscribe,
+    () => document.getElementById("crear-progress"),
+    () => null,
+  );
   useEffect(() => {
     if (!generating) return;
     const timer = setTimeout(() => setSlow(true), SLOW_AFTER_MS);
@@ -272,7 +285,6 @@ export function ImportReview({ draft, onGenerated, onStartOver, onUnauthorized }
     }
   }
 
-  const metricBases = draft.metrics.filter((metric) => metric.kind !== "followers" && metric.basis);
 
   return (
     <div className="panel p-5 sm:p-7" data-testid="import-review">
@@ -295,11 +307,6 @@ export function ImportReview({ draft, onGenerated, onStartOver, onUnauthorized }
               </div>
             ))}
           </dl>
-          {metricBases.length > 0 && (
-            <p className="mt-2 text-xs leading-relaxed text-muted">
-              {metricBases.map((metric) => `${metric.label}: ${metric.basis}.`).join(" ")}
-            </p>
-          )}
         </div>
       )}
       {draft.warnings.length > 0 && (
@@ -336,10 +343,6 @@ export function ImportReview({ draft, onGenerated, onStartOver, onUnauthorized }
             <h2 id={`${uid}-h`} ref={stepHeading} tabIndex={-1} className="title-2 outline-none">
               Confirma sus nichos y sus piezas
             </h2>
-            <p className="mt-2 text-sm text-muted">
-              Lo que eligió la IA ya está puesto. Quita con ×, agrega desde el buscador o su perfil y ordena arrastrando el
-              asa (o con Alt + flechas).
-            </p>
             <div className="mt-6 space-y-9">
               <NichePicker
                 niches={niches}
@@ -370,11 +373,13 @@ export function ImportReview({ draft, onGenerated, onStartOver, onUnauthorized }
             <p className="mt-2 mb-5 text-sm text-muted">Mismos datos, otra piel. Se puede cambiar después sin perder nada.</p>
             <div className="grid gap-5 md:grid-cols-[minmax(0,15rem)_minmax(0,1fr)] md:items-start md:gap-8">
               <TemplateList value={template} onChange={chooseTemplate} name={`${uid}-plantilla`} />
-              <TemplatePreviewStage
+              <PreviewViews
                 template={template}
                 palette={colors}
                 data={preview}
                 caption={`${TEMPLATE_INFO[template].name} · ${colors.name}`}
+                view={previewView}
+                onViewChange={setPreviewView}
               />
             </div>
           </section>
@@ -388,11 +393,13 @@ export function ImportReview({ draft, onGenerated, onStartOver, onUnauthorized }
             <p className="mt-2 mb-5 text-sm text-muted">Todas cuidan que los textos se lean bien. También se puede cambiar después.</p>
             <div className="grid gap-5 md:grid-cols-[minmax(0,1fr)_20rem] md:items-start md:gap-8">
               <PalettePicker value={palette} onChange={setPalette} photo={draft.photo} name={`${uid}-paleta`} />
-              <TemplatePreviewStage
+              <PreviewViews
                 template={template}
                 palette={colors}
                 data={preview}
                 caption={`${TEMPLATE_INFO[template].name} · ${colors.name}`}
+                view={previewView}
+                onViewChange={setPreviewView}
               />
             </div>
           </section>
@@ -446,7 +453,7 @@ export function ImportReview({ draft, onGenerated, onStartOver, onUnauthorized }
             onClick={() => (step === 0 && !validateSelection() ? undefined : goTo(step + 1))}
             className={`${primaryButton} flex-1 sm:flex-none sm:px-8`}
           >
-            {step === 1 ? "Elegir paleta" : "Siguiente: plantilla"}
+            {step === 1 ? "Elegir paleta" : "Elegir plantilla"}
           </button>
         ) : (
           <button type="button" onClick={generate} disabled={generating} className={`${primaryButton} flex-1 sm:flex-none sm:px-8`}>
@@ -457,6 +464,8 @@ export function ImportReview({ draft, onGenerated, onStartOver, onUnauthorized }
           Empezar de nuevo
         </button>
       </div>
+
+      {progressSlot && createPortal(<StepProgress step={step} />, progressSlot)}
 
       {/* 7.1: sin vista previa en la pantalla; un botón flotante la abre en un modal (patrón Beacons). */}
       {step === 0 && (
@@ -472,23 +481,53 @@ export function ImportReview({ draft, onGenerated, onStartOver, onUnauthorized }
           palette={colors}
           data={preview}
           caption={`${TEMPLATE_INFO[template].name} · ${colors.name}`}
+          view={previewView}
+          onViewChange={setPreviewView}
         />
       )}
     </div>
   );
 }
 
-/** Modal de vista previa (7.1): "Sobre mí" (la plantilla) o "Media kit", con los chips tal como están. */
+/** Barra de progreso de los pasos 1-2-3 en el navbar (ajuste 6). */
+function StepProgress({ step }: { step: number }) {
+  return (
+    <div
+      className="crear-progress"
+      role="progressbar"
+      aria-label="Progreso"
+      aria-valuemin={1}
+      aria-valuemax={STEPS.length}
+      aria-valuenow={step + 1}
+      aria-valuetext={`Paso ${step + 1} de ${STEPS.length}: ${STEPS[step]}`}
+      data-crear-progress={step + 1}
+    >
+      <ol aria-hidden="true" className="crear-progress__steps">
+        {STEPS.map((label, index) => (
+          <li key={label} data-state={index < step ? "done" : index === step ? "current" : "next"}>
+            <span className="crear-progress__bar" />
+            <span className="crear-progress__label">
+              <b>{index + 1}</b> {label}
+            </span>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
+/** Modal de vista previa (7.1): la misma vista previa con su switch "Sobre mí | Media kit", en un diálogo. */
 function PreviewModal(props: {
   onClose: () => void;
   template: TemplateId;
   palette: ReturnType<typeof resolvePalette>;
   data: PreviewData;
   caption: string;
+  view: PreviewView;
+  onViewChange: (view: PreviewView) => void;
 }) {
   const uid = useId();
   const dialog = useRef<HTMLDialogElement>(null);
-  const [view, setView] = useState<"about" | "kit">("about");
   const { onClose } = props;
   useEffect(() => {
     const node = dialog.current;
@@ -519,39 +558,15 @@ function PreviewModal(props: {
             Cerrar
           </button>
         </div>
-        <div role="tablist" aria-label="Vista del portafolio" className="preview-modal__tabs">
-          {(
-            [
-              ["about", "Sobre mí"],
-              ["kit", "Media kit"],
-            ] as const
-          ).map(([id, label]) => (
-            <button
-              key={id}
-              type="button"
-              role="tab"
-              id={`${uid}-tab-${id}`}
-              aria-selected={view === id}
-              aria-controls={`${uid}-panel`}
-              onClick={() => setView(id)}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-        <div id={`${uid}-panel`} role="tabpanel" aria-labelledby={`${uid}-tab-${view}`} className="mt-4">
-          {view === "about" ? (
-            <TemplatePreviewStage template={props.template} palette={props.palette} data={props.data} caption={props.caption} />
-          ) : (
-            <figure className="tpv-stage">
-              <div className="tpv-frame">
-                <div className="tpv-layer">
-                  <MediaKitPreview palette={props.palette} data={props.data} />
-                </div>
-              </div>
-              <figcaption className="mt-3 text-center text-sm text-muted">Media kit · {props.palette.name}</figcaption>
-            </figure>
-          )}
+        <div className="mt-4">
+          <PreviewViews
+            template={props.template}
+            palette={props.palette}
+            data={props.data}
+            caption={props.caption}
+            view={props.view}
+            onViewChange={props.onViewChange}
+          />
         </div>
       </div>
     </dialog>

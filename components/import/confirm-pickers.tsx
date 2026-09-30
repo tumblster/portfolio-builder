@@ -1,12 +1,13 @@
 "use client";
 
 import Image from "next/image";
-import { useId, useRef } from "react";
+import { useId, useRef, useState } from "react";
 import { ChipList } from "@/components/chips/chip-list";
 import { Combobox, type ComboOption } from "@/components/chips/combobox";
 import type { DraftPiece } from "@/lib/import/events";
 import { MAX_NICHES, nicheFromLabel } from "@/lib/portfolio/niches";
 import { NICHE_TAXONOMY, foldText } from "@/lib/portfolio/niche-taxonomy";
+import { InlineReel } from "@/components/reel/inline-reel";
 
 /*
  * Pantalla "Confirma sus nichos y sus piezas" (ronda 30/09 · 7.1): dos selectores con chips.
@@ -55,24 +56,50 @@ export function NichePicker(props: {
   const { niches, onChange, onError } = props;
   const uid = useId();
   const inputRef = useRef<HTMLInputElement>(null);
+  const otherRef = useRef<HTMLInputElement>(null);
+  // "Otro" (ajuste 4): habilita un cuadro de texto al lado del selector para escribir un nicho propio.
+  const [otherOpen, setOtherOpen] = useState(false);
+  const [otherText, setOtherText] = useState("");
   const full = niches.length >= MAX_NICHES;
   const taken = new Set(niches.map((niche) => nicheFromLabel(niche.label)?.slug));
   const seen = new Set<string>();
-  const options: ComboOption[] = [...props.suggested, ...NICHE_TAXONOMY].flatMap((label) => {
-    const slug = nicheFromLabel(label)?.slug;
-    const folded = foldText(label);
-    if (!slug || taken.has(slug) || seen.has(folded)) return [];
-    seen.add(folded);
-    return [{ id: slug, label }];
-  });
+  // Los nichos listados en orden alfabético (ajuste 4): la taxonomía y lo que sugirió la IA, juntos.
+  const options: ComboOption[] = [...props.suggested, ...NICHE_TAXONOMY]
+    .flatMap((label) => {
+      const slug = nicheFromLabel(label)?.slug;
+      const folded = foldText(label);
+      if (!slug || taken.has(slug) || seen.has(folded)) return [];
+      seen.add(folded);
+      return [{ id: slug, label }];
+    })
+    .sort((a, b) => a.label.localeCompare(b.label, "es", { sensitivity: "base" }));
 
-  function add(label: string) {
+  function add(label: string): boolean {
     const niche = nicheFromLabel(label);
-    if (!niche) return onError('Ese nombre no sirve para un link: usa letras o números (y no "Todo").');
-    if (taken.has(niche.slug)) return onError(`Ya elegiste «${niche.label}».`);
-    if (full) return onError(`Puedes tener hasta ${MAX_NICHES} nichos: quita uno para agregar otro.`);
+    const fail = (message: string) => {
+      onError(message);
+      return false;
+    };
+    if (!niche) return fail('Ese nombre no sirve para un link: usa letras o números (y no "Todo").');
+    if (taken.has(niche.slug)) return fail(`Ya elegiste «${niche.label}».`);
+    if (full) return fail(`Puedes tener hasta ${MAX_NICHES} nichos: quita uno para agregar otro.`);
     onError(null);
     onChange([...niches, { key: props.newKey(), label: niche.label }]);
+    return true;
+  }
+
+  function openOther() {
+    setOtherOpen(true);
+    requestAnimationFrame(() => otherRef.current?.focus());
+  }
+  function closeOther(focusSelector: boolean) {
+    setOtherOpen(false);
+    setOtherText("");
+    if (focusSelector) requestAnimationFrame(() => inputRef.current?.focus());
+  }
+  function addOther() {
+    if (!otherText.trim()) return otherRef.current?.focus();
+    if (add(otherText)) closeOther(true);
   }
 
   return (
@@ -104,18 +131,49 @@ export function NichePicker(props: {
           emptyText="Sin nichos: todo va en un solo portafolio. Agrega hasta 3 si quieres links por nicho."
         />
       </div>
-      <div className="mt-3">
+      <div className={`mt-3 ${otherOpen && !full ? "grid grid-cols-2 items-start gap-2" : ""}`} data-niche-row>
         <Combobox
           inputRef={inputRef}
           labelId={`${uid}-label`}
           describedBy={`${uid}-help${full ? ` ${uid}-full` : ""}`}
           options={options}
-          onSelect={(option) => add(option.label)}
+          pinnedOption={{ id: "__otro", label: "Otro" }}
+          onSelect={(option) => (option.id === "__otro" ? openOther() : add(option.label))}
           onCreate={add}
           onBackspaceEmpty={() => niches.length > 0 && onChange(niches.slice(0, -1))}
           placeholder={full ? "Ya tienes 3 nichos" : "Busca un nicho (ej.: Fitness)"}
           disabled={full}
         />
+        {otherOpen && !full && (
+          <div className="flex min-w-0 gap-2" data-niche-other>
+            <input
+              ref={otherRef}
+              type="text"
+              value={otherText}
+              maxLength={24}
+              aria-label="Tu nicho (Otro)"
+              placeholder="Escribe tu nicho"
+              onChange={(event) => setOtherText(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  addOther();
+                } else if (event.key === "Escape") {
+                  event.preventDefault();
+                  closeOther(true);
+                }
+              }}
+              className="combo__input min-w-0 flex-1"
+            />
+            <button
+              type="button"
+              onClick={addOther}
+              className="inline-flex min-h-13 shrink-0 items-center rounded-2xl border border-ink bg-ink px-3 text-sm font-semibold text-cream"
+            >
+              Agregar
+            </button>
+          </div>
+        )}
         {full && (
           <p id={`${uid}-full`} className="mt-2 text-sm text-muted">
             Máximo {MAX_NICHES} nichos: quita uno para agregar otro.
@@ -236,11 +294,27 @@ export function PiecePicker(props: {
           const added = chosen.has(piece.id);
           return (
             <li key={piece.id} className="flex min-w-0 flex-col gap-2 rounded-2xl border border-line bg-paper p-2" data-profile-piece={piece.id}>
-              <span className="relative block aspect-square overflow-hidden rounded-xl bg-sand">
-                {piece.image && (
-                  <Image src={piece.image.url} alt="" fill sizes="(min-width: 640px) 160px, 45vw" className="object-cover" />
-                )}
-              </span>
+              {/* Ajuste 5: si es un reel, se ve ahí mismo (hover en web, tap en móvil, uno a la vez). */}
+              {piece.video ? (
+                <InlineReel link={piece.video} title={piece.title} className="block aspect-square overflow-hidden rounded-xl bg-sand">
+                  <span className="absolute inset-0" data-reel-media>
+                    {piece.image && (
+                      <Image src={piece.image.url} alt="" fill sizes="(min-width: 640px) 160px, 45vw" className="object-cover" />
+                    )}
+                  </span>
+                  <span className="pointer-events-none absolute bottom-2 left-2 z-[1] inline-flex size-7 items-center justify-center rounded-full bg-paper/95 text-ink shadow" aria-hidden="true">
+                    <svg viewBox="0 0 10 10" className="size-3 fill-current">
+                      <path d="M3 2v6l5-3z" />
+                    </svg>
+                  </span>
+                </InlineReel>
+              ) : (
+                <span className="relative block aspect-square overflow-hidden rounded-xl bg-sand">
+                  {piece.image && (
+                    <Image src={piece.image.url} alt="" fill sizes="(min-width: 640px) 160px, 45vw" className="object-cover" />
+                  )}
+                </span>
+              )}
               <span className="line-clamp-2 min-h-[2.5em] text-xs leading-snug break-words">{piece.title}</span>
               <button
                 type="button"
