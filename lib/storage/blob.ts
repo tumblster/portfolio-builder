@@ -1,5 +1,5 @@
 import "server-only";
-import { BlobError, BlobNotFoundError, BlobPreconditionFailedError, get, head, put } from "@vercel/blob";
+import { BlobError, BlobNotFoundError, BlobPreconditionFailedError, del, get, head, list, put } from "@vercel/blob";
 import type { Storage } from "./index";
 
 /*
@@ -97,6 +97,19 @@ export const blobStorage: Storage = {
     const result = await get(`media/${file}`, { access: "private" });
     if (!result || result.statusCode !== 200) return null;
     return { body: result.stream, contentType: result.blob.contentType, size: result.blob.size };
+  },
+  async list(prefix) {
+    const paths: string[] = [];
+    let cursor: string | undefined;
+    do {
+      const page = await list({ prefix, cursor, limit: 1000 });
+      paths.push(...page.blobs.map((blob) => blob.pathname));
+      cursor = page.hasMore ? page.cursor : undefined;
+    } while (cursor);
+    return paths;
+  },
+  async deleteJson(pathname) {
+    await del(pathname);
   },
 };
 

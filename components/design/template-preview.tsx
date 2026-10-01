@@ -93,7 +93,7 @@ function Body({ template, data }: { template: TemplateId; data: PreviewData }) {
   const { name, handle, niches } = data;
   const thumb = (index: number) => data.thumbs?.[index] ?? null;
   const firstName = name.split(/\s+/)[0] || name;
-  const kicker = ["Creadora UGC", ...niches].join(" · ");
+  const kicker = ["UGC Creator", ...niches].join(" · ");
   switch (template) {
     case "creator":
       return (
@@ -130,7 +130,7 @@ function Body({ template, data }: { template: TemplateId; data: PreviewData }) {
             </span>
           </span>
           <div className="tpv-block" data-tone="deep">
-            <span className="tpv-block__title">Trabajo seleccionado</span>
+            <span className="tpv-block__title">Contenido destacado</span>
             <span className="tpv-grid2">
               <Video tone="deep" src={thumb(0)} />
               <Video tone="deep" src={thumb(1)} />

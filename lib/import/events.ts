@@ -11,6 +11,10 @@ export type DraftPiece = {
   isVideo: boolean;
   /** Qué es en Instagram (10.2): el visor lo aclara en los carruseles (se importa su portada). */
   kind: "video" | "image" | "carousel";
+  /** Spec 11.5: autor del post agregado por link (oEmbed). */
+  author?: string | null;
+  /** El post original en Instagram (spec 11.3: "verlo completo" de un carrusel). */
+  postUrl: string | null;
   /** Su video, para verlo en línea (ajuste 5); null si es una foto. */
   video: { platform: "tiktok" | "instagram" | "youtube"; url: string } | null;
 };

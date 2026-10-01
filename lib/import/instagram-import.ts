@@ -106,14 +106,16 @@ export async function importFromInstagram(
       username: handle,
       biography: snapshot.biography,
       category: snapshot.businessCategory,
-      posts: selected,
+      // Spec 11.4: todas las publicaciones importadas (no solo las elegidas), en la misma llamada: así las que el
+      // creador sume desde "De tu perfil" llegan con su título y su nicho, no a "Todo".
+      posts,
     });
     generated = {
       provider: "groq",
       model: copy.model,
       generatedAt: new Date().toISOString(),
       valueProp: copy.valueProp,
-      pieces: selected.flatMap((post) => {
+      pieces: posts.flatMap((post) => {
         const suggestion = copy.pieces.get(post.id);
         return suggestion ? [{ sourcePostId: post.id, ...suggestion }] : [];
       }),

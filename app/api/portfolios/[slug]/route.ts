@@ -1,5 +1,5 @@
 import type { NextRequest } from "next/server";
-import { requireCreator } from "@/lib/auth";
+import { requirePortfolioEditor } from "@/lib/auth";
 import { NotFoundError, errorResponse, jsonResponse, readJsonBody } from "@/lib/errors";
 import { getPortfolio, toStoredPieces, updatePortfolio } from "@/lib/portfolio/repository";
 import { resolvePortfolio } from "@/lib/portfolio/resolve";
@@ -19,7 +19,8 @@ function body(request: NextRequest, portfolio: Portfolio) {
 
 /** Lee el portafolio completo: datos scrapeados, generados, manuales y lo que se muestra. */
 export async function GET(request: NextRequest, { params }: Context) {
-  const denied = requireCreator(request);
+  // Con la clave del creador o con el magic link de este portafolio (spec 11.8).
+  const denied = requirePortfolioEditor(request, (await params).slug);
   if (denied) return denied;
 
   try {
@@ -37,7 +38,8 @@ export async function GET(request: NextRequest, { params }: Context) {
  * Cada sección enviada reemplaza a la guardada. Si alguien guardó antes, responde 409.
  */
 export async function PATCH(request: NextRequest, { params }: Context) {
-  const denied = requireCreator(request);
+  // Con la clave del creador o con el magic link de este portafolio (spec 11.8).
+  const denied = requirePortfolioEditor(request, (await params).slug);
   if (denied) return denied;
 
   try {

@@ -107,6 +107,28 @@ el correo **no** se marca como anotado: puede volver a intentarlo. En los logs: 
   que debería dar 412) y `writeWithHeadEtag: "ok"` (el nuevo). Si `writeWithHeadEtag` no fuera `ok`, la causa es otra:
   mándame esa respuesta.
 
+### 4.3 Secciones 11 y 12: correo, archivado, oEmbed y tracking
+
+| Variable | Para qué | Sin ella |
+| --- | --- | --- |
+| `SMTP_HOST` (`smtp.zoho.com`), `SMTP_PORT` (`465`), `SMTP_USER`, `SMTP_PASSWORD` | Correos (magic link 11.8/12.1, avisos de archivado 11.9, hitos de vistas 12.8) desde una dirección @supercreador.tech por el SMTP de Zoho. `SMTP_PASSWORD` = contraseña de aplicación de Zoho. | **Modo mock**: no sale ningún correo; el contenido y el link quedan en los logs (`"scope":"mail"`, `"scope":"magic-link"`). |
+| `MAIL_FROM` (opcional) | Remitente, p. ej. `Supercreador <hola@supercreador.tech>`. | `Supercreador <SMTP_USER>`. |
+| `MAGIC_LINK_SECRET` (recomendada) | Firma los magic links (30 días, un solo portafolio). Cualquier texto largo y aleatorio. | Se deriva de `CREATOR_ACCESS_KEY` (cambiar la clave invalida los links). |
+| `CRON_SECRET` | Vercel la manda al cron diario (`vercel.json`: `GET /api/cron/cleanup`, 06:00 UTC). | El cron no corre (401). A mano: con la clave y `?dry=1` para ver qué haría. |
+| `META_OEMBED_TOKEN` | "Agregar por link" de posts de Instagram (11.5): app token de Meta, `APP_ID|CLIENT_TOKEN` (gratis). | Solo TikTok por link (Instagram responde un aviso claro). |
+| `IG_MESSAGING_TOKEN` (opcional) | El único aviso por Instagram antes de archivar (12.2). Meta solo deja escribir a cuentas que ya conversaron con @supercreador.tech. | Se omite; el correo es el canal garantizado. |
+
+- **Archivado (11.9):** a los 30 días sin actividad (aperturas, creación o última edición) el portafolio se
+  **archiva**: su link muestra a Chispa pensativa con "No disponible temporalmente. Contacta a soporte" (12.3); los
+  datos quedan. Avisos por correo a los 21 y 7 días previos y el día del archivado, con el link para reactivar
+  (1 clic). Desde el editor también hay "Reactivar". El registro de aperturas empezó de cero con esta ronda: ningún
+  portafolio se archiva antes de 30 días de registro. Prueba en seco: `GET /api/cron/cleanup?dry=1` con la clave.
+- **El correo es la cuenta (12.1):** se guarda al pedir el magic link en "Portafolio listo" (`owners/`, `accounts/`);
+  en `/acceso` se puede entrar solo con el correo. Nunca contraseña ni Google.
+- **Tracking propio (12.7 / 12.9):** cada visita cuenta 1 vista por persona por día (hash diario del IP; nunca se
+  guarda el IP), su `?ref=` (`qr`, `whatsapp`…) y la página. Sin cookies ni banner. El editor muestra vistas por
+  origen y la barra de completitud (12.8).
+
 ## 5. Primer deploy y prueba
 
 1. **Deploy** (o push a `main`). Cada push a `main` publica en producción; cada rama o pull request crea un
@@ -430,6 +452,17 @@ perfil real; en "De tu perfil", tocar una foto, un carrusel y un reel. Un reel d
 TikTok o YouTube si hay (igual: se abre y se le da play; nunca arranca solo), y subir una foto al banner desde
 `/editar/<slug>`.
 
+### Verificación ronda de feedback 4 y 5 (secciones 11 y 12)
+
+Local: build de producción con Turbopack y prueba de humo **191/191** (header en 2 filas, servicios obligatorios,
+Agregar por link, magic link con alcance, correo como cuenta, vistas y `?ref=`, hitos, archivado en seco y de verdad
+con avisos, página archivada, reactivación, WhatsApp, Bio sin recorte).
+
+**Para probar en el Preview:** cargar las variables de §4.3 (al menos `CRON_SECRET` y el SMTP); importar → nichos y
+piezas (probar "Agregar por link" con un TikTok público) → **Servicios** (obligatorio) → plantilla → paleta → generar;
+en "Portafolio listo", guardar el correo (debe llegar el magic link), WhatsApp y el QR; abrir el portafolio y
+alternar "Contenido | Media kit" (la fila de chips se colapsa); `GET /api/cron/cleanup?dry=1`.
+
 ## 11. Deudas aceptadas
 
 Ítems del checklist de arquitectura que se decidió no cubrir en el piloto. Son decisiones conscientes, no
@@ -495,3 +528,13 @@ descuidos: cada una dice qué riesgo implica y cuándo hay que volver a revisarl
 
 - **Qué es:** cada borrador fallido deja `drafts/<id>.failure.json` (se usa para el estado consultable).
 - **Riesgo concreto:** ninguno más allá de espacio; son pocos bytes. Se limpian junto con los borradores viejos.
+
+### ⚠ Deuda aceptada: "VER MÁS" depende de cuántas publicaciones trae el perfil
+
+- **Qué es:** el import del perfil (Apify, modo detalles) trae las últimas 12 publicaciones: "VER MÁS" aparece cuando
+  hay más de 12 piezas (con las agregadas por link). Traer más del perfil requiere otra llamada paga a Apify.
+
+### ⚠ Deuda aceptada: el aviso por Instagram casi nunca se podrá mandar
+
+- **Qué es:** la API de Meta solo deja escribir a cuentas que ya conversaron con @supercreador.tech, por su id de esa
+  conversación (no por usuario). Hasta tener ese id, el aviso del 12.2 se omite y queda el correo.
