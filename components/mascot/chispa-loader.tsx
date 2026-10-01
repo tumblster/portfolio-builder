@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Chispa, EXPRESSIONS } from "./chispa";
+import { Chispa, EXPRESSIONS as ALL_EXPRESSIONS } from "./chispa";
+
+/** Las 6 caras del cargador (C5). La "pensativa" es solo para un portafolio archivado (12.3). */
+const EXPRESSIONS = ALL_EXPRESSIONS.filter((expression) => expression !== "pensativa");
 
 /*
  * Carga con Chispa (v2 · M4-rev r2, C5): las 6 expresiones reales ciclan cada ~800 ms con un fundido y un "pop"

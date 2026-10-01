@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import { EmailAccessForm } from "@/components/email-access-form";
 import { AccessForm } from "@/components/access-form";
 import { ConfigNotice } from "@/components/config-notice";
 import { LandingFooter, LandingHeader, landingContainer } from "@/components/landing/landing-chrome";
@@ -28,7 +29,9 @@ function safeNext(value: string | string[] | undefined): string {
 const textLink = "font-medium underline decoration-accent decoration-2 underline-offset-4 hover:text-accent-ink";
 
 export default async function AccessPage({ searchParams }: PageProps<"/acceso">) {
-  const next = safeNext((await searchParams).next);
+  const query = await searchParams;
+  const next = safeNext(query.next);
+  const expiredLink = query.enlace === "vencido";
   const access = await getCreatorAccess();
   if (access.status === "ok") redirect(next);
 
@@ -54,7 +57,13 @@ export default async function AccessPage({ searchParams }: PageProps<"/acceso">)
                 "Pídesela a tu contacto de Supercreador."
               )}
             </p>
+            {expiredLink && (
+              <p role="status" className="mt-5 rounded-2xl border border-line bg-paper px-4 py-3 text-sm" data-testid="enlace-vencido">
+                Ese link para editar venció o no es válido. Pide uno nuevo desde «Portafolio listo» o entra con tu clave.
+              </p>
+            )}
             {access.status === "not-configured" ? <ConfigNotice message={access.message} /> : <AccessForm next={next} />}
+            <EmailAccessForm />
           </div>
           <div className="order-first mx-auto w-40 md:order-none md:w-full" aria-hidden="true">
             <Chispa expression="sonriente" className="mascot-static block h-auto w-full text-ink" />

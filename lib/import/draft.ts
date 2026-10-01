@@ -20,7 +20,7 @@ import {
   type Portfolio,
 } from "@/lib/portfolio/schema";
 import { getStorage } from "@/lib/storage";
-import type { DraftPreview } from "./events";
+import type { DraftPiece, DraftPreview } from "./events";
 
 /*
  * Borrador de importación (v2 · M2). Importar ya no crea el portafolio a ciegas:
@@ -60,6 +60,8 @@ const storedDraftSchema = z.object({
   warnings: z.array(z.string()),
   /** Se marca al confirmar: primero se reclama (slug null) y al terminar queda el slug. */
   claim: z.object({ at: z.iso.datetime(), slug: z.string().nullable() }).nullable(),
+  /** Spec 11.5: piezas agregadas por link (oEmbed), con su autor. Elegibles como las del perfil. */
+  linkPieces: z.array(pieceSchema.extend({ author: z.string().max(120).nullable().default(null) })).max(LIMITS.instagramPosts).default([]),
   /** Cuándo el creador pidió reintentar tras un fallo: los fallos anteriores a esto ya no cuentan. */
   retriedAt: z.iso.datetime().nullable().default(null),
 });
@@ -74,7 +76,7 @@ export async function saveDraft(input: {
   pieces: Piece[];
   warnings: string[];
 }): Promise<DraftPreview> {
-  const draft: StoredDraft = { id: randomUUID(), createdAt: new Date().toISOString(), claim: null, retriedAt: null, ...input };
+  const draft: StoredDraft = { id: randomUUID(), createdAt: new Date().toISOString(), claim: null, retriedAt: null, linkPieces: [], ...input };
   if (!(await getStorage().createJson(draftPath(draft.id), draft))) throw new Error("No se pudo guardar el borrador.");
   return toPreview(draft);
 }
@@ -91,20 +93,63 @@ export function profilePieceId(draftId: string, postId: string): string {
 function piecePool(draft: StoredDraft): Map<string, Piece> {
   const pool = new Map(draft.pieces.map((piece) => [piece.id, piece]));
   const used = new Set(draft.pieces.map((piece) => piece.sourcePostId).filter(Boolean));
+  // Spec 11.4: lo que la IA dijo de cada publicación (título y nicho), también de las que no eligió.
+  const ai = new Map((draft.generated?.pieces ?? []).map((piece) => [piece.sourcePostId, piece]));
   for (const post of draft.snapshot.posts) {
     if (!post.image || used.has(post.id)) continue;
     const id = profilePieceId(draft.id, post.id);
     pool.set(id, {
       id,
       origin: "instagram",
-      title: titleFromCaption(post.caption, post.type),
-      niche: null,
+      title: ai.get(post.id)?.title ?? titleFromCaption(post.caption, post.type),
+      niche: ai.get(post.id)?.niche ?? null,
       image: post.image,
       video: post.type === "video" ? { platform: "instagram", url: post.url } : null,
       sourcePostId: post.id,
     });
   }
+  // Spec 11.5: las agregadas por link (oEmbed), al final.
+  for (const piece of draft.linkPieces) {
+    const { author: _author, ...rest } = piece;
+    void _author;
+    pool.set(piece.id, rest);
+  }
   return pool;
+}
+
+/**
+ * Spec 11.5: agrega al borrador una pieza resuelta por link (oEmbed). Si ya estaba, la devuelve igual. Devuelve lo
+ * que necesita la grilla de "De tu perfil".
+ */
+export async function addLinkPiece(draftId: string, piece: Piece & { author: string | null }): Promise<DraftPiece> {
+  const storage = getStorage();
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const stored = await storage.readJson(draftPath(draftId));
+    if (!stored) throw new NotFoundError("Esta importación ya no existe. Vuelve a importar el perfil.");
+    const draft = storedDraftSchema.parse(stored.data);
+    if (Date.now() - Date.parse(draft.createdAt) > DRAFT_TTL_MS) {
+      throw new InvalidInputError("Pasaron más de 24 horas desde que se importó este perfil. Vuelve a importarlo.", 410);
+    }
+    const existing = draft.linkPieces.find((item) => item.id === piece.id);
+    if (!existing && draft.linkPieces.length >= LIMITS.instagramPosts) {
+      throw new InvalidInputError(`Puedes agregar hasta ${LIMITS.instagramPosts} piezas por link.`);
+    }
+    const saved = existing ?? piece;
+    if (existing || (await storage.replaceJson(draftPath(draftId), { ...draft, linkPieces: [...draft.linkPieces, piece] }, stored.etag))) {
+      return {
+        id: saved.id,
+        title: saved.title,
+        image: saved.image,
+        niche: null,
+        isVideo: true,
+        kind: "video",
+        postUrl: saved.video?.url ?? null,
+        video: saved.video,
+        author: saved.author,
+      };
+    }
+  }
+  throw new ConflictError("Otra pestaña cambió esta importación. Intenta de nuevo.");
 }
 
 function toPreview(draft: StoredDraft): DraftPreview {
@@ -112,6 +157,8 @@ function toPreview(draft: StoredDraft): DraftPreview {
   const used = new Set(pieces.map((piece) => piece.niche));
   const selectedIds = new Set(pieces.map((piece) => piece.id));
   const postType = new Map(snapshot.posts.map((post) => [post.id, post.type]));
+  const postUrl = new Map(snapshot.posts.map((post) => [post.id, post.url]));
+  const urlOf = (piece: Piece) => (piece.sourcePostId ? (postUrl.get(piece.sourcePostId) ?? null) : null);
   const kindOf = (piece: Piece): "video" | "image" | "carousel" =>
     piece.video ? "video" : piece.sourcePostId && postType.get(piece.sourcePostId) === "carousel" ? "carousel" : "image";
   const engagementRate = computeEngagementRate(snapshot);
@@ -129,11 +176,12 @@ function toPreview(draft: StoredDraft): DraftPreview {
       niche: piece.niche,
       isVideo: piece.video !== null,
       kind: kindOf(piece),
+      postUrl: urlOf(piece),
       video: piece.video,
     })),
     profilePosts: [...piecePool(draft).values()]
       .filter((piece) => !selectedIds.has(piece.id))
-      .map((piece) => ({ id: piece.id, title: piece.title, image: piece.image, niche: null, isVideo: piece.video !== null, kind: kindOf(piece), video: piece.video })),
+      .map((piece) => ({ id: piece.id, title: piece.title, image: piece.image, niche: piece.niche, isVideo: piece.video !== null, kind: kindOf(piece), postUrl: urlOf(piece), video: piece.video })),
     engagementRate,
     metrics: creatorMetrics(snapshot, engagementRate),
     pieceLimits: { min: LIMITS.minPieces, max: LIMITS.maxPieces },
@@ -333,6 +381,10 @@ export async function confirmDraft(input: ConfirmImportInput): Promise<ConfirmOu
   const niches = confirmedNiches(input.niches);
   const slugs = new Set(niches.map((niche) => niche.slug));
   const pieces = selectedPieces(draft, input, slugs);
+  // Spec 11.12: el paso de Servicios va antes de generar y es obligatorio (mínimo 1 tarjeta). Clientes anteriores a
+  // esta ronda (sin `selection`) no lo mandan: siguen como antes.
+  const services = input.services?.filter((service) => service.title.trim()) ?? [];
+  if (input.selection && services.length === 0) invalidAt(["services"], "Agrega al menos un servicio: un título y, si quieres, un link o una descripción.");
 
   // Se reclama el borrador antes de crear: si llegan dos confirmaciones a la vez, solo una genera.
   // Con el etag de la lectura: si otra petición reclamó (o liberó un candado vencido) en medio, esta pierde.
@@ -365,7 +417,7 @@ export async function confirmDraft(input: ConfirmImportInput): Promise<ConfirmOu
         instagram: draft.snapshot,
         generated: draft.generated,
         // Los nichos confirmados son la fuente de verdad (mandan sobre los de la IA, que quedan en `generated`).
-        manual: { niches },
+        manual: { niches, ...(services.length > 0 ? { services } : {}) },
         pieces,
         design: input.design,
         insights: { engagementRate: computeEngagementRate(draft.snapshot), computedAt: new Date().toISOString() },

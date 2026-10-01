@@ -6,6 +6,8 @@ import { MediaKit } from "@/components/portfolio/media-kit";
 import { PortfolioViews } from "@/components/portfolio/portfolio-views";
 import type { NicheFilter, TemplateProps } from "@/components/portfolio/template-kit";
 import { paletteStyle, resolvePalette } from "@/lib/palette/palettes";
+import { contactLinks } from "@/lib/portfolio/contact-links";
+import { nichesWithPieces } from "@/lib/portfolio/niches";
 import type { TemplateId } from "@/lib/portfolio/design";
 import type { ResolvedPortfolio } from "@/lib/portfolio/resolve";
 import { publicPath } from "@/lib/portfolio/slug";
@@ -71,6 +73,15 @@ export function PublicPortfolio(props: PublicPortfolioProps) {
       style={paletteStyle(palette) as React.CSSProperties}
       about={about}
       kit={<MediaKit portfolio={portfolio} />}
+      nav={{
+        basePath: publicPath(portfolio.slug),
+        name: portfolio.name,
+        photoUrl: portfolio.photo?.url ?? null,
+        niches: nichesWithPieces(portfolio.niches, portfolio.pieces).map(({ slug, label }) => ({ slug, label })),
+        contactId: contactLinks(portfolio.contact).length > 0 ? "pf-page-contacto" : null,
+        // 12.6: "Hablemos" abre WhatsApp con el número que el creador puso en el editor.
+        whatsapp: portfolio.contact.whatsapp?.replace(/\D/g, "") || null,
+      }}
     />
   );
 }

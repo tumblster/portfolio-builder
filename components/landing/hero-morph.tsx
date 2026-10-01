@@ -32,7 +32,7 @@ export function HeroMorph() {
     <div
       className="hero-morph"
       role="img"
-      aria-label="Ejemplo de portafolio de Valeria Campos, creadora UGC de recetas y fitness, que va cambiando entre las 4 plantillas y las paletas del producto."
+      aria-label="Ejemplo de portafolio de Valeria Campos, UGC Creator de recetas y fitness, que va cambiando entre las 4 plantillas y las paletas del producto."
       data-hero-morph
     >
       {STATES.map(([template, paletteId], index) => {

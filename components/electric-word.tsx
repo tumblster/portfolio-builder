@@ -6,7 +6,7 @@ import "./electric-word.css";
  * - Cada arco es un rayo generado por desplazamiento de punto medio (el algoritmo clásico del relámpago): fino,
  *   quebrado a todas las escalas, con ramificaciones cortas. Arcos por encima de las letras, envolviendo los extremos
  *   de la palabra y por debajo; ninguno es un óvalo.
- * - 7 fotogramas, cada uno con arcos y dentado distintos. Se encienden en ráfagas cortas e irregulares (30–90 ms) con
+ * - 7 fotogramas, cada uno con arcos y dentado distintos. Se encienden en ráfagas cortas e irregulares (50–150 ms) con
  *   pausas de oscuridad: la descarga "tartamudea" como un arco de verdad. Un resplandor ambiente late con las ráfagas.
  * - Brasa #FC3300 con núcleo incandescente y glow. Grosor fijo en píxeles (non-scaling-stroke): fino a cualquier tamaño.
  * Todo sale de una semilla fija: se genera igual en el servidor y en cada visita. Solo SVG + CSS (se anima solo la
@@ -108,15 +108,20 @@ function frame(index: number): string[] {
 const ARC_FRAMES = Array.from({ length: FRAMES }, (_, index) => frame(index));
 
 /*
- * Ritmo de la descarga (ms dentro de un ciclo de 2,1 s): [fotograma, inicio, duración]. Ráfagas cortas y huecos
+ * Ritmo de la descarga (ms dentro de un ciclo de ~4,6 s): [fotograma, inicio, duración]. Ráfagas cortas y huecos
  * de distinto largo: nunca un parpadeo mecánico.
  */
-const CYCLE_MS = 2100;
-const BURSTS: [number, number, number][] = [
-  [0, 0, 70], [1, 70, 40], [2, 150, 90], [0, 240, 30], [3, 380, 60], [4, 440, 80], [5, 690, 50], [1, 740, 70],
-  [6, 810, 40], [2, 1010, 60], [3, 1070, 90], [4, 1160, 40], [6, 1420, 70], [5, 1490, 60], [0, 1550, 50],
-  [1, 1830, 80], [3, 1910, 50],
-];
+// Spec 11.1: el mismo diseño, más lento. Entre truenos, el doble de pausa (×2,2); cada ráfaga dura un 70 % más.
+const GAP_PACE = 2.2;
+const BURST_PACE = 1.7;
+const CYCLE_MS = Math.round(2100 * GAP_PACE);
+const BURSTS: [number, number, number][] = (
+  [
+    [0, 0, 70], [1, 70, 40], [2, 150, 90], [0, 240, 30], [3, 380, 60], [4, 440, 80], [5, 690, 50], [1, 740, 70],
+    [6, 810, 40], [2, 1010, 60], [3, 1070, 90], [4, 1160, 40], [6, 1420, 70], [5, 1490, 60], [0, 1550, 50],
+    [1, 1830, 80], [3, 1910, 50],
+  ] as [number, number, number][]
+).map(([frame, start, duration]) => [frame, Math.round(start * GAP_PACE), Math.round(duration * BURST_PACE)]);
 const pct = (ms: number) => `${((ms / CYCLE_MS) * 100).toFixed(2)}%`;
 
 function keyframes(): string {

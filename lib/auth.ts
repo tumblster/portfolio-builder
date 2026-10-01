@@ -1,6 +1,7 @@
 import "server-only";
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
+import { PORTFOLIO_COOKIE, verifyPortfolioToken } from "@/lib/magic-link";
 import type { NextRequest } from "next/server";
 import { ConfigError, errorResponse, jsonResponse } from "@/lib/errors";
 import { requestHost } from "@/lib/request";
@@ -111,4 +112,37 @@ export async function getCreatorAccess(): Promise<CreatorAccess> {
   }
   const cookie = (await cookies()).get(CREATOR_COOKIE)?.value;
   return cookie && sameSecret(cookie, expected) ? { status: "ok" } : { status: "no-session" };
+}
+
+/*
+ * Spec 11.8: además de la clave del piloto, un magic link deja editar UN portafolio (cookie sc_portfolio con el token
+ * firmado; vence a los 30 días). Las escrituras con cookie solo se aceptan desde este mismo sitio.
+ */
+const portfolioCookieSlug = (request: NextRequest) => verifyPortfolioToken(request.cookies.get(PORTFOLIO_COOKIE)?.value)?.slug ?? null;
+
+/** Para las rutas de UN portafolio: pasa con la clave del creador o con el magic link de ese mismo portafolio. */
+export function requirePortfolioEditor(request: NextRequest, slug: string): Response | null {
+  const denied = requireCreator(request);
+  if (!denied) return null;
+  if (portfolioCookieSlug(request) !== slug) return denied;
+  const isWrite = request.method !== "GET" && request.method !== "HEAD";
+  if (isWrite && !comesFromSameSite(request)) {
+    return jsonResponse({ error: { code: "forbidden", message: "Origen no permitido." } }, { status: 403 });
+  }
+  return null;
+}
+
+/** Subir imágenes: con la clave del creador o con cualquier magic link vigente (quien edita su portafolio). */
+export function requireUploader(request: NextRequest): Response | null {
+  const denied = requireCreator(request);
+  if (!denied || !portfolioCookieSlug(request)) return denied;
+  return comesFromSameSite(request) ? null : jsonResponse({ error: { code: "forbidden", message: "Origen no permitido." } }, { status: 403 });
+}
+
+/** Para páginas de UN portafolio (el editor): "creator" (clave), "owner" (su magic link) o sin acceso. */
+export async function getPortfolioAccess(slug: string): Promise<CreatorAccess | { status: "owner" }> {
+  const access = await getCreatorAccess();
+  if (access.status !== "no-session") return access;
+  const token = (await cookies()).get(PORTFOLIO_COOKIE)?.value;
+  return verifyPortfolioToken(token)?.slug === slug ? { status: "owner" } : access;
 }

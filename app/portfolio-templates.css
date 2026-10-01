@@ -1031,6 +1031,13 @@
 .bio-mesh--photo::after {
   display: none;
 }
-.bio-mesh--photo img {
+/* Spec 11.15: la portada no se recorta: se ve completa (contain) y una copia desenfocada llena el resto del banner. */
+.bio-mesh--photo .bio-mesh__fill {
   object-fit: cover;
+  filter: blur(18px) saturate(1.1);
+  transform: scale(1.15);
+  opacity: 0.85;
+}
+.bio-mesh--photo .bio-mesh__photo {
+  object-fit: contain;
 }
