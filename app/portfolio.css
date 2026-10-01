@@ -1006,3 +1006,14 @@ html:has([data-site="portfolio"]) body::before {
     scroll-behavior: smooth;
   }
 }
+
+/* Spec 11.12: el segundo campo de un servicio puede ser un link. */
+.pf-service-link {
+  color: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-color: var(--pf-accent);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+  overflow-wrap: anywhere;
+}

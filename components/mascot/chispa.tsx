@@ -19,11 +19,11 @@ import "./chispa.css";
  *   carcajada     confirmaciones alegres (link copiado, cambios guardados); sus ojos ya están cerrados
  */
 
-export const EXPRESSIONS = ["sonriente", "guino", "estrella", "picara", "sorprendida", "carcajada"] as const;
+export const EXPRESSIONS = ["sonriente", "guino", "estrella", "picara", "sorprendida", "carcajada", "pensativa"] as const;
 export type Expression = (typeof EXPRESSIONS)[number];
 
 /**
- * Lienzo común de las 6 caras: cuadrado, con la misma escala para todas (la nariz en "c" mide lo mismo en cada
+ * Lienzo común de las caras (la 7.ª, "pensativa", es la de un portafolio archivado: spec 12.3): cuadrado, con la misma escala para todas (la nariz en "c" mide lo mismo en cada
  * una) y cada cara centrada por su tinta, con al menos 10 % de aire por lado. Cambiar de expresión en el mismo
  * lugar no hace saltar la cara. La prueba de humo lo verifica.
  */
@@ -67,6 +67,12 @@ const FACES: Record<Expression, Face> = {
     mouth: "M149 245c-38-5-68-29-73-60c-3-16 3-26 16-26c5 0 9 1 19 8c39 25 73 23 110-9c11-9 13-10 19-10c6 0 1-5-5-5c-7-1-6-6 1-7c13-2 34 14 27 21c-2 1-3 1-5-3c-3-4-5-5-7-5c-2 0-2 0 1 5c6 12 5 27-4 44c-16 31-59 52-99 47zM158 239c1-1 2-46 1-48c0 0-3 0-5-1c-6 0-14-2-18-3c-2-1-3-1-4-1c-1 1-3 14-5 28c-1 2-1 5-1 7c-1 7-1 10-1 11c3 2 20 6 30 7c1 0 2 0 2 0c0 0 1 0 1 0zM176 238c9-1 23-6 25-7c0-1 0-1 0-2c0-1-1-6-2-12c-3-20-5-31-6-32c-1 0-2 0-4 1c-3 1-10 3-17 4l-6 1 0 7c-1 12 0 40 0 41c1 0 4 0 10-1zM119 222c1-5 3-20 4-26c1-2 2-5 2-8c2-5 2-5-4-7c-2-2-7-4-9-6c-6-4-6-4-8 0c0 2-1 5-2 7c-3 6-7 20-8 25c-1 3 10 13 20 19c4 3 4 3 5-4zM212 225c8-4 20-14 22-18c2-3-11-39-14-39c0 0-3 2-6 4c-3 3-8 6-10 7c-5 3-6 3-5 6c3 14 5 20 6 30c1 6 2 11 2 12c0 1 1 0 5-2zM91 196c1-5 6-17 8-23c2-6 2-6-1-7c-5-2-8-2-12 1c-6 5-6 17 0 30c2 4 3 4 5-1zM241 196c7-9 10-27 7-35c-3-9-9-9-17-2c-5 3-5 4-3 9c4 10 7 18 11 30c0 1 1 0 2-2zM67 164c-6-6 20-25 28-21c4 2 2 5-3 6c-6 1-8 3-7 7c1 3-1 4-4 1l-2-2-1 1c-1 1-3 3-5 5c-3 4-5 5-6 3z",
     nose: "M159 165c-1 0-2 0-4-1c-11-4-14-20-5-28c8-7 20-7 27 1c5 5 0 9-5 4c-6-6-16-5-20 2c-4 7 1 15 10 16c4 1 6 3 3 5c-1 1-5 2-6 1z",
     rest: "M192 122c-1-2 0-5 5-13c20-31 60-33 79-5c3 5 3 6 2 8c-3 2-4 2-7-2c-17-26-51-22-70 6c-5 8-6 9-9 6zM131 126c-1 0-2-2-3-4c-8-14-28-25-41-23c-13 2-23 9-29 20c-1 3-2 4-3 4c-9 0 0-17 13-26c21-14 48-6 65 19c3 5 4 7 2 9c-1 1-3 1-4 1z",
+  },
+  pensativa: {
+    eyes: ["M93 211c-37-5-55-68-32-115c18-37 56-35 72 4c7 19 9 40 5 61c-6 30-26 52-45 50zM101 202c1 0 1-1-2-2c-11-6-21-29-20-48l0-4 5-2c2-1 7-4 10-5c7-3 7-3 4-5c-6-4-12-8-14-10l-2-2 0-4c3-18 14-35 26-36c5-1 5-2 1-4c-16-9-32-1-42 20c-19 40-6 97 24 103c2 1 9 0 10-1z", "M227 209c-49-12-47-129 2-140c34-7 59 45 47 97c-8 30-28 49-49 43zM239 203c2-1 2-2-1-3c-11-7-18-24-19-45c-1-8-1-7 10-13c7-3 9-4 9-5c0 0-3-3-8-6c-10-7-9-6-8-11c2-19 14-36 27-37c3 0 3-1-1-3c-24-14-47 11-50 54c-3 40 19 75 41 69z"],
+    mouth: "M140 273c11-5 23-5 35-2c10 3 19 3 27-2c3-2 6 2 3 5c-9 7-20 7-31 4c-11-3-21-3-30 1c-3 2-7-3-4-6z",
+    nose: "M158 207c-10-4-14-14-11-24c5-12 23-14 31-4c3 4-1 8-4 4c-6-7-18-5-21 2c-3 8 2 16 11 17c4 0 6 2 3 5c-1 1-5 1-9 0z",
+    rest: "M209 57c15-9 34-10 49-3c3 2 1 6-2 5c-14-6-30-5-42 3c-3 2-7-2-5-5z",
   },
 };
 

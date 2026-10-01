@@ -125,3 +125,37 @@ export function toStoredPieces(inputs: PieceInput[], existing: Piece[] = []): Pi
     };
   });
 }
+
+/**
+ * Borra un portafolio (spec 11.9: limpieza por inactividad) y deja de servir sus páginas públicas. Las imágenes que
+ * subió quedan en el almacenamiento (deuda aceptada en DEPLOY.md). Devuelve false si no existía.
+ */
+export async function deletePortfolio(slug: string): Promise<boolean> {
+  const doc = await getPortfolio(slug);
+  if (!doc) return false;
+  await getStorage().deleteJson(docPath(slug));
+  refreshPublicPages(slug, doc);
+  return true;
+}
+
+/**
+ * Spec 11.9: archiva (soft-delete: se despublica, los datos quedan) o reactiva un portafolio. Reactivar cuenta como
+ * actividad (updatedAt). Escritura condicional con un reintento; devuelve el documento resultante o null si no existe.
+ */
+export async function setArchived(slug: string, archived: boolean): Promise<Portfolio | null> {
+  const storage = getStorage();
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const stored = await storage.readJson(docPath(slug));
+    if (!stored) return null;
+    const current = parseStored(stored.data, slug);
+    const now = new Date().toISOString();
+    const next = portfolioSchema.parse(
+      archived ? { ...current, archivedAt: now } : { ...current, archivedAt: null, updatedAt: now },
+    );
+    if (await storage.replaceJson(docPath(slug), next, stored.etag)) {
+      refreshPublicPages(slug, next);
+      return next;
+    }
+  }
+  throw new ConflictError();
+}

@@ -407,6 +407,8 @@ export const portfolioSchema = z
     design: designSchema.optional(),
     /** v2 · M2. Ausente = se calcula al leer, desde la captura de Instagram. */
     insights: insightsSchema.optional(),
+    /** Spec 11.9: archivado por inactividad (soft-delete). null/ausente = publicado. Se reactiva con 1 clic. */
+    archivedAt: utcDate.nullable().optional(),
   })
   .refine((doc) => Boolean(doc.manual.name || doc.instagram?.fullName || doc.instagram?.username), {
     error: "El portafolio necesita un nombre.",
@@ -500,6 +502,8 @@ export const confirmImportInputSchema = z.object({
     .optional(),
   /** Reintentar a propósito un borrador que quedó fallido (7.4 b). */
   retry: z.boolean().optional(),
+  /** Spec 11.12: las tarjetas de servicio del creador (obligatorias desde esta ronda: mínimo 1). */
+  services: servicesSchema.optional(),
   design: designSchema,
 });
 export type ConfirmImportInput = z.output<typeof confirmImportInputSchema>;

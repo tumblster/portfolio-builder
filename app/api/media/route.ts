@@ -1,5 +1,5 @@
 import type { NextRequest } from "next/server";
-import { requireCreator } from "@/lib/auth";
+import { requireUploader } from "@/lib/auth";
 import { InvalidInputError, errorResponse, jsonResponse } from "@/lib/errors";
 import { MAX_UPLOAD_BYTES, saveImage } from "@/lib/media";
 
@@ -8,7 +8,7 @@ import { MAX_UPLOAD_BYTES, saveImage } from "@/lib/media";
  * Responde { image: { url, width, height } } para usarlo en el portafolio.
  */
 export async function POST(request: NextRequest) {
-  const denied = requireCreator(request);
+  const denied = requireUploader(request); // clave del creador o magic link (spec 11.8)
   if (denied) return denied;
 
   try {

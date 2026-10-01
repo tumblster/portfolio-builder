@@ -18,6 +18,8 @@ export type ResolvedPortfolio = {
   photo: StoredImage | null;
   /** Foto propia del banner del hero (ajuste 7), o null. */
   cover: StoredImage | null;
+  /** Spec 11.9: si está archivado (su link muestra "no disponible temporalmente"). */
+  archivedAt: string | null;
   valueProp: string;
   /** Solo los canales con valor. */
   contact: Partial<Record<keyof Contact, string>>;
@@ -71,10 +73,12 @@ export function resolvePortfolio(doc: Portfolio): ResolvedPortfolio {
     bio: manual.bio ?? ig?.biography ?? "",
     photo: manual.photo !== undefined ? manual.photo : (ig?.profilePhoto ?? null),
     cover: manual.cover ?? null,
+    archivedAt: doc.archivedAt ?? null,
     valueProp: manual.valueProp ?? doc.generated?.valueProp ?? "",
     contact,
     niches: resolveNiches(doc),
-    services: manual.services ?? doc.generated?.services ?? [],
+    // Spec 11.12: solo los servicios que el creador escribió; nunca los que propuso la IA.
+    services: manual.services ?? [],
     stats: profileStats(ig),
     engagementRate,
     metrics: creatorMetrics(ig, engagementRate),

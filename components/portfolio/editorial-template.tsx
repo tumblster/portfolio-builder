@@ -3,14 +3,15 @@ import { ArrowIcon, PlayIcon } from "./icons";
 import { NichePills } from "./niche-filter";
 import {
   ContactPill,
+  copyrightYear,
   NicheSuffix,
   PieceLink,
-  STAT_LABEL,
-  TemplateFrame,
-  copyrightYear,
   pieceMeta,
   pieceShow,
   portfolioView,
+  ServiceText,
+  STAT_LABEL,
+  TemplateFrame,
   type TemplateProps,
 } from "./template-kit";
 
@@ -46,7 +47,7 @@ export function EditorialTemplate({ portfolio, variant, filter, coverEdit }: Tem
           <section className="ed-hero" aria-labelledby={id("nombre")}>
             <p className="ed-kicker">
               <span className="ed-dot" aria-hidden="true" />
-              Creadora UGC
+              UGC Creator
               <NicheSuffix niches={filterable} />
             </p>
             <H1 id={id("nombre")} className="ed-display">
@@ -150,7 +151,7 @@ export function EditorialTemplate({ portfolio, variant, filter, coverEdit }: Tem
                     </span>
                     <div>
                       <H3 className="ed-service__title">{service.title}</H3>
-                      {service.description && <p className="ed-service__text">{service.description}</p>}
+                      <ServiceText text={service.description} className="ed-service__text" />
                     </div>
                   </li>
                 ))}
