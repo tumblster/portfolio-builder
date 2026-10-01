@@ -12,7 +12,7 @@ import { nichesWithPieces } from "@/lib/portfolio/niches";
 import type { ResolvedPortfolio } from "@/lib/portfolio/resolve";
 import { Avatar } from "./avatar";
 import { CopyButton } from "./copy-button";
-import { errorText, fieldLabel, pillButton, primaryButton } from "./brand-ui";
+import { errorText, fieldLabel, pillButton, primaryButton, textInput } from "./brand-ui";
 
 /**
  * "Portafolio listo" (v2 · M1; diseño editable desde el M2): modal centrado con el link, copiar, abrir, editar y crear otro.
@@ -131,6 +131,10 @@ export function ReadyDialog({
 
         <DesignSection result={result} onResultChange={onResultChange} />
 
+        <MagicLinkSection slug={result.slug} />
+
+        <ShareSection url={url} name={resolved.name} />
+
         {warnings.length > 0 && (
           <ul className="mt-5 space-y-1 text-sm text-accent-ink">
             {warnings.map((warning) => (
@@ -138,8 +142,79 @@ export function ReadyDialog({
             ))}
           </ul>
         )}
+
+        {/* Spec 11.9: al final, el aviso de la limpieza por inactividad. */}
+        <p className="mt-7 border-t border-line pt-4 text-sm text-muted" data-testid="ready-disclaimer">
+          Si nadie abre tu portafolio en 30 días, lo archivamos y te avisamos por correo.
+        </p>
       </div>
     </dialog>
+  );
+}
+
+/**
+ * Spec 11.8: el correo del creador para recibir un magic link (volver a su link o editar), sin usuario ni contraseña.
+ * El link vale 30 días y solo para este portafolio. Sin SMTP configurado (desarrollo o Preview), queda en los logs.
+ */
+function MagicLinkSection({ slug }: { slug: string }) {
+  const uid = useId();
+  const [email, setEmail] = useState("");
+  const [state, setState] = useState<{ kind: "idle" | "sending" | "sent" | "mock" | "error"; message?: string }>({ kind: "idle" });
+
+  async function send(event: React.FormEvent) {
+    event.preventDefault();
+    setState({ kind: "sending" });
+    try {
+      const response = await fetch(`/api/portfolios/${slug}/magic-link`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim() }),
+      });
+      const data = await response.json().catch(() => null);
+      if (!response.ok) {
+        setState({ kind: "error", message: data?.error?.message ?? "No pudimos enviar el correo. Intenta de nuevo." });
+        return;
+      }
+      setState({ kind: data?.sent === "mock" ? "mock" : "sent" });
+    } catch {
+      setState({ kind: "error", message: "Se cortó la conexión. Intenta de nuevo." });
+    }
+  }
+
+  return (
+    <form onSubmit={send} className="mt-7 border-t border-line pt-5" data-testid="ready-magic-link" noValidate>
+      <label htmlFor={`${uid}-email`} className={fieldLabel}>
+        Guarda tu portafolio con tu correo
+      </label>
+      <p id={`${uid}-help`} className="mt-1 text-sm text-muted">
+        Tu correo es tu cuenta: te mandamos un link para volver a tu portafolio o editarlo cuando quieras. Sin
+        contraseña. Solo lo usamos para eso y para avisarte si tu portafolio se va a archivar.
+      </p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <input
+          id={`${uid}-email`}
+          type="email"
+          autoComplete="email"
+          inputMode="email"
+          required
+          value={email}
+          onChange={(event) => setEmail(event.target.value)}
+          aria-describedby={`${uid}-help`}
+          placeholder="tu@correo.com"
+          className={`${textInput} min-w-0 flex-1 basis-56`}
+        />
+        <button type="submit" disabled={state.kind === "sending" || !email.trim()} className={pillButton}>
+          {state.kind === "sending" ? "Enviando…" : "Enviarme el link"}
+        </button>
+      </div>
+      <p aria-live="polite" className="mt-2 text-sm">
+        {state.kind === "sent" && <span className="text-success">Listo: revisa tu correo (vale 30 días).</span>}
+        {state.kind === "mock" && (
+          <span className="text-muted">Modo de prueba: el correo aún no está configurado y el link quedó en los registros del servidor.</span>
+        )}
+        {state.kind === "error" && <span className={errorText}>{state.message}</span>}
+      </p>
+    </form>
   );
 }
 
@@ -248,6 +323,54 @@ function DesignSection({ result, onResultChange }: { result: ImportResult; onRes
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * Spec 12.4 y 12.5: compartir por WhatsApp (texto pre-llenado + link) y un QR del link para eventos, descargable en
+ * PNG, con ?ref=qr para medir cuántas visitas llegan por QR (12.9).
+ */
+function ShareSection({ url, name }: { url: string; name: string }) {
+  const [qr, setQr] = useState<string | null>(null);
+  const qrUrl = `${url}?ref=qr`;
+  const whatsapp = `https://wa.me/?text=${encodeURIComponent(`Mira mi portafolio de UGC: ${url}?ref=whatsapp`)}`;
+
+  useEffect(() => {
+    let alive = true;
+    void import("qrcode")
+      .then((QRCode) => QRCode.toDataURL(qrUrl, { width: 1024, margin: 2, color: { dark: "#0e110b", light: "#ffffff" } }))
+      .then((data) => alive && setQr(data))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [qrUrl]);
+
+  return (
+    <div className="mt-7 border-t border-line pt-5" data-testid="ready-share">
+      <p className={fieldLabel}>Compártelo</p>
+      <div className="mt-3 flex flex-wrap items-start gap-4">
+        <a href={whatsapp} target="_blank" rel="noopener noreferrer" className={pillButton} data-testid="ready-whatsapp">
+          Compartir por WhatsApp<span className="sr-only"> (se abre en otra pestaña)</span>
+        </a>
+        <figure className="flex items-center gap-3">
+          {qr ? (
+            // eslint-disable-next-line @next/next/no-img-element -- QR generado en el navegador (data URL)
+            <img src={qr} alt={`Código QR del portafolio de ${name}`} width={88} height={88} className="rounded-lg border border-line" />
+          ) : (
+            <span aria-hidden="true" className="block size-[88px] rounded-lg border border-line bg-sand" />
+          )}
+          <figcaption className="text-sm">
+            <span className="block text-muted">QR para eventos</span>
+            {qr && (
+              <a href={qr} download={`qr-${name.toLowerCase().replace(/[^a-z0-9]+/gi, "-")}.png`} className="font-semibold underline underline-offset-4" data-testid="ready-qr">
+                Descargar PNG
+              </a>
+            )}
+          </figcaption>
+        </figure>
+      </div>
     </div>
   );
 }

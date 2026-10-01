@@ -158,7 +158,8 @@ export function formFromPortfolio(resolved: ResolvedPortfolio): FormState {
       niche: piece.niche,
       image: piece.image,
       imageSource: piece.image ? "saved" : null,
-      videoUrl: piece.video?.url ?? "",
+      // Spec 11.11: pre-llenado con el link del contenido importado (no vacío).
+      videoUrl: piece.video?.url ?? piece.link?.url ?? "",
       postLink: !piece.video && piece.link ? piece.link : null,
     })),
     design: resolved.design,
@@ -175,12 +176,21 @@ export function extrasFromPortfolio(resolved: ResolvedPortfolio): PreviewExtras 
   };
 }
 
+/**
+ * El link de video que de verdad cuenta (spec 11.11): el campo viene pre-llenado con el post importado; si quedó
+ * igual a ese link y la pieza no era un video, no se guarda como video (lo guardado no cambia por estar pre-llenado).
+ */
+export const effectiveVideoUrl = (piece: Pick<PieceDraft, "videoUrl" | "postLink">) => {
+  const url = piece.videoUrl.trim();
+  return url && url !== piece.postLink?.url ? url : null;
+};
+
 const pieceInput = (piece: PieceDraft) => ({
   ...(piece.id ? { id: piece.id } : {}),
   title: piece.title,
   niche: piece.niche,
   image: piece.image,
-  videoUrl: piece.videoUrl.trim() || null,
+  videoUrl: effectiveVideoUrl(piece),
 });
 
 const serviceInput = (service: ServiceDraft): Service => ({ title: service.title, description: service.description });
@@ -289,6 +299,7 @@ export function toPreview(form: FormState, extras: PreviewExtras = NO_EXTRAS): R
     bio: form.bio.trim(),
     photo: form.photo,
     cover: form.cover,
+    archivedAt: null,
     valueProp: form.valueProp.trim(),
     contact,
     niches: form.niches,
@@ -300,7 +311,8 @@ export function toPreview(form: FormState, extras: PreviewExtras = NO_EXTRAS): R
     metrics: extras.creatorMetrics,
     design: form.design,
     pieces: form.pieces.map((piece, index) => {
-      const video = piece.videoUrl.trim() ? parseVideoLink(piece.videoUrl) : null;
+      const url = effectiveVideoUrl(piece);
+      const video = url ? parseVideoLink(url) : null;
       return {
         id: piece.key,
         origin: "manual",

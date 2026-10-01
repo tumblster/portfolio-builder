@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { ConfigNotice } from "@/components/config-notice";
 import { PortfolioEditor } from "@/components/editor/portfolio-editor";
-import { SiteHeader } from "@/components/site-header";
+import { LandingFooter } from "@/components/landing/landing-chrome";
+import { StudioHeader } from "@/components/studio-header";
 import { getCreatorAccess } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -19,8 +20,8 @@ export default async function ManualFormPage() {
 
   return (
     <>
-      <SiteHeader showLogout={access.status === "ok"} wide />
-      <main className="page-y mx-auto w-full max-w-6xl px-5 sm:px-8">
+      <StudioHeader showLogout={access.status === "ok"} />
+      <main className="mx-auto w-full max-w-6xl px-5 pt-28 pb-24 sm:px-8 md:pt-32">
         <p className="eyebrow">Nuevo portafolio</p>
         <h1 className="title-1 mt-5">Llénalo a mano</h1>
         <p className="lead mt-5 max-w-prose">
@@ -32,6 +33,7 @@ export default async function ManualFormPage() {
           <PortfolioEditor mode="create" />
         )}
       </main>
+      <LandingFooter />
     </>
   );
 }

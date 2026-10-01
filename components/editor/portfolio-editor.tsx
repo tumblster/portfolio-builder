@@ -7,9 +7,9 @@ import { PalettePicker, TemplatePicker } from "@/components/design/design-picker
 import { resolvePalette } from "@/lib/palette/palettes";
 import { nichesWithPieces } from "@/lib/portfolio/niches";
 import { LIMITS } from "@/lib/portfolio/schema";
-import { SUGGESTED_SERVICES } from "@/lib/portfolio/services";
 import { Avatar } from "../avatar";
 import { PublicPortfolio } from "../public-portfolio";
+import { Completeness } from "./completeness";
 import { CoverEditButton } from "./cover-edit-button";
 import { errorText, fieldLabel, pillButton, primaryButton, textInput } from "../ui";
 import {
@@ -178,8 +178,16 @@ function EditorForm({ initial, initialBaseline }: { initial: FormState; initialB
     );
     touched();
   }
-  function applySuggestedServices() {
-    setForm((current) => ({ ...current, services: SUGGESTED_SERVICES.map((service) => serviceDraft(service)) }));
+  /** Mueve una tarjeta de servicio un lugar arriba (-1) o abajo (+1). */
+  function moveService(key: string, delta: -1 | 1) {
+    setForm((current) => {
+      const from = current.services.findIndex((service) => service.key === key);
+      const to = from + delta;
+      if (from < 0 || to < 0 || to >= current.services.length) return current;
+      const services = [...current.services];
+      [services[from], services[to]] = [services[to], services[from]];
+      return { ...current, services };
+    });
     touched();
   }
   function addPiece() {
@@ -293,6 +301,8 @@ function EditorForm({ initial, initialBaseline }: { initial: FormState; initialB
           noValidate
           className={tab === "form" ? "block" : "hidden lg:block"}
         >
+          {/* Spec 12.8: barra de completitud, en vivo. */}
+          <Completeness form={form} />
           <section aria-labelledby="seccion-datos" className="space-y-5">
             <h2 id="seccion-datos" className="title-2">
               Datos
@@ -406,7 +416,8 @@ function EditorForm({ initial, initialBaseline }: { initial: FormState; initialB
               Servicios
             </h2>
             <p className="mt-2 text-sm text-muted">
-              Formas de colaborar con marcas, hasta {LIMITS.maxServices}. Sin servicios, esa sección no aparece.
+              Tus formas de colaborar con marcas, como tarjetas (hasta {LIMITS.maxServices}): un título y un link o una
+              descripción. Ordénalas como quieras. Sin tarjetas, esa sección no aparece.
             </p>
             {form.services.length > 0 && (
               <ol className="mt-5 space-y-4">
@@ -418,6 +429,8 @@ function EditorForm({ initial, initialBaseline }: { initial: FormState; initialB
                     errors={errors}
                     onChange={(patch) => editService(service.key, patch)}
                     onRemove={() => removeService(service.key)}
+                    onMove={(delta) => moveService(service.key, delta)}
+                    total={form.services.length}
                   />
                 ))}
               </ol>
@@ -436,11 +449,6 @@ function EditorForm({ initial, initialBaseline }: { initial: FormState; initialB
               >
                 {form.services.length >= LIMITS.maxServices ? `Máximo ${LIMITS.maxServices} servicios` : "Agregar servicio"}
               </button>
-              {form.services.length === 0 && (
-                <button type="button" onClick={applySuggestedServices} className={pillButton}>
-                  Usar sugerencias
-                </button>
-              )}
             </div>
           </section>
 
@@ -595,12 +603,16 @@ function ServiceEditor({
   errors,
   onChange,
   onRemove,
+  onMove,
+  total,
 }: {
   service: ServiceDraft;
   index: number;
   errors: FieldErrors;
   onChange: (patch: Partial<ServiceDraft>) => void;
   onRemove: () => void;
+  onMove: (delta: -1 | 1) => void;
+  total: number;
 }) {
   const id = (field: string) => `servicio-${service.key}-${field}`;
   const titleError = errors[`services.${index}.title`];
@@ -608,17 +620,37 @@ function ServiceEditor({
   return (
     <li className="panel p-4 sm:p-5">
       <div className="flex items-center justify-between gap-3">
-        <p className="font-mono text-xs text-muted">servicio {String(index + 1).padStart(2, "0")}</p>
-        <button
-          type="button"
-          onClick={onRemove}
-          className="flex min-h-tap items-center px-2 text-sm text-muted transition hover:text-ink"
-        >
-          Quitar<span className="sr-only"> el servicio {index + 1}</span>
-        </button>
+        <p className="font-mono text-xs text-muted">tarjeta {String(index + 1).padStart(2, "0")}</p>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => onMove(-1)}
+            disabled={index === 0}
+            aria-label={`Subir la tarjeta ${index + 1}`}
+            className="flex min-h-tap min-w-tap items-center justify-center rounded-full text-muted transition hover:text-ink disabled:opacity-40"
+          >
+            <span aria-hidden="true">↑</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => onMove(1)}
+            disabled={index === total - 1}
+            aria-label={`Bajar la tarjeta ${index + 1}`}
+            className="flex min-h-tap min-w-tap items-center justify-center rounded-full text-muted transition hover:text-ink disabled:opacity-40"
+          >
+            <span aria-hidden="true">↓</span>
+          </button>
+          <button
+            type="button"
+            onClick={onRemove}
+            className="flex min-h-tap items-center px-2 text-sm text-muted transition hover:text-ink"
+          >
+            Quitar<span className="sr-only"> la tarjeta {index + 1}</span>
+          </button>
+        </div>
       </div>
       <div className="mt-2 space-y-4">
-        <Field id={id("title")} label="Nombre" error={titleError}>
+        <Field id={id("title")} label="Título" error={titleError}>
           <input
             id={id("title")}
             value={service.title}
@@ -630,13 +662,14 @@ function ServiceEditor({
             className={textInput}
           />
         </Field>
-        <Field id={id("description")} label="Descripción (opcional)" error={descriptionError}>
+        <Field id={id("description")} label="Link o descripción (opcional)" error={descriptionError}>
           <textarea
             id={id("description")}
             rows={2}
             value={service.description}
             onChange={(event) => onChange({ description: event.target.value })}
             maxLength={LIMITS.serviceDescription}
+            placeholder="https://… o cuéntale a la marca qué incluye"
             aria-invalid={descriptionError ? true : undefined}
             aria-describedby={descriptionError ? `${id("description")}-error` : undefined}
             className={`${textInput} py-3`}

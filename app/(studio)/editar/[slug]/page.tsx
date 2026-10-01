@@ -5,8 +5,11 @@ import { ConfigNotice } from "@/components/config-notice";
 import { CopyButton } from "@/components/copy-button";
 import { extrasFromPortfolio, formFromPortfolio, type Baseline } from "@/components/editor/form-model";
 import { PortfolioEditor } from "@/components/editor/portfolio-editor";
-import { SiteHeader } from "@/components/site-header";
-import { getCreatorAccess } from "@/lib/auth";
+import { LandingFooter } from "@/components/landing/landing-chrome";
+import { PortfolioStatus } from "@/components/editor/portfolio-status";
+import { StudioHeader } from "@/components/studio-header";
+import { readActivity } from "@/lib/portfolio/activity";
+import { getPortfolioAccess } from "@/lib/auth";
 import { getPortfolio } from "@/lib/portfolio/repository";
 import { resolvePortfolio } from "@/lib/portfolio/resolve";
 import { publicPath } from "@/lib/portfolio/slug";
@@ -26,18 +29,20 @@ export const metadata: Metadata = {
  */
 export default async function EditPortfolioPage({ params, searchParams }: PageProps<"/editar/[slug]">) {
   const { slug } = await params;
-  const access = await getCreatorAccess();
+  // Con la clave del creador o con el magic link de este portafolio (spec 11.8).
+  const access = await getPortfolioAccess(slug);
   if (access.status === "no-session") redirect(`/acceso?next=${encodeURIComponent(`/editar/${slug}`)}`);
 
   if (access.status === "not-configured") {
     return (
       <>
-        <SiteHeader />
-        <main className="page-y mx-auto w-full max-w-3xl px-5 sm:px-8">
+        <StudioHeader showLogout={false} />
+        <main className="mx-auto w-full max-w-3xl px-5 pt-28 pb-24 sm:px-8 md:pt-32">
           <p className="eyebrow">Editor</p>
         <h1 className="title-1 mt-5">Edita el portafolio</h1>
           <ConfigNotice message={access.message} />
         </main>
+        <LandingFooter />
       </>
     );
   }
@@ -55,7 +60,10 @@ export default async function EditPortfolioPage({ params, searchParams }: PagePr
       path: publicPath(doc.slug, niche.slug),
     })),
   ].map((link) => ({ ...link, url: new URL(link.path, origin).toString() }));
-  const justCreated = (await searchParams).creado === "1";
+  const query = await searchParams;
+  const justCreated = query.creado === "1";
+  const reactivated = query.reactivado === "1";
+  const activity = await readActivity(doc.slug);
   const baseline: Baseline = {
     slug: doc.slug,
     revision: doc.revision,
@@ -66,10 +74,17 @@ export default async function EditPortfolioPage({ params, searchParams }: PagePr
 
   return (
     <>
-      <SiteHeader showLogout wide />
-      <main className="page-y mx-auto w-full max-w-6xl px-5 sm:px-8">
+      <StudioHeader showLogout />
+      <main className="mx-auto w-full max-w-6xl px-5 pt-28 pb-24 sm:px-8 md:pt-32">
         <p className="eyebrow">Editor</p>
         <h1 className="title-1 mt-5">Edita el portafolio</h1>
+        <PortfolioStatus
+          slug={doc.slug}
+          archived={Boolean(doc.archivedAt)}
+          views={activity?.views ?? 0}
+          refs={activity?.refs ?? {}}
+          reactivated={reactivated}
+        />
         {justCreated && (
           <p role="status" className="mt-5 text-lg text-success">
             Listo: el portafolio de {resolved.name} ya tiene link.
@@ -112,6 +127,7 @@ export default async function EditPortfolioPage({ params, searchParams }: PagePr
         </section>
         <PortfolioEditor mode="edit" baseline={baseline} />
       </main>
+      <LandingFooter />
     </>
   );
 }

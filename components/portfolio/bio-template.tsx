@@ -4,14 +4,15 @@ import { NichePills } from "./niche-filter";
 import {
   Avatar,
   ContactPill,
+  copyrightYear,
   NicheSuffix,
   PieceLink,
-  STAT_LABEL,
-  TemplateFrame,
-  copyrightYear,
   pieceMeta,
   pieceShow,
   portfolioView,
+  ServiceText,
+  STAT_LABEL,
+  TemplateFrame,
   type TemplateProps,
 } from "./template-kit";
 
@@ -30,7 +31,13 @@ export function BioTemplate({ portfolio, variant, filter, coverEdit }: TemplateP
   return (
     <TemplateFrame view={view} template="bio" variant={variant} filter={filter}>
       <div className={portfolio.cover ? "bio-mesh bio-mesh--photo" : "bio-mesh"} aria-hidden="true">
-        {portfolio.cover && <Image src={portfolio.cover.url} alt="" fill sizes="(min-width: 768px) 720px, 100vw" preload={view.isPage} />}
+        {/* Spec 11.15: la foto completa (contain), sin recortes; una copia desenfocada rellena los costados. */}
+        {portfolio.cover && (
+          <>
+            <Image src={portfolio.cover.url} alt="" fill sizes="(min-width: 768px) 720px, 100vw" className="bio-mesh__fill" />
+            <Image src={portfolio.cover.url} alt="" fill sizes="(min-width: 768px) 720px, 100vw" preload={view.isPage} className="bio-mesh__photo" />
+          </>
+        )}
       </div>
       {coverEdit && <div className="pf-cover-edit-slot--bio">{coverEdit}</div>}
       <div className="pf-body">
@@ -50,7 +57,7 @@ export function BioTemplate({ portfolio, variant, filter, coverEdit }: TemplateP
           </header>
 
           {hasContact && (
-            <ul className="bio-links" aria-label="Contacto">
+            <ul id={id("contacto")} className="bio-links" aria-label="Contacto">
               {links.map((link, index) => (
                 <li key={link.kind}>
                   <ContactPill link={link} className={index === 0 ? "bio-link bio-link--solid" : "bio-link"} />
@@ -124,7 +131,7 @@ export function BioTemplate({ portfolio, variant, filter, coverEdit }: TemplateP
                 {services.map((service, index) => (
                   <li key={`${index}-${service.title}`} className="bio-service">
                     <H3 className="bio-service__title">{service.title}</H3>
-                    {service.description && <p className="bio-service__text">{service.description}</p>}
+                    <ServiceText text={service.description} className="bio-service__text" />
                   </li>
                 ))}
               </ul>

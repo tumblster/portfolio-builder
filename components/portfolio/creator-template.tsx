@@ -7,15 +7,16 @@ import { NichePills } from "./niche-filter";
 import {
   Avatar,
   ContactPill,
+  copyrightYear,
   NicheSuffix,
   PieceLink,
-  STAT_LABEL,
-  Star,
-  TemplateFrame,
-  copyrightYear,
   pieceMeta,
   pieceShow,
   portfolioView,
+  ServiceText,
+  Star,
+  STAT_LABEL,
+  TemplateFrame,
   type TemplateProps,
 } from "./template-kit";
 
@@ -84,7 +85,7 @@ export function CreatorTemplate({ portfolio, variant, filter, coverEdit }: Templ
                 {!cover && <Avatar photo={portfolio.photo} name={name} size={72} className="pf-hero__avatar" />}
                 <p className="pf-eyebrow">
                   <Star />
-                  Creadora UGC
+                  UGC Creator
                   <NicheSuffix niches={filterable} />
                 </p>
                 <H1 id={id("nombre")} className="pf-h1">
@@ -136,7 +137,7 @@ export function CreatorTemplate({ portfolio, variant, filter, coverEdit }: Templ
                   <NicheSuffix niches={filterable} />
                 </p>
                 <H2 id={id("trabajo-titulo")} className="pf-h2">
-                  Trabajo seleccionado
+                  Contenido destacado
                 </H2>
               </div>
               <CarouselControls targetId={id("carrusel")} />
@@ -184,7 +185,7 @@ export function CreatorTemplate({ portfolio, variant, filter, coverEdit }: Templ
                       {String(index + 1).padStart(2, "0")}
                     </span>
                     <H3 className="pf-service__title">{service.title}</H3>
-                    {service.description && <p className="pf-service__text">{service.description}</p>}
+                    <ServiceText text={service.description} className="pf-service__text" />
                   </li>
                 ))}
               </ul>

@@ -13,6 +13,8 @@ export function portfolioTitle(name: string, nicheLabel?: string | null): string
 
 export function portfolioMetadata(portfolio: ResolvedPortfolio | null, niche: NicheDef | null): Metadata {
   if (!portfolio) return { title: "Portafolio no encontrado", robots: NO_INDEX };
+  // 11.9 / 12.3: archivado → no se indexa mientras no esté disponible.
+  if (portfolio.archivedAt) return { title: "No disponible temporalmente", robots: NO_INDEX };
   const title = portfolioTitle(portfolio.name, niche?.label);
   const description = portfolio.valueProp || portfolio.bio || "Portafolio UGC";
   return {

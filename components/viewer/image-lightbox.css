@@ -64,3 +64,40 @@
   outline: 3px solid #fc3300;
   outline-offset: 2px;
 }
+
+/* Spec 11.3: "Clic acá para verlo completo" aparece abajo, dentro del marco de la foto, con un fade-in suave. */
+.lightbox__frame {
+  position: relative;
+}
+.lightbox__original {
+  position: absolute;
+  bottom: 0.875rem;
+  left: 50%;
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+  padding: 0 1.125rem;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.95);
+  color: #0e110b;
+  font-size: 0.875rem;
+  font-weight: 700;
+  white-space: nowrap;
+  box-shadow: 0 6px 18px -8px rgb(14 17 11 / 0.6);
+  transform: translateX(-50%);
+  animation: lightbox-original-in 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.lightbox__original:focus-visible {
+  outline: 3px solid #fc3300;
+  outline-offset: 2px;
+}
+@keyframes lightbox-original-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 6px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
