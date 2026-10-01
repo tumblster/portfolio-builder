@@ -2,7 +2,7 @@
 // Úsala en tu compu, no contra producción (crea datos de prueba en .data/).
 // 1) npm run dev   2) en otra terminal: npm run smoke
 
-import { randomUUID } from "node:crypto";
+import { createHmac, randomUUID } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
@@ -56,6 +56,15 @@ function panelsOf(html) {
   const about = html.indexOf('id="pf-panel-about"');
   const kit = html.indexOf('id="pf-panel-kit"');
   return { about: about >= 0 && kit > about ? html.slice(about, kit) : "", kit: kit >= 0 ? html.slice(kit) : "" };
+}
+
+/** Todo el CSS que carga una página (para revisar reglas de diseño). */
+async function cssOf(pageHtml) {
+  let css = "";
+  for (const href of [...pageHtml.matchAll(/<link[^>]*rel="stylesheet"[^>]*href="([^"]+)"/g)].map((m) => m[1])) {
+    css += await (await fetch(new URL(href.replace(/&amp;/g, "&"), BASE))).text();
+  }
+  return css;
 }
 
 /** Piezas de la página: { id → "todo belleza" }. */
@@ -163,6 +172,7 @@ try {
   check((media.headers.get("cache-control") ?? "").includes("immutable"), "La imagen se cachea como inmutable");
 
   const name = `Prueba ${Date.now().toString(36)}`;
+  const chipsSlugForMagic = "lol-no-existe";
   const draft = {
     name,
     bio: "Creo contenido UGC de skincare y viajes.",
@@ -211,6 +221,21 @@ try {
     json: { revision: 1, manual: read.data.portfolio.manual },
   });
   check(stale.status === 409, "No deja guardar encima de una versión vieja (409)", stale.data);
+  // Spec 11.12: tarjetas propias, título + link o descripción; un link se muestra como link.
+  const beforeServices = (await call("GET", `/api/portfolios/${slug}`)).data.portfolio;
+  const withServices = await call("PATCH", `/api/portfolios/${slug}`, {
+    json: {
+      revision: beforeServices.revision,
+      manual: {
+        ...beforeServices.manual,
+        services: [
+          { title: "Tarifas", description: "supercreador.tech/tarifas" },
+          { title: "Videos UGC para anuncios", description: "Piezas verticales para pauta." },
+        ],
+      },
+    },
+  });
+  check(withServices.status === 200 && withServices.data?.resolved?.services?.[0]?.title === "Tarifas", "Servicios: el orden de las tarjetas se guarda tal cual", withServices.data);
   // Ajuste 7: foto propia para el banner del hero.
   const beforeCover = (await call("GET", `/api/portfolios/${slug}`)).data.portfolio;
   const covered = await call("PATCH", `/api/portfolios/${slug}`, {
@@ -231,10 +256,123 @@ try {
   check(html.includes('<meta name="theme-color" content="#faf7f2"'), "La barra del navegador toma el crema de la página (theme-color)");
   check(html.includes('data-template="creator"') && html.includes('data-pf-filter="todo"'), 'Se dibuja con la plantilla Creator, en "Todo"');
   check(text.includes(`Hola, soy ${name}.`), "El titular presenta a la creadora");
+  check(text.includes("UGC Creator") && !/Creadora UGC|Creador UGC/.test(text), "Eyebrow neutral: «UGC Creator» (sin adivinar género)");
+  check(text.includes("Contenido destacado") && !text.includes("Trabajo seleccionado"), "La sección se llama «Contenido destacado»");
   check(
     html.includes(`alt="Portada de ${name}"`) && html.includes(encodeURIComponent(image.url).slice(0, 20)) ,
     "El banner del hero usa la foto propia (ajuste 7)",
   );
+  check(
+    /<a[^>]*href="https:\/\/supercreador\.tech\/tarifas"[^>]*>supercreador\.tech\/tarifas/.test(html) && html.includes("Piezas verticales para pauta."),
+    "Servicios: el segundo campo es link (si es un link) o descripción",
+  );
+
+  // ── Spec 11.8: magic link (sin registro), alcance de UN portafolio, 30 días ──
+  const magic = await call("POST", `/api/portfolios/${slug}/magic-link`, { json: { email: "creadora@ejemplo.com" } });
+  check(magic.status === 200 && magic.data?.sent === "mock", `Magic link: se envía (sin SMTP aquí: modo mock, el link queda en los logs) → ${magic.data?.sent}`, magic.data);
+  const magicBadEmail = await call("POST", `/api/portfolios/${slug}/magic-link`, { json: { email: "no-es-correo" } });
+  check(magicBadEmail.status === 400, "Magic link: pide un correo válido", magicBadEmail.data);
+  const magicSecret = createHmac("sha256", KEY).update("portfolio-builder/magic-link/v1").digest("hex");
+  const tokenFor = (target, expires) => {
+    const payload = Buffer.from(JSON.stringify({ s: target, e: expires, v: 1 })).toString("base64url");
+    return `${payload}.${createHmac("sha256", magicSecret).update(payload).digest("base64url")}`;
+  };
+  const opened = await fetch(new URL(`/m/${tokenFor(slug, Date.now() + 29 * 24 * 3600 * 1000)}`, BASE), { redirect: "manual" });
+  const ownerCookie = (opened.headers.get("set-cookie") ?? "").match(/sc_portfolio=[^;]+/)?.[0] ?? "";
+  check(
+    opened.status === 303 && (opened.headers.get("location") ?? "").endsWith(`/editar/${slug}`) && ownerCookie,
+    "Magic link: abrirlo lleva al editor de ESE portafolio y deja su acceso",
+  );
+  const asOwner = (target) => fetch(new URL(`/api/portfolios/${target}`, BASE), { headers: { cookie: ownerCookie } });
+  const ownOk = await asOwner(slug);
+  const otherNo = await asOwner(chipsSlugForMagic ?? "otro-portafolio");
+  check(ownOk.status === 200 && otherNo.status === 401, `Magic link: sirve solo para su portafolio (el suyo ${ownOk.status}, otro ${otherNo.status})`);
+  const expired = await fetch(new URL(`/m/${tokenFor(slug, Date.now() - 1000)}`, BASE), { redirect: "manual" });
+  check(expired.status === 303 && (expired.headers.get("location") ?? "").includes("/acceso?enlace=vencido"), "Magic link vencido: a /acceso con aviso");
+  const forged = await fetch(new URL(`/m/${tokenFor(slug, Date.now() + 1000).slice(0, -3)}abc`, BASE), { redirect: "manual" });
+  check(forged.status === 303 && (forged.headers.get("location") ?? "").includes("enlace=vencido"), "Magic link con la firma alterada: no da acceso");
+
+  // ── 11.9 / 12.7 / 12.9: aperturas con vistas (1 por IP por día), ?ref= y página ──
+  const openAs = (ip, body) =>
+    fetch(new URL(`/api/portfolios/${slug}/open`, BASE), {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-forwarded-for": ip },
+      body: JSON.stringify(body),
+    }).then((r) => r.json());
+  const v1 = await openAs("203.0.113.1", { ref: "qr", path: "/" });
+  const v2 = await openAs("203.0.113.1", { ref: "qr", path: "/" });
+  const v3 = await openAs("203.0.113.2", { ref: "whatsapp", path: "/viajes" });
+  const repeat = await openAs("203.0.113.9", { seen: true });
+  const openRecord = JSON.parse(await readFile(path.join(process.cwd(), ".data", "opens", `${slug}.json`), "utf8").catch(() => "null"));
+  check(
+    v1.views === 1 && v2.views === 1 && v3.views === 2 && repeat.views === 2 && openRecord?.lastOpenedAt,
+    `12.7: vistas públicas, 1 por persona por día (${v1.views} → ${v2.views} → ${v3.views}); repetir en la sesión no suma`,
+  );
+  check(
+    openRecord?.refs?.qr === 2 && openRecord?.refs?.whatsapp === 1 && openRecord?.paths?.["/viajes"] === 1 &&
+      !JSON.stringify(openRecord).includes("203.0.113"),
+    "12.9: tracking propio de ?ref= (qr, whatsapp) y página visitada, sin guardar IPs",
+    { refs: openRecord?.refs, paths: openRecord?.paths },
+  );
+  for (let n = 3; n <= 10; n += 1) await openAs(`198.51.100.${n}`, { path: "/" });
+  const afterMilestone = JSON.parse(await readFile(path.join(process.cwd(), ".data", "opens", `${slug}.json`), "utf8"));
+  check(afterMilestone.views === 10 && afterMilestone.milestones?.includes(10), "12.8: el hito de 10 vistas queda registrado (y se avisa por correo al dueño)");
+  check(
+    (await readFile(path.join(process.cwd(), ".data", "owners", `${slug}.json`), "utf8").then(JSON.parse).catch(() => null))?.email === "creadora@ejemplo.com",
+    "12.1: el correo ES la cuenta: queda guardado al pedir el magic link",
+  );
+  const account = await call("POST", "/api/account/magic-link", { json: { email: "creadora@ejemplo.com" }, withKey: false });
+  const accountBad = await call("POST", "/api/account/magic-link", { json: { email: "x" }, withKey: false });
+  check(account.status === 200 && account.data?.ok && accountBad.status === 400, "12.1: entrar solo con el correo (magic link, sin contraseña)");
+
+  // ── 11.9: archivado por inactividad (no borrado), avisos y reactivación ──
+  const inactive = await call("POST", "/api/portfolios", { json: { ...draft, name: `Inactiva ${Date.now().toString(36)}` } });
+  const warned = await call("POST", "/api/portfolios", { json: { ...draft, name: `Avisada ${Date.now().toString(36)}` } });
+  const fresh = await call("POST", "/api/portfolios", { json: { ...draft, name: `Nueva ${Date.now().toString(36)}` } });
+  const daysAgo = (n) => new Date(Date.now() - n * 24 * 3600 * 1000).toISOString();
+  const inactiveSlug = inactive.data?.portfolio?.slug;
+  const warnedSlug = warned.data?.portfolio?.slug;
+  const freshSlug = fresh.data?.portfolio?.slug;
+  await mkdir(path.join(process.cwd(), ".data", "opens"), { recursive: true });
+  for (const [target, days] of [[inactiveSlug, 40], [warnedSlug, 25]]) {
+    const doc = JSON.parse(await readFile(fixturePath(target), "utf8"));
+    await writeFile(fixturePath(target), JSON.stringify({ ...doc, createdAt: daysAgo(days), updatedAt: daysAgo(days) }));
+    await writeFile(path.join(process.cwd(), ".data", "opens", `${target}.json`), JSON.stringify({ trackingSince: daysAgo(days), lastOpenedAt: daysAgo(days) }));
+  }
+  await call("POST", `/api/portfolios/${warnedSlug}/magic-link`, { json: { email: "avisada@ejemplo.com" } });
+  const cronNoKey = await call("GET", "/api/cron/cleanup", { withKey: false });
+  check(cronNoKey.status === 401, "Archivado: el cron no corre sin CRON_SECRET (o la clave)");
+  const dry = await call("GET", "/api/cron/cleanup?dry=1");
+  check(
+    dry.status === 200 && dry.data?.dryRun && dry.data.archived.includes(inactiveSlug) && dry.data.notified.d7.includes(warnedSlug) &&
+      (await call("GET", `/api/portfolios/${inactiveSlug}`)).data?.portfolio?.archivedAt == null,
+    "Archivado en seco (?dry=1): dice qué archivaría y a quién avisaría, sin tocar nada",
+    dry.data,
+  );
+  const run = await call("GET", "/api/cron/cleanup");
+  const archivedPage = await fetch(new URL(`/p/${inactiveSlug}`, BASE));
+  const archivedHtml = await archivedPage.text();
+  const kept = await fetch(new URL(`/p/${freshSlug}`, BASE));
+  const warnedRecord = JSON.parse(await readFile(path.join(process.cwd(), ".data", "opens", `${warnedSlug}.json`), "utf8"));
+  check(
+    run.status === 200 && run.data.archived.includes(inactiveSlug) && !run.data.archived.includes(freshSlug) && run.data.startedTracking.includes(freshSlug) &&
+      kept.status === 200 && (await call("GET", `/api/portfolios/${inactiveSlug}`)).data?.portfolio?.archivedAt,
+    "11.9: a los 30 días sin actividad se ARCHIVA (los datos quedan); uno sin registro empieza a contar hoy",
+    run.data,
+  );
+  check(
+    run.data.notified.d7.includes(warnedSlug) && run.data.notified.ig.includes(warnedSlug) && warnedRecord.notices?.d7 && warnedRecord.notices?.ig,
+    "11.9 / 12.2: aviso por correo 7 días antes (y el único intento por Instagram de la última semana)",
+    warnedRecord.notices,
+  );
+  check(
+    /data-archived/.test(archivedHtml) && /data-expression="pensativa"/.test(archivedHtml) && archivedHtml.includes("No disponible temporalmente") &&
+      /Contacta a soporte/.test(archivedHtml) && /noindex/.test(archivedHtml),
+    "12.3: el link archivado muestra a Chispa pensativa, «No disponible temporalmente. Contacta a soporte» y el formulario",
+  );
+  const reactivated = await call("POST", `/api/portfolios/${inactiveSlug}/reactivate`);
+  const backHtml = await (await fetch(new URL(`/p/${inactiveSlug}`, BASE))).text();
+  check(reactivated.status === 200 && !/data-archived/.test(backHtml) && /data-pf-bar/.test(backHtml), "11.9: se reactiva con 1 clic y vuelve a estar en línea");
   check(html.includes("Videos que venden sin parecer anuncio."), "Muestra al instante el cambio recién guardado (el caché se invalida)");
   check(html.includes("https://www.tiktok.com/@prueba/video/"), "La pieza de video conoce su original");
   // Ajuste 5 (spec 3.1): reels en línea con facade. Sin iframes ni JS de las plataformas en la carga inicial.
@@ -274,14 +412,34 @@ try {
     filterNiches(html),
   );
   const views = panelsOf(html);
+  // Spec 11.6: header ÚNICO en 2 filas: [foto] | «Contenido | Media kit» | Hablemos; abajo, chips de nichos (sin «Todo»).
+  const bar = html.match(/<header[^>]*data-pf-bar[\s\S]*?<\/header>/)?.[0] ?? "";
+  const barChips = [...bar.matchAll(/data-pf-chip="([a-z0-9-]+)"/g)].map((m) => m[1]);
   check(
-    /role="tablist"/.test(html) && />Sobre mí</.test(html) && />Media kit</.test(html) && views.about && views.kit,
-    "Arriba del portafolio: el toggle SOBRE MÍ / MEDIA KIT, con las dos vistas en la página",
+    /class="pf-bar__avatar"/.test(bar) &&
+      /role="tablist"[^>]*class="pf-seg"/.test(bar) && />Contenido<\/button>/.test(bar) && />Media kit<\/button>/.test(bar) &&
+      barChips.length > 0 && barChips.every((chip) => filterNiches(html).includes(chip)) &&
+      !barChips.includes("media-kit") && !barChips.includes("todo") && !/>Todo</.test(bar) &&
+      /class="pf-bar__cta"[^>]*href="(#pf-page-contacto|https:\/\/wa\.me\/\d+\?text=[^"]+)"[^>]*>Hablemos/.test(bar) &&
+      !bar.replace(/<[^>]+>/g, " ").includes(name) &&
+      (html.match(/data-pf-bar/g) ?? []).length === 1,
+    `Header único: foto | Contenido · Media kit | Hablemos; chips: ${barChips.join(" · ")} (sin nombre ni «Todo»)`,
+    bar.slice(0, 300),
   );
   check(
-    /id="pf-tab-about"[^>]*aria-selected="true"/.test(html) && /id="pf-panel-kit"[^>]*hidden/.test(html),
-    "SOBRE MÍ es la vista por defecto; el Media Kit empieza oculto (link directo: #media-kit)",
+    views.about && views.kit && /id="pf-panel-kit"[^>]*hidden/.test(html) && /id="pf-tab-content"[^>]*aria-selected="true"/.test(bar) &&
+      !/aria-current="page"/.test(bar),
+    "Por defecto: Contenido, sin chip elegido (se ve todo); el Media kit a un toque (link directo: #media-kit)",
   );
+  const publicCss = await cssOf(html);
+  check(
+    /\.pf-chip\[aria-current=("?)page\1\]\s*\{[^}]*background:\s*(transparent|0 0|none)[;}]/.test(publicCss) &&
+      /\.pf-views\[data-view=("?)kit\1\] \.pf-bar__row2\s*\{[^}]*grid-template-rows:\s*0fr/.test(publicCss) &&
+      /\.pf-views \.pf-nav,\s*\.pf-views \.ed-top\s*\{\s*display:\s*none/.test(publicCss) &&
+      /\.pf-bar__chips\[data-scrolled\]\s*\{[^}]*mask-image:\s*linear-gradient\(90deg,\s*(transparent|#0000)/.test(publicCss),
+    "Header: el chip elegido va solo trazado; en Media kit la fila de chips se colapsa; fundido a la izquierda",
+  );
+  check(/<a[^>]*href="https:\/\/wa\.me\/\?text=[^"]+"[^>]*data-pf-share/.test(html), "12.4: «Compartir por WhatsApp» en el portafolio publicado");
   check(
     views.about && !/pf-stats|Engagement Rate|Seguidores en Instagram/.test(views.about),
     "SOBRE MÍ no muestra métricas",
@@ -298,7 +456,12 @@ try {
   const viajes = await fetch(`${BASE}/p/${slug}/viajes`);
   const viajesHtml = await viajes.text();
   check(viajes.status === 200 && viajesHtml.includes('data-pf-filter="viajes"'), "El link de un nicho abre ya filtrado → /p/…/viajes");
-  check(activeNiche(viajesHtml) === "viajes" && pills(viajesHtml).length === 0, "En /viajes, la página ya viene filtrada (sin selector para la marca)");
+  check(activeNiche(viajesHtml) === "viajes" && pills(viajesHtml).length === 0, "En /viajes, la página ya viene filtrada");
+  const viajesBar = viajesHtml.match(/<header[^>]*data-pf-bar[\s\S]*?<\/header>/)?.[0] ?? "";
+  check(
+    new RegExp(`<a[^>]*href="/p/${slug}"[^>]*aria-current="page"[^>]*data-pf-chip="viajes"`).test(viajesBar),
+    "En /viajes, su chip queda elegido y tocarlo vuelve a todo",
+  );
   check(/<title>[^<]*— Viajes<\/title>/.test(viajesHtml), "El título de la pestaña nombra el nicho");
   check(/<meta name="robots" content="noindex, nofollow"/.test(viajesHtml), "El link de nicho tampoco se indexa");
   const belleza = await (await fetch(`${BASE}/p/${slug}/belleza`)).text();
@@ -507,6 +670,7 @@ try {
       arcPaths.every((d) => (d.match(/L/g) ?? []).length >= 8) &&
       /vector-effect="non-scaling-stroke"/.test(electricHtml) &&
       /@keyframes arc-f0/.test(landingHtml) &&
+      /animation:arc-f0 4620ms/.test(landingHtml) &&
       !/<style/.test(landingHtml.match(/<h1[\s\S]*?<\/h1>/)?.[0] ?? "<style") &&
       !/<img|<image|\.png|\.gif/.test(electricHtml),
     `"superpoderes": electricidad en Brasa, ${arcFrames.length} fotogramas de rayos quebrados (${arcPaths.length} trazos), sin imágenes ni partir la palabra`,
@@ -704,7 +868,7 @@ try {
     return box;
   };
   const union = (boxes) => [Math.min(...boxes.map((b) => b[0])), Math.min(...boxes.map((b) => b[1])), Math.max(...boxes.map((b) => b[2])), Math.max(...boxes.map((b) => b[3]))];
-  check(faces.length === 6 && SIZE > 0, `Chispa: las 6 expresiones comparten un lienzo cuadrado de ${SIZE} unidades`, faces.map((f) => f.name));
+  check(faces.length === 7 && SIZE > 0, `Chispa: las 7 expresiones (con la pensativa del 12.3) comparten un lienzo cuadrado de ${SIZE} unidades`, faces.map((f) => f.name));
   const noses = [];
   for (const face of faces) {
     const noseBox = pathBox(face.nose);
@@ -968,6 +1132,12 @@ try {
       filterNiches(bioPage.html),
     );
     const bioViews = panelsOf(bioPage.html);
+    // Spec 11.15: en Bio la portada propia se ve completa (contain) con un relleno desenfocado: sin recorte.
+    const bioCss = await cssOf(bioPage.html);
+    check(
+      /\.bio-mesh--photo \.bio-mesh__photo\s*\{\s*object-fit:\s*contain/.test(bioCss) && /\.bio-mesh--photo \.bio-mesh__fill\s*\{[^}]*object-fit:\s*cover/.test(bioCss),
+      "Bio: la foto de portada se ve completa (sin recorte), con un relleno desenfocado",
+    );
     check(
       /10,7\s%/.test(bioViews.kit) && bioViews.kit.includes("Engagement Rate") && bioViews.kit.includes("(me gusta + comentarios) ÷ vistas · 2 reels") &&
         !bioViews.about.includes("Engagement Rate"),
@@ -1053,6 +1223,23 @@ try {
     check(pending.status === 200 && pending.data?.state === "pending", "Estado consultable: un borrador sin confirmar está «pending»", pending.data);
     const tooFew = await confirm({ draftId: chipsId, niches: [{ label: "Fitness" }], selection: [{ id: "pieza-1", niche: null }], design: confirmInput.design });
     check(tooFew.status === 400 && tooFew.data?.error?.issues?.[0]?.path === "selection", `Chips: pide al menos 3 piezas: "${tooFew.data?.error?.issues?.[0]?.message}"`);
+    const noServices = await confirm({
+      draftId: chipsId,
+      niches: [{ label: "Fitness" }],
+      selection: [{ id: "pieza-1", niche: null }, { id: "pieza-2", niche: null }, { id: "pieza-3", niche: null }],
+      design: confirmInput.design,
+    });
+    check(
+      noServices.status === 400 && noServices.data?.error?.issues?.[0]?.path === "services",
+      `11.12: el paso de Servicios es obligatorio antes de generar: "${noServices.data?.error?.issues?.[0]?.message}"`,
+    );
+    const badLink = await call("POST", "/api/import/link", { json: { draftId: chipsId, url: "https://example.com/algo" } });
+    const igNoToken = await call("POST", "/api/import/link", { json: { draftId: chipsId, url: "https://www.instagram.com/p/C1abc/" } });
+    check(
+      badLink.status === 400 && (igNoToken.status === 400 ? /token de Meta/.test(igNoToken.data?.error?.message ?? "") : igNoToken.status !== 401),
+      "11.5: «Agregar por link» acepta Instagram o TikTok; sin el token de Meta, Instagram lo dice claro",
+      { badLink: badLink.data, igNoToken: igNoToken.data },
+    );
     const chips = await confirm({
       draftId: chipsId,
       niches: [{ label: "Fitness" }, { label: "Viajes" }],
@@ -1062,6 +1249,7 @@ try {
         { id: "pieza-1", niche: null },
       ],
       design: { template: "creator", palette: "crema" },
+      services: [{ title: "Videos UGC para anuncios", description: "supercreador.tech/tarifas" }],
     });
     const chipPieces = chips.data?.resolved?.pieces ?? [];
     check(
@@ -1071,6 +1259,11 @@ try {
         JSON.stringify(chipPieces.map((piece) => piece.niche)) === JSON.stringify(["viajes", "fitness", null]),
       "Chips: las piezas quedan en el orden elegido, con su nicho, incluida una «De tu perfil»",
       chipPieces.map((piece) => [piece.sourcePostId, piece.niche]),
+    );
+    check(
+      JSON.stringify(chips.data?.resolved?.services?.map((service) => service.title)) === JSON.stringify(["Videos UGC para anuncios"]),
+      "Servicios: solo las tarjetas del creador (nada de las que propuso la IA)",
+      chips.data?.resolved?.services,
     );
     const done = await call("GET", `/api/import/status?draftId=${chipsId}`);
     check(done.data?.state === "done" && done.data?.slug === chips.data?.slug, "Estado consultable: el borrador confirmado queda «done» con su link", done.data);

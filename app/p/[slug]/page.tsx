@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { notFound } from "next/navigation";
+import { ArchivedPortfolio } from "@/components/portfolio/archived-portfolio";
 import { PublicPortfolio } from "@/components/public-portfolio";
 import { portfolioMetadata, portfolioViewport } from "@/lib/portfolio/metadata";
 import { loadPublicPortfolio } from "@/lib/portfolio/public";
@@ -28,5 +29,7 @@ export async function generateViewport({ params }: PageProps<"/p/[slug]">): Prom
 export default async function PublicPortfolioPage({ params }: PageProps<"/p/[slug]">) {
   const portfolio = await loadPublicPortfolio((await params).slug);
   if (!portfolio) notFound();
+  // Spec 11.9 / 12.3: archivado por inactividad → "No disponible temporalmente" (los datos siguen guardados).
+  if (portfolio.archivedAt) return <ArchivedPortfolio />;
   return <PublicPortfolio portfolio={portfolio} />;
 }
