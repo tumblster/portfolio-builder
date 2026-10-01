@@ -5,6 +5,8 @@ import { createPortal } from "react-dom";
 import { PalettePicker, TemplateList, recommendedPalette } from "@/components/design/design-pickers";
 import { PreviewViews, type PreviewData, type PreviewView } from "@/components/design/template-preview";
 import { NichePicker, PiecePicker, type NicheChip, type PieceChip } from "@/components/import/confirm-pickers";
+import { ServicesStep, type ServiceCard } from "@/components/import/services-step";
+import type { DraftPiece } from "@/lib/import/events";
 import "@/components/import/review.css";
 import { ChispaLoader } from "@/components/mascot/chispa-loader";
 import {
@@ -38,7 +40,8 @@ import { errorText, pillButton, primaryButton, textLink } from "./brand-ui";
  * Rendimiento (C3): cambiar de paso o de plantilla va en startTransition, la vista previa está memoizada.
  */
 
-const STEPS = ["Nichos y piezas", "Plantilla", "Paleta"] as const;
+// Spec 11.12: Servicios va antes de generar (y es obligatorio).
+const STEPS = ["Nichos y piezas", "Servicios", "Plantilla", "Paleta"] as const;
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 /** El espacio de la barra de progreso no cambia mientras la pantalla vive: no hay nada a qué suscribirse. */
@@ -93,6 +96,11 @@ export function ImportReview({ draft, onGenerated, onStartOver, onUnauthorized }
     })),
   );
   const [nicheError, setNicheError] = useState<string | null>(null);
+  // Spec 11.12: tarjetas de servicio del creador (mínimo 1 antes de generar).
+  const [services, setServices] = useState<ServiceCard[]>(() => [{ key: "s-1", title: "", description: "" }]);
+  const [serviceError, setServiceError] = useState<string | null>(null);
+  // Spec 11.5: piezas agregadas por link (oEmbed) en esta sesión.
+  const [linkPieces, setLinkPieces] = useState<DraftPiece[]>([]);
   const [pieceError, setPieceError] = useState<string | null>(null);
   const [template, setTemplate] = useState<TemplateId>(DEFAULT_DESIGN.template);
   const [palette, setPalette] = useState<PaletteId>(() => recommendedPalette(draft.photo));
@@ -134,10 +142,13 @@ export function ImportReview({ draft, onGenerated, onStartOver, onUnauthorized }
   // Si un nicho se quita, sus piezas pasan a "Todo".
   const nicheKeys = niches.map((niche) => niche.key).join("|");
   const livePieces = useMemo(
-    () => pieces.map((piece) => (piece.nicheKey && !nicheKeys.split("|").includes(piece.nicheKey) ? { ...piece, nicheKey: null } : piece)),
+    () =>
+      pieces.map((piece) =>
+        piece.nicheKey && !nicheKeys.split("|").includes(piece.nicheKey) ? { ...piece, nicheKey: null, pending: true } : piece,
+      ),
     [pieces, nicheKeys],
   );
-  const pool = useMemo(() => [...draft.pieces, ...draft.profilePosts], [draft.pieces, draft.profilePosts]);
+  const pool = useMemo(() => [...draft.pieces, ...draft.profilePosts, ...linkPieces], [draft.pieces, draft.profilePosts, linkPieces]);
   const colors = resolvePalette(palette, draft.photo);
 
   // Datos reales de la creadora para las vistas previas. Estable entre renders (están memoizadas).
@@ -191,9 +202,23 @@ export function ImportReview({ draft, onGenerated, onStartOver, onUnauthorized }
     return true;
   }
 
+  /** Spec 11.12: al menos una tarjeta con título. */
+  function validateServices(): boolean {
+    if (!services.some((card) => card.title.trim())) {
+      setServiceError("Agrega al menos un servicio: un título y, si quieres, un link o una descripción.");
+      return false;
+    }
+    setServiceError(null);
+    return true;
+  }
+
   async function generate() {
     if (!validateSelection()) {
       goTo(0);
+      return;
+    }
+    if (!validateServices()) {
+      goTo(1);
       return;
     }
     const retry = retryNext.current;
@@ -211,6 +236,9 @@ export function ImportReview({ draft, onGenerated, onStartOver, onUnauthorized }
       niches: niches.map((niche) => ({ label: niche.label })),
       selection: livePieces.map((piece) => ({ id: piece.id, niche: slugOf(piece.nicheKey) })),
       design: { template, palette },
+      services: services
+        .filter((card) => card.title.trim())
+        .map((card) => ({ title: card.title.trim(), description: card.description.trim() })),
       ...(retry ? { retry: true } : {}),
     });
     // Error terminal (7.4 a): claro, con salida al soporte, y el próximo "Generar" pide otro intento.
@@ -268,6 +296,9 @@ export function ImportReview({ draft, onGenerated, onStartOver, onUnauthorized }
         } else if (path.startsWith("selection")) {
           setPieceError(issue.message);
           goTo(0);
+        } else if (path.startsWith("services")) {
+          setServiceError(issue.message);
+          goTo(1);
         } else {
           if (response.status === 404 || response.status === 410) setExpired(true);
           if (response.status >= 500 || response.status === 404 || response.status === 410) setFailed(true);
@@ -323,7 +354,7 @@ export function ImportReview({ draft, onGenerated, onStartOver, onUnauthorized }
           <li key={label} className="min-w-0 flex-1">
             <button
               type="button"
-              onClick={() => (index <= step || validateSelection() ? goTo(index) : undefined)}
+              onClick={() => (index <= step || (validateSelection() && (index <= 1 || validateServices())) ? goTo(index) : undefined)}
               aria-current={index === step ? "step" : undefined}
               data-step-pill
               className={`min-h-tap w-full rounded-full border-2 px-2 py-2 text-[0.8125rem] leading-tight font-semibold [overflow-wrap:anywhere] transition sm:px-3 sm:text-sm ${
@@ -360,12 +391,33 @@ export function ImportReview({ draft, onGenerated, onStartOver, onUnauthorized }
                 limits={draft.pieceLimits}
                 error={pieceError}
                 onError={setPieceError}
+                draftId={draft.draftId}
+                onLinkPiece={(piece) => {
+                  setLinkPieces((current) => (current.some((item) => item.id === piece.id) ? current : [...current, piece]));
+                  setPieces((current) =>
+                    current.some((item) => item.id === piece.id) || current.length >= draft.pieceLimits.max
+                      ? current
+                      : [...current, { id: piece.id, nicheKey: null, pending: true }],
+                  );
+                }}
               />
             </div>
           </section>
         )}
 
         {step === 1 && (
+          <section aria-labelledby={`${uid}-h`}>
+            <h2 id={`${uid}-h`} ref={stepHeading} tabIndex={-1} className="title-2 outline-none">
+              Sus servicios
+            </h2>
+            <p className="mt-2 mb-5 text-sm text-muted">
+              Cómo trabaja con marcas, en tarjetas: un título y un link o una descripción. Al menos una.
+            </p>
+            <ServicesStep cards={services} onChange={setServices} newKey={newKey} error={serviceError} />
+          </section>
+        )}
+
+        {step === 2 && (
           <section aria-labelledby={`${uid}-h`}>
             <h2 id={`${uid}-h`} ref={stepHeading} tabIndex={-1} className="title-2 outline-none">
               Elige la plantilla
@@ -385,7 +437,7 @@ export function ImportReview({ draft, onGenerated, onStartOver, onUnauthorized }
           </section>
         )}
 
-        {step === 2 && (
+        {step === 3 && (
           <section aria-labelledby={`${uid}-h`}>
             <h2 id={`${uid}-h`} ref={stepHeading} tabIndex={-1} className="title-2 outline-none">
               Elige la paleta
@@ -450,10 +502,10 @@ export function ImportReview({ draft, onGenerated, onStartOver, onUnauthorized }
         {step < STEPS.length - 1 ? (
           <button
             type="button"
-            onClick={() => (step === 0 && !validateSelection() ? undefined : goTo(step + 1))}
+            onClick={() => ((step === 0 && !validateSelection()) || (step === 1 && !validateServices()) ? undefined : goTo(step + 1))}
             className={`${primaryButton} flex-1 sm:flex-none sm:px-8`}
           >
-            {step === 1 ? "Elegir paleta" : "Elegir plantilla"}
+            {step === 0 ? "Agregar servicios" : step === 1 ? "Elegir plantilla" : "Elegir paleta"}
           </button>
         ) : (
           <button type="button" onClick={generate} disabled={generating} className={`${primaryButton} flex-1 sm:flex-none sm:px-8`}>

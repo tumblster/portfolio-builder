@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { notFound } from "next/navigation";
+import { ArchivedPortfolio } from "@/components/portfolio/archived-portfolio";
 import { PublicPortfolio } from "@/components/public-portfolio";
 import { portfolioMetadata, portfolioViewport } from "@/lib/portfolio/metadata";
 import { findNiche, isNicheSlug } from "@/lib/portfolio/niches";
@@ -40,5 +41,6 @@ export async function generateViewport({ params }: PageProps<"/p/[slug]/[niche]"
 export default async function NichePortfolioPage({ params }: PageProps<"/p/[slug]/[niche]">) {
   const found = await load(params);
   if (!found) notFound();
+  if (found.portfolio.archivedAt) return <ArchivedPortfolio />; // 11.9 / 12.3
   return <PublicPortfolio portfolio={found.portfolio} />;
 }

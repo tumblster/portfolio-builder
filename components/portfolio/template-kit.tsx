@@ -193,3 +193,28 @@ export function ContactPill({ link, className, iconSize = 18 }: { link: ContactL
 }
 
 export const copyrightYear = () => new Date().getFullYear();
+
+/** Si el texto de un servicio es un link (con o sin https://), su URL; si no, null (spec 11.12: título + link o descripción). */
+export function serviceUrl(text: string): string | null {
+  const value = text.trim();
+  if (/\s/.test(value)) return null;
+  if (/^https?:\/\/[^\s.]+\.[^\s]+$/i.test(value)) return value;
+  if (/^(www\.)?[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}(\/\S*)?$/i.test(value)) return `https://${value}`;
+  return null;
+}
+
+/** El segundo campo de una tarjeta de servicio: link (se abre en otra pestaña) o descripción. */
+export function ServiceText({ text, className }: { text: string; className: string }) {
+  if (!text) return null;
+  const url = serviceUrl(text);
+  return url ? (
+    <p className={className}>
+      <a href={url} target="_blank" rel="noopener noreferrer" className="pf-service-link">
+        {text.replace(/^https?:\/\//i, "").replace(/\/$/, "")}
+        <span className="sr-only"> (se abre en otra pestaña)</span>
+      </a>
+    </p>
+  ) : (
+    <p className={className}>{text}</p>
+  );
+}

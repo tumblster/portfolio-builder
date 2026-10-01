@@ -23,7 +23,8 @@ import { embedFor } from "@/lib/portfolio/embed";
  */
 
 export type NicheChip = { key: string; label: string };
-export type PieceChip = { id: string; nicheKey: string | null };
+/** `pending`: la sumó desde "De tu perfil" y no traía nicho: su selector pide "Elegir nicho…" (spec 11.4). */
+export type PieceChip = { id: string; nicheKey: string | null; pending?: boolean };
 
 export function Thumb({ piece, size = 48 }: { piece: DraftPiece; size?: number }) {
   return piece.image ? (
@@ -67,6 +68,9 @@ function TileBadge({ kind }: { kind: "video" | "image" | "carousel" }) {
     </span>
   );
 }
+
+/** Spec 11.5: cuántas piezas muestra "De tu perfil" de entrada y cuántas suma cada "VER MÁS". */
+export const PROFILE_PAGE = 12;
 
 const move = <T,>(list: T[], from: number, to: number) => {
   const next = [...list];
@@ -162,7 +166,22 @@ export function NichePicker(props: {
           emptyText="Sin nichos: todo va en un solo portafolio. Agrega hasta 3 si quieres links por nicho."
         />
       </div>
-      <div className={`mt-3 ${otherOpen && !full ? "grid grid-cols-2 items-start gap-2" : ""}`} data-niche-row>
+      <div className={`mt-3 ${otherOpen && !full ? "flex items-start gap-2" : ""}`} data-niche-row>
+        {otherOpen && !full ? (
+          // Spec 11.2: elegido "Otro", queda marcado como seleccionado; tocarlo de nuevo vuelve a la lista.
+          <button
+            type="button"
+            aria-pressed="true"
+            onClick={() => closeOther(true)}
+            className="inline-flex min-h-13 shrink-0 items-center gap-1.5 rounded-full border-2 border-ink bg-highlight px-4 text-sm font-semibold text-ink"
+            data-niche-other-chip
+          >
+            <svg viewBox="0 0 12 12" aria-hidden="true" className="size-3" fill="none" stroke="currentColor" strokeWidth={2}>
+              <path d="M2.5 6.5 5 9l4.5-6" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            Otro
+          </button>
+        ) : (
         <Combobox
           inputRef={inputRef}
           labelId={`${uid}-label`}
@@ -175,8 +194,9 @@ export function NichePicker(props: {
           placeholder={full ? "Ya tienes 3 nichos" : "Busca un nicho (ej.: Fitness)"}
           disabled={full}
         />
+        )}
         {otherOpen && !full && (
-          <div className="flex min-w-0 gap-2" data-niche-other>
+          <div className="flex min-w-0 flex-1 gap-2" data-niche-other>
             <input
               ref={otherRef}
               type="text"
@@ -229,20 +249,55 @@ export function PiecePicker(props: {
   limits: { min: number; max: number };
   error: string | null;
   onError: (message: string | null) => void;
+  /** Spec 11.5: "Agregar por link" (oEmbed) necesita el borrador; la pieza nueva vuelve por onLinkPiece. */
+  draftId: string;
+  onLinkPiece: (piece: DraftPiece) => void;
 }) {
   const { pieces, onChange, onError, limits } = props;
+  const [link, setLink] = useState("");
+  const [linkState, setLinkState] = useState<{ busy: boolean; message: string | null }>({ busy: false, message: null });
+
+  async function addByLink(event: React.FormEvent) {
+    event.preventDefault();
+    if (!link.trim()) return;
+    setLinkState({ busy: true, message: null });
+    try {
+      const response = await fetch("/api/import/link", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ draftId: props.draftId, url: link.trim() }),
+      });
+      const data = await response.json().catch(() => null);
+      if (!response.ok || !data?.piece) {
+        setLinkState({ busy: false, message: data?.error?.message ?? "No pudimos agregar ese post. Intenta de nuevo." });
+        return;
+      }
+      props.onLinkPiece(data.piece as DraftPiece);
+      setLink("");
+      setLinkState({ busy: false, message: `Agregada: «${(data.piece as DraftPiece).title}».` });
+    } catch {
+      setLinkState({ busy: false, message: "Se cortó la conexión. Intenta de nuevo." });
+    }
+  }
   const uid = useId();
   const inputRef = useRef<HTMLInputElement>(null);
+  // Spec 11.5: "De tu perfil" muestra 12 por defecto y "VER MÁS" suma de a 12 (las imágenes cargan perezosas).
+  const [shown, setShown] = useState(PROFILE_PAGE);
   const byId = new Map(props.pool.map((piece) => [piece.id, piece]));
   const chosen = new Set(pieces.map((piece) => piece.id));
   const full = pieces.length >= limits.max;
   const titleOf = (id: string) => byId.get(id)?.title ?? "Pieza";
 
+  // El chip de nicho que corresponde a un nicho de la IA (por su slug), si el creador lo tiene elegido.
+  const keyForSlug = (slug: string | null) =>
+    slug ? (props.niches.find((niche) => nicheFromLabel(niche.label)?.slug === slug)?.key ?? null) : null;
+
   function add(id: string) {
     if (chosen.has(id)) return;
     if (full) return onError(`Puedes elegir hasta ${limits.max} piezas: quita una para sumar otra.`);
     onError(null);
-    onChange([...pieces, { id, nicheKey: null }]);
+    const nicheKey = keyForSlug(byId.get(id)?.niche ?? null);
+    onChange([...pieces, { id, nicheKey, pending: nicheKey === null }]);
   }
 
   const options: ComboOption[] = props.pool
@@ -274,12 +329,24 @@ export function PiecePicker(props: {
                 <span className="line-clamp-2 min-w-[7rem] flex-1 text-sm break-words">{titleOf(chip.id)}</span>
                 <select
                   aria-label={`Nicho de «${titleOf(chip.id)}»`}
-                  value={chip.nicheKey ?? ""}
+                  value={chip.pending ? "__elegir" : (chip.nicheKey ?? "")}
                   onChange={(event) =>
-                    onChange(pieces.map((item) => (item.id === chip.id ? { ...item, nicheKey: event.target.value || null } : item)))
+                    onChange(
+                      pieces.map((item) =>
+                        item.id === chip.id ? { id: item.id, nicheKey: event.target.value || null, pending: false } : item,
+                      ),
+                    )
                   }
-                  className="min-h-tap w-full rounded-field border border-ink/60 bg-paper px-3 text-sm sm:w-40"
+                  data-niche-pending={chip.pending ? "" : undefined}
+                  className={`min-h-tap w-full rounded-field border bg-paper px-3 text-sm sm:w-40 ${
+                    chip.pending ? "border-accent-ink text-accent-ink" : "border-ink/60"
+                  }`}
                 >
+                  {chip.pending && (
+                    <option value="__elegir" disabled>
+                      Elegir nicho…
+                    </option>
+                  )}
                   <option value="">Solo en «Todo»</option>
                   {props.niches.map((niche) => (
                     <option key={niche.key} value={niche.key}>
@@ -320,8 +387,33 @@ export function PiecePicker(props: {
       )}
 
       <h4 className="mt-6 text-sm font-semibold tracking-[0.12em] text-muted uppercase">De tu perfil</h4>
+      {/* Spec 11.5: un post público de Instagram o TikTok, por su link (oEmbed: portada, título y autor). */}
+      <form onSubmit={addByLink} className="mt-3 flex flex-wrap gap-2" data-add-by-link>
+        <label htmlFor={`${uid}-link`} className="sr-only">
+          Agregar por link: pega la URL de un post público de Instagram o TikTok
+        </label>
+        <input
+          id={`${uid}-link`}
+          type="url"
+          inputMode="url"
+          value={link}
+          onChange={(event) => setLink(event.target.value)}
+          placeholder="Agregar por link: pega un post de Instagram o TikTok"
+          className="combo__input min-w-0 flex-1 basis-64"
+        />
+        <button
+          type="submit"
+          disabled={linkState.busy || !link.trim()}
+          className="inline-flex min-h-13 items-center rounded-2xl border border-ink bg-ink px-4 text-sm font-semibold text-cream disabled:opacity-50"
+        >
+          {linkState.busy ? "Buscando…" : "Agregar"}
+        </button>
+      </form>
+      <p aria-live="polite" className="mt-1 min-h-5 text-sm text-muted" data-add-by-link-status>
+        {linkState.message}
+      </p>
       <ul className="mt-3 grid grid-cols-2 gap-3 min-[26rem]:grid-cols-3 sm:grid-cols-4" data-profile-grid>
-        {props.pool.map((piece) => {
+        {props.pool.slice(0, shown).map((piece) => {
           const added = chosen.has(piece.id);
           return (
             <li key={piece.id} className="flex min-w-0 flex-col gap-2 rounded-2xl border border-line bg-paper p-2" data-profile-piece={piece.id}>
@@ -331,7 +423,7 @@ export function PiecePicker(props: {
                 <InlineReel link={piece.video} title={piece.title} className="block aspect-square overflow-hidden rounded-xl bg-sand">
                   <span className="absolute inset-0" data-reel-media>
                     {piece.image && (
-                      <Image src={piece.image.url} alt="" fill sizes="(min-width: 640px) 160px, 45vw" className="object-cover" />
+                      <Image src={piece.image.url} alt="" fill loading="lazy" sizes="(min-width: 640px) 160px, 45vw" className="object-cover" />
                     )}
                   </span>
                   <TileBadge kind="video" />
@@ -341,10 +433,11 @@ export function PiecePicker(props: {
                   image={piece.image}
                   title={piece.title}
                   note={piece.kind === "carousel" ? "Carrusel: se ve su portada, que es lo que se importa." : undefined}
+                  originalUrl={piece.kind === "carousel" ? piece.postUrl : null}
                   className="block aspect-square overflow-hidden rounded-xl bg-sand"
                 >
                   <span className="absolute inset-0">
-                    <Image src={piece.image.url} alt="" fill sizes="(min-width: 640px) 160px, 45vw" className="object-cover" />
+                    <Image src={piece.image.url} alt="" fill loading="lazy" sizes="(min-width: 640px) 160px, 45vw" className="object-cover" />
                   </span>
                   <TileBadge kind={piece.kind === "carousel" ? "carousel" : "image"} />
                 </ImageLightbox>
@@ -366,6 +459,19 @@ export function PiecePicker(props: {
           );
         })}
       </ul>
+      {props.pool.length > shown && (
+        <div className="mt-4 flex justify-center">
+          <button
+            type="button"
+            onClick={() => setShown((count) => count + PROFILE_PAGE)}
+            className="inline-flex min-h-tap items-center rounded-full border border-ink/60 bg-paper px-6 text-sm font-semibold tracking-[0.08em] text-ink uppercase hover:border-ink"
+            data-profile-more
+          >
+            Ver más
+            <span className="sr-only"> ({props.pool.length - shown} piezas más)</span>
+          </button>
+        </div>
+      )}
     </div>
   );
 }

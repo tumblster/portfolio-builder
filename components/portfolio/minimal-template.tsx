@@ -4,14 +4,15 @@ import { NichePills } from "./niche-filter";
 import {
   Avatar,
   ContactPill,
+  copyrightYear,
   NicheSuffix,
   PieceLink,
-  STAT_LABEL,
-  TemplateFrame,
-  copyrightYear,
   pieceMeta,
   pieceShow,
   portfolioView,
+  ServiceText,
+  STAT_LABEL,
+  TemplateFrame,
   type TemplateProps,
 } from "./template-kit";
 
@@ -80,7 +81,7 @@ export function MinimalTemplate({ portfolio, variant, filter }: TemplateProps) {
                       </span>
                       <div>
                         <H3 className="min-service__title">{service.title}</H3>
-                        {service.description && <p className="min-service__text">{service.description}</p>}
+                        <ServiceText text={service.description} className="min-service__text" />
                       </div>
                     </li>
                   ))}
@@ -113,7 +114,7 @@ export function MinimalTemplate({ portfolio, variant, filter }: TemplateProps) {
           <section id={id("trabajo")} className="min-main" aria-labelledby={id("trabajo-titulo")}>
             <div className="min-main__head">
               <H2 id={id("trabajo-titulo")} className="min-label">
-                Trabajo seleccionado
+                Contenido destacado
                 <NicheSuffix niches={filterable} />
               </H2>
               {view.showNicheNav && filterable.length > 0 && <NichePills {...filter} niches={filterable} name={name} />}
