@@ -26,8 +26,17 @@ export function embedFor(link: { platform: string; url: string }): Embed | null 
   const path = url.pathname;
   if (link.platform === "instagram") {
     const code = /\/(?:p|reel|reels|tv)\/([A-Za-z0-9_-]+)/.exec(path)?.[1];
+    // Experimento 01/10: los reels usan /reel/{code}/embed para probar si el player
+    // reproduce inline en móvil (/p/ bota a la app de IG al dar play). Si no funciona,
+    // el fallback es botón "Ver en Instagram" (decisión pendiente de prueba en device real).
+    const isReel = /\/(?:reel|reels|tv)\//.test(path);
     return code
-      ? { src: `https://www.instagram.com/p/${code}/embed/`, platform: "instagram", autoplay: false, naturalWidth: 326 }
+      ? {
+          src: isReel ? `https://www.instagram.com/reel/${code}/embed/` : `https://www.instagram.com/p/${code}/embed/`,
+          platform: "instagram",
+          autoplay: false,
+          naturalWidth: 326,
+        }
       : null;
   }
   if (link.platform === "tiktok") {
