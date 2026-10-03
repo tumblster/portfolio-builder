@@ -127,6 +127,18 @@ export default function PrivacidadPage() {
           y lo resolvemos.
         </p>
 
+        <h2 style={h2}>Eliminación de tus datos</h2>
+        <p style={p}>
+          Si quieres que borremos todo lo que tenemos sobre ti: escríbenos a{" "}
+          <a style={{ color: "#0e110b", fontWeight: 700 }} href="mailto:hola@supercreador.tech">
+            hola@supercreador.tech
+          </a>{" "}
+          con el asunto "Eliminar mis datos" desde el correo de tu cuenta.
+          Borramos tu cuenta, tu(s) portafolio(s) y tu correo de nuestros
+          registros. Los portafolios públicos dejan de estar disponibles de
+          inmediato.
+        </p>
+
         <h2 style={h2}>Cambios a esta política</h2>
         <p style={p}>
           Si cambiamos algo relevante, actualizaremos esta página e indicaremos la
