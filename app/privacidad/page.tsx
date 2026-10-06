@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
 export const metadata: Metadata = {
   title: "Política de privacidad · Supercreador",
@@ -66,7 +67,7 @@ export default function PrivacidadPage() {
         <p style={updated}>Última actualización: 2 de octubre de 2026</p>
 
         <p style={p}>
-          Supercreador (en adelante, "nosotros") ofrece herramientas para que
+          Supercreador (en adelante, &ldquo;nosotros&rdquo;) ofrece herramientas para que
           creadoras y creadores de contenido armen su portafolio profesional y lo
           compartan con marcas. Esta política explica, en lenguaje simple, qué
           datos recogemos, para qué los usamos y qué control tienes sobre ellos.
@@ -133,7 +134,7 @@ export default function PrivacidadPage() {
           <a style={{ color: "#0e110b", fontWeight: 700 }} href="mailto:hola@supercreador.tech">
             hola@supercreador.tech
           </a>{" "}
-          con el asunto "Eliminar mis datos" desde el correo de tu cuenta.
+          con el asunto &ldquo;Eliminar mis datos&rdquo; desde el correo de tu cuenta.
           Borramos tu cuenta, tu(s) portafolio(s) y tu correo de nuestros
           registros. Los portafolios públicos dejan de estar disponibles de
           inmediato.
@@ -145,9 +146,9 @@ export default function PrivacidadPage() {
           nueva fecha arriba.
         </p>
 
-        <a style={btn} href="/">
+        <Link style={btn} href="/">
           ← Volver al inicio
-        </a>
+        </Link>
       </article>
     </main>
   );
