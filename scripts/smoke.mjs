@@ -380,9 +380,16 @@ try {
     /data-inline-reel="tiktok"/.test(html) && /<button[^>]*class="reel-hit"[^>]*aria-label="Ver «[^"]+»"/.test(html) && !/<iframe/i.test(html),
     "Reels en línea: tap o clic abre el video ahí mismo; la carga inicial no trae ningún iframe (facade)",
   );
+  // Ronda 6 · 13.2: en el portafolio público el video se abre en el overlay (un diálogo), no sobre la miniatura.
+  check(
+    /data-inline-reel="tiktok"[^>]*data-reel-mode="overlay"/.test(html) && /<button[^>]*class="reel-hit"[^>]*aria-haspopup="dialog"/.test(html),
+    "13.2: en el portafolio público el video se abre en el overlay (diálogo a pantalla completa)",
+  );
   const embed = await import(new URL("../lib/portfolio/embed.ts", import.meta.url));
+  // Los reels van a /reel/{code}/embed/ (experimento 01/10 de lib/portfolio/embed.ts); los posts, a /p/{code}/embed/.
   const embeds = [
-    ["instagram", "https://www.instagram.com/reel/C9xYz123/", "https://www.instagram.com/p/C9xYz123/embed/"],
+    ["instagram", "https://www.instagram.com/reel/C9xYz123/", "https://www.instagram.com/reel/C9xYz123/embed/"],
+    ["instagram", "https://www.instagram.com/p/C9xYz123/", "https://www.instagram.com/p/C9xYz123/embed/"],
     ["tiktok", "https://www.tiktok.com/@prueba/video/7312345678901234567", "https://www.tiktok.com/player/v1/7312345678901234567?"],
     ["youtube", "https://youtu.be/dQw4w9WgXcQ", "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ?"],
   ];
@@ -397,6 +404,17 @@ try {
       return e && e.autoplay === false && !/autoplay=1|mute=1/.test(e.src);
     }),
     "Reels en línea: sin autoplay en ninguna plataforma (play manual, también en TikTok y YouTube)",
+  );
+  // Ronda 6 · 13.3 / 13.23.3: la cadena del carrusel.
+  const carouselChain = embed.carouselEmbedFor({ platform: "instagram", url: "https://www.instagram.com/p/C1abc_9/?img_index=2" });
+  check(
+    JSON.stringify(carouselChain?.srcs) ===
+      JSON.stringify(["https://www.instagram.com/p/C1abc_9/embed/", "https://www.instagram.com/reel/C1abc_9/embed/"]) &&
+      carouselChain?.postUrl === "https://www.instagram.com/p/C1abc_9/" && carouselChain?.autoplay === false &&
+      embed.carouselEmbedFor({ platform: "tiktok", url: "https://www.tiktok.com/@prueba/video/1" }) === null &&
+      embed.carouselEmbedFor({ platform: "instagram", url: "https://example.com/p/C1abc/" }) === null,
+    "13.3: carrusel → /p/{code}/embed/, luego /reel/{code}/embed/; si no carga, su portada + «Ver carrusel en Instagram»",
+    carouselChain,
   );
   check(html.includes("Formas de colaborar") && html.includes("Videos UGC para anuncios"), "Muestra los servicios");
   check(html.includes('href="mailto:hola@prueba.pe"') && html.includes("Hablemos"), 'Cierra con "Hablemos" y el correo a la vista');
@@ -568,6 +586,19 @@ try {
     check(activeNiche(customHtml) === "cocina-saludable", "El link del nicho propio abre ya filtrado");
     const customBelleza = await fetch(`${BASE}/p/${customSlug}/belleza`);
     check(customBelleza.status === 404, "Con nichos propios, los de la v1 no existen (/belleza → 404)");
+
+    // Ronda 6 · 13.3: un carrusel de Instagram en el portafolio público se abre en el overlay (facade: sin iframe al cargar).
+    const carouselSlug = `fixture-carrusel-${stamp}`;
+    const carouselDoc = fixtureDoc({ slug: carouselSlug, version: 2, image, niches: null, pieceNiches: [null, null, null] });
+    carouselDoc.instagram.posts[2] = { ...carouselDoc.instagram.posts[2], type: "carousel" };
+    await writeFixture(carouselSlug, carouselDoc);
+    const carouselHtml = await (await fetch(`${BASE}/p/${carouselSlug}`)).text();
+    check(
+      /data-inline-reel="instagram"[^>]*data-reel-mode="overlay"[^>]*data-reel-carousel/.test(carouselHtml) &&
+        /<button[^>]*class="reel-hit"[^>]*aria-label="Ver «Detrás de cámaras»"[^>]*aria-haspopup="dialog"/.test(carouselHtml) &&
+        !/<iframe/i.test(carouselHtml),
+      "13.3: el carrusel del portafolio público se abre en el overlay (la carga inicial no trae iframes)",
+    );
   } else {
     console.log("· Se saltan las pruebas con JSON de la v1/v2: el almacenamiento no es local (.data/).");
   }
@@ -1348,7 +1379,7 @@ try {
       check(blobEtags.writeWithHeadEtag === "ok" && blobEtags.staleWriteRejected, "Blob: ifMatch con el etag canónico (head) funciona", blobEtags);
     }
 
-    // ── Spec 10.2: en "De tu perfil" TODA pieza abre un visor (la misma regla que usa la grilla). ──
+    // ── Spec 10.2 · ronda 6 13.3: en la grilla TODA pieza abre un visor (la misma regla que usa la grilla). ──
     const { viewerFor } = await import(new URL("../lib/import/piece-viewer.ts", import.meta.url));
     const { embedFor: embedOf } = await import(new URL("../lib/portfolio/embed.ts", import.meta.url));
     const hasEmbed = (video) => embedOf(video) !== null;
@@ -1357,10 +1388,11 @@ try {
       viewerFor({ video: { platform: "instagram", url: "https://www.instagram.com/reel/C1abc/" }, image: img }, hasEmbed),
       viewerFor({ video: null, image: img }, hasEmbed),
       viewerFor({ video: { platform: "instagram", url: "https://www.instagram.com/prueba/" }, image: img }, hasEmbed),
+      viewerFor({ video: null, image: img, kind: "carousel", postUrl: "https://www.instagram.com/p/C1abc/" }, hasEmbed),
     ];
     check(
-      JSON.stringify(viewers) === JSON.stringify(["reel", "image", "image"]),
-      "«De tu perfil»: toda pieza abre visor (reel inline; foto, carrusel o video sin embed → visor de imagen)",
+      JSON.stringify(viewers) === JSON.stringify(["reel", "image", "image", "carousel"]),
+      "«Tus últimos 12 contenidos»: toda pieza abre visor (reel y carrusel en el overlay; foto o video sin embed → visor de imagen)",
       viewers,
     );
   } else {
@@ -1401,6 +1433,24 @@ try {
   check(
     chipRule.length > 0 && !/touch-action/.test(chipRule) && /\.chip__handle \{[^}]*touch-action: none/.test(chipsCss) && /scrollBy\(/.test(chipListSrc),
     "13.22: la lista de piezas deja hacer scroll (solo el asa toma el gesto) y al arrastrar cerca del borde la página se desplaza",
+  );
+
+  // ── Ronda 6 · pieza 2: 13.2 y 13.3 (overlay y carruseles), revisados en el código ──
+  const reelSrc = await source("components", "reel", "inline-reel.tsx");
+  const reelCss = await source("components", "reel", "inline-reel.css");
+  const kitSrc = await source("components", "portfolio", "template-kit.tsx");
+  check(
+    /mode = "overlay"/.test(reelSrc) && /showModal\(\)/.test(reelSrc) && /onClose=\{onClose\}/.test(reelSrc) &&
+      /event\.target === event\.currentTarget/.test(reelSrc) && !/allow="[^"]*autoplay/.test(reelSrc) &&
+      /IFRAME_ALLOW = "encrypted-media; picture-in-picture; fullscreen"/.test(reelSrc) &&
+      /\.reel-overlay\s*\{[^}]*background:\s*rgb\(0 0 0 \/ 0\.92\)/.test(reelCss) &&
+      /\.reel-overlay\[open\]\s*\{[^}]*place-items:\s*center/.test(reelCss),
+    "13.2: overlay negro al 92 %, centrado y sin autoplay; se cierra con la ×, tap fuera o Escape (diálogo modal)",
+  );
+  check(
+    /CAROUSEL_LOAD_TIMEOUT_MS/.test(reelSrc) && /Ver carrusel en Instagram/.test(reelSrc) && /data-carousel-fallback/.test(reelSrc) &&
+      /carouselEmbedFor/.test(kitSrc) && /carousel=\{\{ cover:/.test(kitSrc),
+    "13.3: carrusel en cadena (/p/ → /reel/) y, si no carga, la portada + «Ver carrusel en Instagram»; también en el portafolio público",
   );
 } catch (error) {
   failures += 1;
