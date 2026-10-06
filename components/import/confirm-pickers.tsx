@@ -33,6 +33,10 @@ import { embedFor } from "@/lib/portfolio/embed";
  * Ronda 6 · 13.4: la sección de la grilla lleva los textos exactos del dueño ("Tus últimos 12 contenidos" y "¿No ves
  * el que buscas? Pégalo por link ↓"), explica en simple dónde aparece lo agregado y nunca muestra jerga técnica.
  * Agregar por link acepta solo videos de TikTok; los links de Instagram siguen ocultos (lib/import/link-sources.ts).
+ *
+ * Ronda 6 · 13.2 / 13.3: en la grilla, los reels y los carruseles se abren en el overlay (components/reel/
+ * inline-reel.tsx); los carruseles prueban su cadena de embeds y, si no cargan, muestran la portada + un botón al
+ * post original. Las fotos siguen en el visor de imagen.
  */
 
 export type NicheChip = { key: string; label: string };
@@ -476,11 +480,27 @@ export function PiecePicker(props: {
       <ul aria-labelledby={`${uid}-profile`} className="mt-3 grid grid-cols-2 gap-3 min-[26rem]:grid-cols-3 sm:grid-cols-4" data-profile-grid>
         {props.pool.slice(0, shown).map((piece) => {
           const added = chosen.has(piece.id);
+          const viewer = viewerFor(piece, (video) => embedFor(video) !== null);
           return (
             <li key={piece.id} className="flex min-w-0 flex-col gap-2 rounded-2xl border border-line bg-paper p-2" data-profile-piece={piece.id}>
-              {/* Spec 10.2: TODA pieza se ve con tap o clic, esté o no agregada: los reels ahí mismo (play manual,
-                  uno a la vez) y las fotos y carruseles en un visor dentro de la página. Nunca hover. */}
-              {viewerFor(piece, (video) => embedFor(video) !== null) === "reel" && piece.video ? (
+              {/* Spec 10.2 · ronda 6 13.2 / 13.3: TODA pieza se ve con tap o clic, esté o no agregada. Reels y
+                  carruseles en el overlay (play manual, uno a la vez; el carrusel prueba su cadena de embeds y, si
+                  no carga, muestra su portada + el botón al post); las fotos en el visor de imagen. Nunca hover. */}
+              {viewer === "carousel" && piece.postUrl ? (
+                <InlineReel
+                  link={{ platform: "instagram", url: piece.postUrl }}
+                  title={piece.title}
+                  carousel={{ cover: piece.image?.url ?? null }}
+                  className="block aspect-square overflow-hidden rounded-xl bg-sand"
+                >
+                  <span className="absolute inset-0" data-reel-media>
+                    {piece.image && (
+                      <Image src={piece.image.url} alt="" fill loading="lazy" sizes="(min-width: 640px) 160px, 45vw" className="object-cover" />
+                    )}
+                  </span>
+                  <TileBadge kind="carousel" />
+                </InlineReel>
+              ) : viewer === "reel" && piece.video ? (
                 <InlineReel link={piece.video} title={piece.title} className="block aspect-square overflow-hidden rounded-xl bg-sand">
                   <span className="absolute inset-0" data-reel-media>
                     {piece.image && (

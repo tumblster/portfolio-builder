@@ -11,12 +11,12 @@ import type { ProfileStatKind } from "@/lib/portfolio/stats";
 import { ContactIcon, PLATFORM_LABEL } from "./icons";
 import { NicheScope } from "./niche-filter";
 import { InlineReel } from "@/components/reel/inline-reel";
-import { embedFor } from "@/lib/portfolio/embed";
+import { carouselEmbedFor, embedFor } from "@/lib/portfolio/embed";
 
 /*
  * Lo que comparten las 4 plantillas (v2 · M2): los datos ya preparados para dibujar, el marco
  * (filtro de nichos + paleta) y piezas chicas. Cada plantilla decide solo su maquetación.
- * Componentes de servidor: lo único que llega al navegador es el filtro y las flechas.
+ * Componentes de servidor: lo único que llega al navegador es el filtro, las flechas y el reproductor.
  */
 
 export type NicheFilter =
@@ -160,12 +160,21 @@ export function pieceMeta(piece: ResolvedPiece): { platform: string | null; meta
   return { platform, meta: piece.metrics.display ?? (platform ? `Ver en ${platform}` : null) };
 }
 
-/** La pieza lleva a su original (otra pestaña); sin link, solo se muestra. */
 /**
- * La pieza como enlace. Spec 3.1 / 7.1: si es un video con embed oficial, tap o clic lo abre AHÍ MISMO (play manual,
- * sin autoplay ni hover, uno a la vez) en vez de llevar a otra pestaña; si no, abre su original.
+ * La pieza como enlace (spec 3.1 / 7.1; ronda 6 · 13.2 y 13.3). Tap o clic la abre AHÍ MISMO, en el overlay (play
+ * manual, sin autoplay ni hover, una a la vez), en vez de llevar a otra pestaña:
+ * - carrusel de Instagram: cadena de embeds y, si no carga, su portada + "Ver carrusel en Instagram";
+ * - video con embed oficial: su reproductor.
+ * Si no es ninguna de las dos, abre su original (otra pestaña); sin link, solo se muestra.
  */
 export function PieceLink({ piece, className, children }: { piece: ResolvedPiece; className: string; children: ReactNode }) {
+  if (piece.kind === "carousel" && piece.link && carouselEmbedFor(piece.link)) {
+    return (
+      <InlineReel link={piece.link} title={piece.title} className={className} carousel={{ cover: piece.image?.url ?? null }}>
+        {children}
+      </InlineReel>
+    );
+  }
   if (piece.video && embedFor(piece.video)) {
     return (
       <InlineReel link={piece.video} title={piece.title} className={className}>

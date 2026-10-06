@@ -2,13 +2,21 @@ import { DEFAULT_DESIGN, type Design } from "./design";
 import { computeEngagementRate } from "./engagement";
 import { creatorMetrics, type CreatorMetric } from "./metrics";
 import { resolveNiches, type NicheDef } from "./niches";
-import type { Contact, EngagementRate, Piece, Portfolio, Service, StoredImage, VideoLink } from "./schema";
+import type { Contact, EngagementRate, InstagramPost, Piece, Portfolio, Service, StoredImage, VideoLink } from "./schema";
 import { pieceMetrics, profileStats, type PieceMetrics, type ProfileStat } from "./stats";
 
 /** A dónde lleva una pieza: su video original o el post de Instagram del que salió. */
 export type PieceLink = VideoLink;
 
-export type ResolvedPiece = Piece & { link: PieceLink | null; metrics: PieceMetrics };
+export type ResolvedPiece = Piece & {
+  link: PieceLink | null;
+  metrics: PieceMetrics;
+  /**
+   * Ronda 6 · 13.3: qué era en Instagram (foto, video o carrusel); null o ausente si se agregó a mano. Con esto el
+   * portafolio público abre los carruseles en el overlay (cadena de embeds) en vez de mandar a Instagram.
+   */
+  kind?: InstagramPost["type"] | null;
+};
 
 /** Lo que se muestra: un valor final por campo, sin importar de qué fuente salió. */
 export type ResolvedPortfolio = {
@@ -63,6 +71,7 @@ export function resolvePortfolio(doc: Portfolio): ResolvedPortfolio {
       ...piece,
       link: piece.video ?? (post ? { platform: "instagram", url: post.url } : null),
       metrics: pieceMetrics(post),
+      kind: post?.type ?? null,
     };
   });
 
