@@ -51,7 +51,7 @@ function filterNiches(html) {
 }
 /** Nicho activo de la página (atributo del marco de la plantilla). */
 const activeNiche = (html) => html.match(/class="pf"[^>]*data-pf-filter="([a-z0-9-]+)"|data-pf-filter="([a-z0-9-]+)"[^>]*class="pf"/)?.slice(1).find(Boolean) ?? null;
-/** Las dos vistas del portafolio público (7.3): el panel "Sobre mí" y el del Media Kit. */
+/** Las dos vistas del portafolio público (7.3): el panel "Contenido" (antes «Sobre mí») y el del Media Kit. */
 function panelsOf(html) {
   const about = html.indexOf('id="pf-panel-about"');
   const kit = html.indexOf('id="pf-panel-kit"');
@@ -442,7 +442,7 @@ try {
   check(/<a[^>]*href="https:\/\/wa\.me\/\?text=[^"]+"[^>]*data-pf-share/.test(html), "12.4: «Compartir por WhatsApp» en el portafolio publicado");
   check(
     views.about && !/pf-stats|Engagement Rate|Seguidores en Instagram/.test(views.about),
-    "SOBRE MÍ no muestra métricas",
+    "La vista Contenido no muestra métricas",
   );
   const shown = pieceViews(html);
   check(
@@ -527,7 +527,7 @@ try {
     const v1 = await fetch(`${BASE}/p/${v1Slug}`);
     const v1Html = await v1.text();
     check(v1.status === 200 && v1Html.includes("Valentina Fixture"), "Un portafolio guardado en la v1 sigue abriendo");
-    // Ronda 30/09 · 7.3: las cifras de Instagram viven en el MEDIA KIT; SOBRE MÍ no muestra métricas.
+    // Ronda 30/09 · 7.3: las cifras de Instagram viven en el MEDIA KIT; la vista Contenido no muestra métricas.
     const v1Views = panelsOf(v1Html);
     check(
       /48,2\s?mil/.test(v1Views.kit) && v1Views.kit.includes("Seguidores") && v1Views.kit.includes("Interacciones promedio"),
@@ -535,7 +535,7 @@ try {
     );
     check(
       /12,4\s?mil vistas/.test(v1Views.about) && !/Seguidores en Instagram|Engagement Rate/.test(v1Views.about),
-      "SOBRE MÍ muestra las vistas de cada pieza (ajuste 10), pero no las cifras del perfil ni el ER",
+      "Contenido muestra las vistas de cada pieza (ajuste 10), pero no las cifras del perfil ni el ER",
     );
     const v1Belleza = await fetch(`${BASE}/p/${v1Slug}/belleza`);
     check(v1Belleza.status === 200, "Sus links de la v1 por nicho siguen abriendo (/belleza)");
@@ -1141,7 +1141,7 @@ try {
     check(
       /10,7\s%/.test(bioViews.kit) && bioViews.kit.includes("Engagement Rate") && bioViews.kit.includes("(me gusta + comentarios) ÷ vistas · 2 reels") &&
         !bioViews.about.includes("Engagement Rate"),
-      "El ER (10,7 %) vive en el MEDIA KIT, con su base etiquetada, y no en SOBRE MÍ",
+      "El ER (10,7 %) vive en el MEDIA KIT, con su base etiquetada, y no en Contenido",
     );
     const kitMetrics = [...bioViews.kit.matchAll(/data-metric="([a-zA-Z]+)"/g)].map((m) => m[1]);
     check(
@@ -1233,12 +1233,16 @@ try {
       noServices.status === 400 && noServices.data?.error?.issues?.[0]?.path === "services",
       `11.12: el paso de Servicios es obligatorio antes de generar: "${noServices.data?.error?.issues?.[0]?.message}"`,
     );
+    // 13.4: agregar por link acepta solo TikTok; Instagram queda oculto, con un mensaje amable y sin jerga técnica.
     const badLink = await call("POST", "/api/import/link", { json: { draftId: chipsId, url: "https://example.com/algo" } });
-    const igNoToken = await call("POST", "/api/import/link", { json: { draftId: chipsId, url: "https://www.instagram.com/p/C1abc/" } });
+    const igLink = await call("POST", "/api/import/link", { json: { draftId: chipsId, url: "https://www.instagram.com/p/C1abc/" } });
+    const jargon = /\b(token|oembed|api)\b|\bMeta\b/i;
     check(
-      badLink.status === 400 && (igNoToken.status === 400 ? /token de Meta/.test(igNoToken.data?.error?.message ?? "") : igNoToken.status !== 401),
-      "11.5: «Agregar por link» acepta Instagram o TikTok; sin el token de Meta, Instagram lo dice claro",
-      { badLink: badLink.data, igNoToken: igNoToken.data },
+      badLink.status === 400 && badLink.data?.error?.message === "Por ahora puedes agregar por link solo videos de TikTok." &&
+        igLink.status === 400 && igLink.data?.error?.message === "Los links de Instagram estarán disponibles pronto." &&
+        ![badLink, igLink].some((r) => jargon.test(r.data?.error?.message ?? "")),
+      "13.4: «Agregar por link» acepta solo TikTok; un link de Instagram responde «Los links de Instagram estarán disponibles pronto.» (sin jerga)",
+      { badLink: badLink.data, igLink: igLink.data },
     );
     const chips = await confirm({
       draftId: chipsId,
@@ -1362,6 +1366,42 @@ try {
   } else {
     console.log("· (se omiten las pruebas del borrador de importación: no es almacenamiento local)");
   }
+
+  // ── Ronda 6 · pieza 1: 13.4, 13.5, 13.21 y 13.22, revisados en el código (sin navegador) ──
+  const source = (...parts) => readFile(path.join(process.cwd(), ...parts), "utf8");
+  const pickersSrc = await source("components", "import", "confirm-pickers.tsx");
+  const linkSourcesSrc = await source("lib", "import", "link-sources.ts");
+  const linkSection = pickersSrc.slice(pickersSrc.indexOf("data-add-by-link-section"), pickersSrc.indexOf("data-profile-grid"));
+  check(
+    linkSection.includes("Tus últimos 12 contenidos") &&
+      /¿No ves el que buscas\? Pégalo por link <span aria-hidden="true">↓<\/span>/.test(linkSection) &&
+      /<form[^>]*\bdata-add-by-link>/.test(linkSection) && /TikTok/.test(linkSection) &&
+      !/\b(instagram|token|oembed|api)\b|\bMeta\b/i.test(linkSection) &&
+      linkSourcesSrc.includes('"Los links de Instagram estarán disponibles pronto."') &&
+      /export const INSTAGRAM_LINKS_ENABLED: boolean = false;/.test(linkSourcesSrc),
+    "13.4: «Tus últimos 12 contenidos» / «¿No ves el que buscas? Pégalo por link ↓», solo TikTok y sin jerga ni Instagram en la sección",
+  );
+  const previewSrc = await source("components", "design", "template-preview.tsx");
+  const reviewSrc = await source("components", "import-review.tsx");
+  const modalSrc = reviewSrc.slice(reviewSrc.indexOf("function PreviewModal"));
+  check(
+    previewSrc.includes('["about", "Contenido"]') && previewSrc.includes('["kit", "Media kit"]') && !previewSrc.includes('["about", "Sobre mí"]') &&
+      /useEffect\(\(\) => \{[^}]*showModal\(\);?\s*\}, \[\]\);/.test(modalSrc) &&
+      /onClose=\{props\.onClose\}/.test(modalSrc) && !/addEventListener\("close"/.test(modalSrc),
+    "13.5: el switch dice «Contenido | Media kit» y cambiar de vista no cierra el modal (se abre una vez; cierra con Cerrar, Escape o tap fuera)",
+  );
+  const groqSrc = await source("lib", "ai", "groq.ts");
+  check(
+    /const TEMPERATURE = 0;/.test(groqSrc) && /temperature: TEMPERATURE\b/.test(groqSrc) && /const SEED = \d+;/.test(groqSrc) && /seed: SEED\b/.test(groqSrc),
+    "13.21: los nichos de la IA son deterministas (temperatura 0 y semilla fija); la creadora los confirma antes de generar",
+  );
+  const chipsCss = await source("components", "chips", "chips.css");
+  const chipListSrc = await source("components", "chips", "chip-list.tsx");
+  const chipRule = chipsCss.match(/(^|\n)\.chip \{[^}]*\}/)?.[0] ?? "";
+  check(
+    chipRule.length > 0 && !/touch-action/.test(chipRule) && /\.chip__handle \{[^}]*touch-action: none/.test(chipsCss) && /scrollBy\(/.test(chipListSrc),
+    "13.22: la lista de piezas deja hacer scroll (solo el asa toma el gesto) y al arrastrar cerca del borde la página se desplaza",
+  );
 } catch (error) {
   failures += 1;
   console.error(`✘ Error inesperado: ${error.message}`);
