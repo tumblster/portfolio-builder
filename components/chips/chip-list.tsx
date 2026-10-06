@@ -10,7 +10,16 @@ import "./chips.css";
  * - Teclado: con el foco en cualquier parte del chip, Alt + flechas lo mueve; el foco lo acompaña.
  * - Al quitar un chip, el foco vuelve al campo (onAfterRemove): nunca se pierde.
  * - Cada movimiento y cada quitada se anuncia a lectores de pantalla.
+ * - Ronda 6 · 13.22: el scroll es libre. Solo el asa toma el gesto del dedo (touch-action: none, en chips.css); el
+ *   resto del chip (miniatura, título, selector de nicho) deja deslizar la página como siempre. Y si al arrastrar
+ *   el puntero llega cerca del borde de arriba o de abajo, la página se desplaza sola.
  */
+
+/** 13.22: franja (px) junto al borde de la ventana donde el arrastre desplaza la página, y su velocidad máxima. */
+const AUTO_SCROLL_EDGE = 96;
+const AUTO_SCROLL_SPEED = 16;
+/** Cuánto (px) hay que mover el puntero antes de que el borde desplace la página (tocar el asa no basta). */
+const DRAG_THRESHOLD = 6;
 
 type Props<T> = {
   /** Nombre accesible de la lista ("Nichos elegidos"). */
@@ -70,7 +79,15 @@ export function ChipList<T>(props: Props<T>) {
     if (event.button !== 0) return;
     event.preventDefault();
     setDragging(key);
-    const onMoveWindow = (moveEvent: PointerEvent) => {
+    const startX = event.clientX;
+    const startY = event.clientY;
+    let pointerX = startX;
+    let pointerY = startY;
+    let moved = false;
+    let frame = 0;
+
+    // El chip va a la posición del chip más cercano al puntero.
+    const reorder = () => {
       const list = listRef.current;
       if (!list) return;
       const chips = [...list.querySelectorAll<HTMLElement>(":scope > li[data-chip]")];
@@ -78,7 +95,7 @@ export function ChipList<T>(props: Props<T>) {
       let best = Infinity;
       chips.forEach((chip, index) => {
         const rect = chip.getBoundingClientRect();
-        const distance = Math.hypot(moveEvent.clientX - (rect.left + rect.width / 2), moveEvent.clientY - (rect.top + rect.height / 2));
+        const distance = Math.hypot(pointerX - (rect.left + rect.width / 2), pointerY - (rect.top + rect.height / 2));
         if (distance < best) {
           best = distance;
           nearest = index;
@@ -88,7 +105,29 @@ export function ChipList<T>(props: Props<T>) {
       const from = current.findIndex((item) => keyOf(item) === key);
       if (nearest >= 0 && from >= 0 && nearest !== from) onMove(from, nearest);
     };
+
+    // 13.22: cerca del borde de arriba o de abajo, la página se desplaza sola (más rápido cuanto más cerca), así se
+    // puede llevar una pieza más allá de lo que se ve sin soltarla.
+    const autoScroll = () => {
+      const edge = Math.min(AUTO_SCROLL_EDGE, window.innerHeight / 4);
+      const bottom = window.innerHeight - edge;
+      const pull = pointerY < edge ? (pointerY - edge) / edge : pointerY > bottom ? (pointerY - bottom) / edge : 0;
+      const delta = Math.round(Math.max(-1, Math.min(1, pull)) * AUTO_SCROLL_SPEED);
+      if (moved && delta !== 0) {
+        window.scrollBy({ top: delta, behavior: "instant" });
+        reorder();
+      }
+      frame = requestAnimationFrame(autoScroll);
+    };
+
+    const onMoveWindow = (moveEvent: PointerEvent) => {
+      pointerX = moveEvent.clientX;
+      pointerY = moveEvent.clientY;
+      if (!moved && Math.hypot(pointerX - startX, pointerY - startY) > DRAG_THRESHOLD) moved = true;
+      reorder();
+    };
     const onEnd = () => {
+      cancelAnimationFrame(frame);
       window.removeEventListener("pointermove", onMoveWindow);
       window.removeEventListener("pointerup", onEnd);
       window.removeEventListener("pointercancel", onEnd);
@@ -100,6 +139,7 @@ export function ChipList<T>(props: Props<T>) {
     window.addEventListener("pointermove", onMoveWindow);
     window.addEventListener("pointerup", onEnd);
     window.addEventListener("pointercancel", onEnd);
+    frame = requestAnimationFrame(autoScroll);
   }
 
   return (

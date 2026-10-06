@@ -2,6 +2,10 @@
  * Chips y combobox (ronda 30/09 · 7.1), con el sistema de la landing: tinta sobre blanco/crema, borde fino y el
  * acento solo como gráfico (foco, coincidencia resaltada, chip arrastrado). Blancos táctiles ≥ 44 px.
  * Contraste: tinta sobre blanco 19:1; texto secundario (--color-muted) ≥ 7:1 sobre blanco y crema.
+ *
+ * Ronda 6 · 13.22: el chip NO bloquea el gesto del dedo (antes tenía touch-action: none y, como en la lista de
+ * piezas cada chip ocupa todo el ancho, en el celular no se podía hacer scroll sobre la lista). Solo el asa
+ * (.chip__handle) lo toma, para poder arrastrar.
  */
 .chip {
   display: inline-flex;
@@ -16,7 +20,6 @@
   color: var(--color-ink);
   font-size: 0.9375rem;
   font-weight: 600;
-  touch-action: none;
   transition:
     box-shadow 120ms ease,
     transform 120ms ease;
