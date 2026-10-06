@@ -1452,6 +1452,42 @@ try {
       /carouselEmbedFor/.test(kitSrc) && /carousel=\{\{ cover:/.test(kitSrc),
     "13.3: carrusel en cadena (/p/ → /reel/) y, si no carga, la portada + «Ver carrusel en Instagram»; también en el portafolio público",
   );
+
+  // ── Ronda 6 · pieza 3: 13.6 (servicios sugeridos) y 13.7 (tarjeta con QR) ──
+  const { captionMentions } = await import(new URL("../lib/portfolio/mentions.ts", import.meta.url));
+  const mentions = captionMentions(
+    ["Mi rutina con @CeraVe y @la.roche.posay 💧", "Gracias @cerave. Escríbeme a hola@correo.com", "Yo soy @valen.ugc y uso @Nivea_Peru."],
+    ["valen.ugc"],
+  );
+  check(
+    JSON.stringify(mentions) === JSON.stringify(["cerave", "la.roche.posay", "nivea_peru"]),
+    "13.6: las @marcas de los captions se detectan (sin la propia cuenta ni correos), las más mencionadas primero",
+    mentions,
+  );
+  const servicesSrc = await source("components", "import", "services-step.tsx");
+  const draftSrc = await source("lib", "import", "draft.ts");
+  check(
+    /suggested\?: boolean/.test(servicesSrc) && /Usar todas/.test(servicesSrc) && /card\.suggested/.test(servicesSrc) &&
+      /SERVICES_MAX = 4;/.test(servicesSrc) && /suggestedServices:/.test(draftSrc) && /captionMentions\(/.test(draftSrc) &&
+      /marcas_mencionadas/.test(groqSrc) && /pendingSuggestions\(services\)/.test(reviewSrc) && /!card\.suggested && card\.title\.trim\(\)/.test(reviewSrc),
+    "13.6: Servicios llega con sugerencias de la IA (captions + marcas mencionadas), editables y eliminables; solo se envía lo que la creadora confirma",
+  );
+  const qrLib = await import(new URL("../lib/share/qr.ts", import.meta.url));
+  check(
+    qrLib.qrTargetUrl("https://ejemplo.com/p/valen") === "https://ejemplo.com/p/valen?ref=qr" &&
+      qrLib.qrTargetUrl("https://ejemplo.com/p/valen?ref=whatsapp") === "https://ejemplo.com/p/valen?ref=qr" &&
+      qrLib.displayUrl("https://ejemplo.com/p/valen/") === "ejemplo.com/p/valen" &&
+      qrLib.qrFileName("Valen UGC") === "tarjeta-qr-valen-ugc.png",
+    "13.7: el QR lleva el link del portafolio con ?ref=qr; la tarjeta muestra el link limpio y se descarga como tarjeta-qr-<slug>.png",
+  );
+  const qrCardSrc = await source("components", "share", "qr-card.tsx");
+  const readySrc = await source("components", "ready-dialog.tsx");
+  check(
+    /canvas\.toBlob\(/.test(qrCardSrc) && /URL\.createObjectURL\(/.test(qrCardSrc) && /link\.download = fileName/.test(qrCardSrc) &&
+      /document\.body\.appendChild\(link\)/.test(qrCardSrc) && /qrTargetUrl\(/.test(qrCardSrc) && /drawImage\(photo/.test(qrCardSrc) &&
+      /Descargar PNG/.test(qrCardSrc) && /<QrCard/.test(readySrc) && !/download=\{`qr-/.test(readySrc),
+    "13.7: tarjeta con foto + nombre + QR (con ?ref=qr) + link, y «Descargar PNG» descarga de verdad (blob + enlace temporal en el documento)",
+  );
 } catch (error) {
   failures += 1;
   console.error(`✘ Error inesperado: ${error.message}`);
