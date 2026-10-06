@@ -8,6 +8,7 @@ import {
   resolveNiches,
 } from "./niches";
 import { DEFAULT_DESIGN, PALETTE_IDS, TEMPLATES } from "./design";
+import { GENDERS } from "./gender";
 import { slugSchema } from "./slug";
 
 /*
@@ -354,6 +355,13 @@ export const manualDataSchema = z.object({
   niches: nichesSchema.optional(),
   /** Reemplaza los servicios de la IA. [] = no mostrar el bloque. */
   services: servicesSchema.optional(),
+  /**
+   * Ronda 6 · 13.11: el género que eligió la creadora (Hombre / Mujer / Otro / Prefiero no decirlo). Solo adapta los
+   * textos de WhatsApp (13.8, lib/portfolio/gender.ts). Nunca se infiere; ausente = textos en neutro.
+   */
+  gender: z
+    .enum(GENDERS, { error: "Elige una de las opciones: Hombre, Mujer, Otro o Prefiero no decirlo." })
+    .optional(),
 });
 export type ManualData = z.infer<typeof manualDataSchema>;
 

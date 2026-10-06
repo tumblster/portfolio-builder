@@ -8,6 +8,8 @@ import {
   Avatar,
   ContactPill,
   copyrightYear,
+  HireLink,
+  KitLink,
   NicheSuffix,
   PieceLink,
   pieceMeta,
@@ -23,8 +25,9 @@ import {
 /*
  * Plantilla Creator (la recomendada): lenguaje de la referencia Starlet con implementación propia.
  * Orden: nav píldora (con los nichos) → hero (foto + tarjeta de vidrio, titular, propuesta de
- * valor, botones) → cifras con el Engagement Rate primero → trabajo seleccionado (carrusel oscuro)
+ * valor, CTAs) → cifras con el Engagement Rate primero → contenido destacado (carrusel oscuro)
  * → formas de colaborar → "Hablemos" monumental → footer mínimo. Estilos en app/portfolio.css.
+ * Ronda 6 · 13.9: los CTAs del hero son "Trabaja conmigo" (WhatsApp) y "Ver media kit".
  */
 
 export function CreatorTemplate({ portfolio, variant, filter, coverEdit }: TemplateProps) {
@@ -93,15 +96,10 @@ export function CreatorTemplate({ portfolio, variant, filter, coverEdit }: Templ
                 </H1>
                 {valueProp && <p className="pf-lead">{valueProp}</p>}
                 {bio && <p className="pf-bio">{bio}</p>}
+                {/* 13.9: principal "Trabaja conmigo" y secundario "Ver media kit". */}
                 <div className="pf-actions">
-                  {hasContact && (
-                    <a className="pf-btn pf-btn--solid" href={`#${id("contacto")}`}>
-                      Trabajemos juntos
-                    </a>
-                  )}
-                  <a className={`pf-btn ${hasContact ? "pf-btn--ghost" : "pf-btn--solid"}`} href={`#${id("trabajo")}`}>
-                    Ver mi trabajo
-                  </a>
+                  <HireLink view={view} className="pf-btn pf-btn--solid" />
+                  <KitLink view={view} className={`pf-btn ${view.hire ? "pf-btn--ghost" : "pf-btn--solid"}`} />
                 </div>
               </div>
             </div>
@@ -254,4 +252,3 @@ function PieceCard({ piece, Heading }: { piece: ResolvedPiece; Heading: "h3" | "
     </PieceLink>
   );
 }
-

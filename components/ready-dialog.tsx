@@ -9,6 +9,7 @@ import type { ImportResult } from "@/lib/import/events";
 import { resolvePalette } from "@/lib/palette/palettes";
 import { TEMPLATE_INFO, type Design } from "@/lib/portfolio/design";
 import { describeEngagementRate } from "@/lib/portfolio/engagement";
+import { shareMessage, whatsappUrl, type Gender } from "@/lib/portfolio/gender";
 import { nichesWithPieces } from "@/lib/portfolio/niches";
 import type { ResolvedPortfolio } from "@/lib/portfolio/resolve";
 import { Avatar } from "./avatar";
@@ -134,7 +135,13 @@ export function ReadyDialog({
 
         <MagicLinkSection slug={result.slug} />
 
-        <ShareSection url={url} name={resolved.name} slug={result.slug} photoUrl={resolved.photo?.url ?? null} />
+        <ShareSection
+          url={url}
+          name={resolved.name}
+          slug={result.slug}
+          photoUrl={resolved.photo?.url ?? null}
+          gender={resolved.gender ?? null}
+        />
 
         {warnings.length > 0 && (
           <ul className="mt-5 space-y-1 text-sm text-accent-ink">
@@ -329,11 +336,23 @@ function DesignSection({ result, onResultChange }: { result: ImportResult; onRes
 }
 
 /**
- * Spec 12.4 · 12.5 · ronda 6 13.7: compartir por WhatsApp (texto pre-llenado + link) y la tarjeta de presentación con
- * QR (foto + nombre + QR con ?ref=qr + link), descargable en PNG de verdad (components/share/qr-card.tsx).
+ * Spec 12.4 · 12.5 · ronda 6 13.7 / 13.8: compartir por WhatsApp (texto según el género + link) y la tarjeta de
+ * presentación con QR (foto + nombre + QR con ?ref=qr + link), descargable en PNG (components/share/qr-card.tsx).
  */
-function ShareSection({ url, name, slug, photoUrl }: { url: string; name: string; slug: string; photoUrl: string | null }) {
-  const whatsapp = `https://wa.me/?text=${encodeURIComponent(`Mira mi portafolio de UGC: ${url}?ref=whatsapp`)}`;
+function ShareSection({
+  url,
+  name,
+  slug,
+  photoUrl,
+  gender,
+}: {
+  url: string;
+  name: string;
+  slug: string;
+  photoUrl: string | null;
+  gender: Gender | null;
+}) {
+  const whatsapp = whatsappUrl(null, shareMessage(gender, `${url}?ref=whatsapp`));
 
   return (
     <div className="mt-7 border-t border-line pt-5" data-testid="ready-share">

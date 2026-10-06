@@ -1,18 +1,35 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type CSSProperties,
+  type KeyboardEvent,
+  type MouseEvent,
+  type ReactNode,
+} from "react";
+import { contactMessage, shareMessage, whatsappUrl, type Gender } from "@/lib/portfolio/gender";
+import { MadeWithBadge } from "./made-with-badge";
 
 /*
- * Header ÚNICO del portafolio publicado (spec 11.6), en 2 filas contextuales:
+ * Header ÚNICO del portafolio publicado (spec 11.6; ronda 6 · 13.10), en 2 filas contextuales:
  *  - Fila 1 (siempre): [foto en círculo + vistas] | control segmentado "Contenido | Media kit" | Hablemos.
  *  - Fila 2 (solo en Contenido): chips de nichos, con scroll horizontal y fundido a la izquierda si no caben.
  *    Al pasar a Media kit se colapsa con animación y el header se compacta: el Media kit es ER + métricas, ahí no
- *    se filtra por nicho. Sin nombre en texto, sin chip "Todo"; "Media kit" no es un chip. El chip elegido va solo
- *    trazado (outline). Tocar el elegido lo suelta (vuelve a todo).
+ *    se filtra por nicho. Sin nombre en texto, sin chip "Todo"; "Media kit" es texto del control, nunca un chip. El
+ *    chip elegido va solo trazado (outline). Tocar el elegido lo suelta (vuelve a todo).
  * Además: "Hablemos" abre WhatsApp con un mensaje pre-llenado si el creador puso su número (12.6; si no, lleva a su
  * contacto); el ojito con las vistas (12.7: 1 por persona por día, lo cuenta el servidor); y "Compartir por WhatsApp"
  * al final (12.4). Al abrir, avisa la visita con su ?ref= y la página (11.9 / 12.9): sin cookies.
+ *
+ * Ronda 6:
+ *  - 13.8: los textos de WhatsApp ("Hablemos" y compartir) se adaptan al género que eligió (lib/portfolio/gender.ts);
+ *    sin dato, Otro o Prefiero no decirlo, en neutro (13.23 · 2).
+ *  - 13.9: el CTA "Ver media kit" de las plantillas (data-pf-to-kit) cambia de vista igual que el switch.
+ *  - 13.17 / 13.23 · 6: el badge flotante "Hecho con Supercreador", en todos los portafolios.
  */
 
 const KIT_HASH = "#media-kit";
@@ -48,6 +65,8 @@ export type PortfolioNav = {
   contactId: string | null;
   /** WhatsApp del creador, solo dígitos con código de país (12.6), o null. */
   whatsapp: string | null;
+  /** 13.8: el género que eligió (adapta los textos de WhatsApp); null = neutro. */
+  gender: Gender | null;
 };
 
 export function PortfolioViews({ about, kit, style, nav }: { about: ReactNode; kit: ReactNode; style?: CSSProperties; nav: PortfolioNav }) {
@@ -108,15 +127,30 @@ export function PortfolioViews({ about, kit, style, nav }: { about: ReactNode; k
     document.getElementById(next ? "pf-tab-kit" : "pf-tab-content")?.focus();
   }
 
+  // 13.9: "Ver media kit" de la plantilla cambia de vista como el switch (sin dejar entradas en el historial).
+  function onViewsClick(event: MouseEvent<HTMLDivElement>) {
+    if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    const target = event.target as Element | null;
+    if (!target?.closest?.("[data-pf-to-kit]")) return;
+    event.preventDefault();
+    show(true);
+  }
+
   const hablemos = nav.whatsapp
-    ? `https://wa.me/${nav.whatsapp}?text=${encodeURIComponent(`Hola ${firstName}, vi tu portafolio en Supercreador y me gustaría conversar contigo.`)}`
+    ? whatsappUrl(nav.whatsapp, contactMessage(nav.gender, firstName, "talk"))
     : nav.contactId
       ? `#${nav.contactId}`
       : null;
   const hasNiches = nav.niches.length > 0;
 
   return (
-    <div className="pf-views" style={style} data-view={kitActive ? "kit" : "about"} data-has-niches={hasNiches ? "" : undefined}>
+    <div
+      className="pf-views"
+      style={style}
+      data-view={kitActive ? "kit" : "about"}
+      data-has-niches={hasNiches ? "" : undefined}
+      onClick={onViewsClick}
+    >
       <header className="pf-bar" data-pf-bar>
         <div className="pf-bar__row">
           <a className="pf-bar__avatar" href={nav.basePath} aria-label={`Portafolio de ${nav.name}: inicio`}>
@@ -213,10 +247,13 @@ export function PortfolioViews({ about, kit, style, nav }: { about: ReactNode; k
       <p className="pf-share">
         <a
           className="pf-share__whatsapp"
-          href={`https://wa.me/?text=${encodeURIComponent(`Mira el portafolio de ${nav.name}: `)}`}
+          href={whatsappUrl(null, shareMessage(nav.gender, ""))}
           onClick={(event) => {
             // El link completo (con el dominio de este deployment) se arma al tocar.
-            event.currentTarget.href = `https://wa.me/?text=${encodeURIComponent(`Mira el portafolio de ${nav.name}: ${window.location.origin}${nav.basePath}?ref=whatsapp`)}`;
+            event.currentTarget.href = whatsappUrl(
+              null,
+              shareMessage(nav.gender, `${window.location.origin}${nav.basePath}?ref=whatsapp`),
+            );
           }}
           target="_blank"
           rel="noopener noreferrer"
@@ -225,6 +262,8 @@ export function PortfolioViews({ about, kit, style, nav }: { about: ReactNode; k
           Compartir por WhatsApp<span className="sr-only"> (se abre en otra pestaña)</span>
         </a>
       </p>
+      {/* 13.17 / 13.23 · 6: en todos los portafolios (aún no hay plan pago). */}
+      <MadeWithBadge />
     </div>
   );
 }
