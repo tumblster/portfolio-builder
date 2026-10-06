@@ -444,6 +444,14 @@ try {
     `Header único: foto | Contenido · Media kit | Hablemos; chips: ${barChips.join(" · ")} (sin nombre ni «Todo»)`,
     bar.slice(0, 300),
   );
+  // Ronda 6 · 13.10: la fila 1 en ese orden, y «Media kit» es texto del control (nunca un chip).
+  check(
+    bar.indexOf("pf-bar__avatar") >= 0 &&
+      bar.indexOf("pf-bar__avatar") < bar.indexOf('class="pf-seg"') &&
+      bar.indexOf('class="pf-seg"') < bar.indexOf("pf-bar__cta") &&
+      !/class="pf-chip"[^>]*>Media kit/.test(bar),
+    "13.10: fila 1 en orden (foto | Contenido · Media kit | Hablemos); «Media kit» no es un chip",
+  );
   check(
     views.about && views.kit && /id="pf-panel-kit"[^>]*hidden/.test(html) && /id="pf-tab-content"[^>]*aria-selected="true"/.test(bar) &&
       !/aria-current="page"/.test(bar),
@@ -458,6 +466,19 @@ try {
     "Header: el chip elegido va solo trazado; en Media kit la fila de chips se colapsa; fundido a la izquierda",
   );
   check(/<a[^>]*href="https:\/\/wa\.me\/\?text=[^"]+"[^>]*data-pf-share/.test(html), "12.4: «Compartir por WhatsApp» en el portafolio publicado");
+  // Ronda 6 · 13.9: los dos CTAs de la plantilla (Creator, con WhatsApp).
+  check(
+    /<a[^>]*href="https:\/\/wa\.me\/\d+\?text=[^"]+"[^>]*data-pf-cta="hire"[^>]*>Trabaja conmigo/.test(html) &&
+      /<a[^>]*href="#media-kit"[^>]*data-pf-cta="kit"[^>]*data-pf-to-kit[^>]*>Ver media kit/.test(html),
+    "13.9: Creator lleva «Trabaja conmigo» (WhatsApp con mensaje) y «Ver media kit» (abre la vista Media kit)",
+  );
+  // Ronda 6 · 13.17: badge flotante discreto; su CTA al producto aparece recién al tocarlo.
+  check(
+    /data-pf-made-with/.test(html) &&
+      /<button[^>]*aria-expanded="false"[^>]*>[\s\S]*?Hecho con Supercreador<\/button>/.test(html) &&
+      /hidden=""[^>]*data-pf-made-with-panel|data-pf-made-with-panel[^>]*hidden=""/.test(html),
+    "13.17: badge flotante «Hecho con Supercreador»; el CTA al producto se abre al tocarlo",
+  );
   check(
     views.about && !/pf-stats|Engagement Rate|Seguidores en Instagram/.test(views.about),
     "La vista Contenido no muestra métricas",
@@ -469,6 +490,38 @@ try {
     shown,
   );
   check(html.includes('[data-pf-filter="viajes"]'), "La regla CSS del filtro viene en la página (no hace falta pedir nada al filtrar)");
+
+  // ── Ronda 6 · 13.8 / 13.23 · 2: textos de WhatsApp según el género ──
+  const genderLib = await import(new URL("../lib/portfolio/gender.ts", import.meta.url));
+  const sampleLink = "https://ejemplo.com/p/valen";
+  check(
+    genderLib.shareMessage("mujer", sampleLink) === `Conoce mi trabajo como supercreadora 😀: ${sampleLink}` &&
+      genderLib.shareMessage("hombre", sampleLink) === `Conoce mi trabajo como supercreador 😀: ${sampleLink}` &&
+      ["otro", "prefiero-no-decirlo", null].every((gender) => genderLib.shareMessage(gender, sampleLink) === `Conoce mi trabajo 😀: ${sampleLink}`) &&
+      JSON.stringify(Object.values(genderLib.GENDER_LABEL)) === JSON.stringify(["Hombre", "Mujer", "Otro", "Prefiero no decirlo"]) &&
+      genderLib.contactMessage(null, "Valen", "talk") === "Hola Valen, vi tu portafolio en Supercreador y me gustaría conversar contigo.",
+    "13.8 / 13.23 · 2: «supercreadora» / «supercreador» según el género; en neutro, «Conoce mi trabajo 😀: [link]»",
+  );
+  const beforeGender = (await call("GET", `/api/portfolios/${slug}`)).data.portfolio;
+  const badGender = await call("PATCH", `/api/portfolios/${slug}`, {
+    json: { revision: beforeGender.revision, manual: { ...beforeGender.manual, gender: "x" } },
+  });
+  const withGender = await call("PATCH", `/api/portfolios/${slug}`, {
+    json: { revision: beforeGender.revision, manual: { ...beforeGender.manual, gender: "mujer" } },
+  });
+  const genderHtml = await (await fetch(`${BASE}/p/${slug}`)).text();
+  const genderBar = genderHtml.match(/<header[^>]*data-pf-bar[\s\S]*?<\/header>/)?.[0] ?? "";
+  const hrefOf = (pattern, source) => decodeURIComponent(source.match(pattern)?.[1] ?? "");
+  const hablemosHref = hrefOf(/class="pf-bar__cta"[^>]*href="([^"]+)"/, genderBar);
+  const shareHref = hrefOf(/<a[^>]*href="(https:\/\/wa\.me\/\?text=[^"]+)"[^>]*data-pf-share/, genderHtml);
+  const hireHref = hrefOf(/<a[^>]*href="(https:\/\/wa\.me\/\d+\?text=[^"]+)"[^>]*data-pf-cta="hire"/, genderHtml);
+  check(
+    badGender.status === 400 && withGender.status === 200 && withGender.data?.resolved?.gender === "mujer" &&
+      /como supercreadora.*conversar contigo/.test(hablemosHref) && /Conoce mi trabajo como supercreadora 😀/.test(shareHref) &&
+      /como supercreadora.*trabajar contigo/.test(hireHref),
+    "13.8: con «Mujer», «Hablemos», «Trabaja conmigo» y «Compartir por WhatsApp» dicen «supercreadora»",
+    { status: [badGender.status, withGender.status], hablemosHref, shareHref, hireHref },
+  );
 
   // ── Links por nicho ──
   const viajes = await fetch(`${BASE}/p/${slug}/viajes`);
@@ -1073,6 +1126,11 @@ try {
       html.includes('data-template="minimal"') && html.includes("--pf-bg:#f5f7f2") && themeColor(html) === "#f5f7f2",
       "La página se dibuja con Minimal y la paleta Salvia (fondo y barra del navegador)",
     );
+    // Ronda 6 · 13.9 / 13.23 · 6: sin ningún contacto no hay «Trabaja conmigo», pero sí «Ver media kit»; y el badge sale igual.
+    check(
+      /data-pf-cta="kit"[^>]*>Ver media kit/.test(html) && !/data-pf-cta="hire"/.test(html) && /data-pf-made-with/.test(html),
+      "13.9 / 13.23 · 6: Minimal lleva «Ver media kit» (sin contacto no hay «Trabaja conmigo») y el badge también",
+    );
   }
   const badTemplate = await call("POST", "/api/portfolios", {
     json: { name: "X", design: { template: "revista", palette: "crema" }, pieces: [1, 2, 3].map((n) => ({ title: `P${n}`, image })) },
@@ -1162,6 +1220,12 @@ try {
       "La página usa Bio y sus nichos salen de los confirmados (los que tienen piezas)",
       filterNiches(bioPage.html),
     );
+    // Ronda 6 · 13.9: Bio, sin WhatsApp: «Trabaja conmigo» lleva a su contacto.
+    check(
+      /<a[^>]*href="#pf-page-contacto"[^>]*data-pf-cta="hire"[^>]*>Trabaja conmigo/.test(bioPage.html) &&
+        /data-pf-cta="kit"[^>]*>Ver media kit/.test(bioPage.html),
+      "13.9: Bio lleva «Trabaja conmigo» (sin WhatsApp, a su contacto) y «Ver media kit»",
+    );
     const bioViews = panelsOf(bioPage.html);
     // Spec 11.15: en Bio la portada propia se ve completa (contain) con un relleno desenfocado: sin recorte.
     const bioCss = await cssOf(bioPage.html);
@@ -1215,6 +1279,11 @@ try {
     check(
       edPage.html.includes('data-template="editorial"') && themeColor(edPage.html) === "#0e0e0e" && /10,7\s%/.test(edPage.html),
       "Editorial se ve oscura (barra del navegador incluida) y mantiene el ER",
+    );
+    // Ronda 6 · 13.9: Editorial también lleva los dos CTAs.
+    check(
+      /data-pf-cta="hire"[^>]*>Trabaja conmigo/.test(edPage.html) && /data-pf-cta="kit"[^>]*>Ver media kit/.test(edPage.html),
+      "13.9: Editorial lleva «Trabaja conmigo» y «Ver media kit»",
     );
     const badDesign = await call("PATCH", `/api/portfolios/${draftSlug}`, {
       json: { revision: after?.revision, design: { template: "editorial", palette: "neon" } },
@@ -1487,6 +1556,11 @@ try {
       /document\.body\.appendChild\(link\)/.test(qrCardSrc) && /qrTargetUrl\(/.test(qrCardSrc) && /drawImage\(photo/.test(qrCardSrc) &&
       /Descargar PNG/.test(qrCardSrc) && /<QrCard/.test(readySrc) && !/download=\{`qr-/.test(readySrc),
     "13.7: tarjeta con foto + nombre + QR (con ?ref=qr) + link, y «Descargar PNG» descarga de verdad (blob + enlace temporal en el documento)",
+  );
+  // ── Ronda 6 · pieza 4: el modal "Portafolio listo" comparte con el texto según el género (13.8). ──
+  check(
+    /shareMessage\(gender, `\$\{url\}\?ref=whatsapp`\)/.test(readySrc) && !/Mira mi portafolio de UGC/.test(readySrc),
+    "13.8: «Compartir por WhatsApp» del modal «Portafolio listo» usa el texto según el género",
   );
 } catch (error) {
   failures += 1;
