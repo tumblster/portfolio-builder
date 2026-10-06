@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { PalettePicker, TemplateList, recommendedPalette } from "@/components/design/design-pickers";
 import { PreviewViews, type PreviewData, type PreviewView } from "@/components/design/template-preview";
 import { NichePicker, PiecePicker, type NicheChip, type PieceChip } from "@/components/import/confirm-pickers";
-import { ServicesStep, type ServiceCard } from "@/components/import/services-step";
+import { ServicesStep, initialServiceCards, pendingSuggestions, type ServiceCard } from "@/components/import/services-step";
 import type { DraftPiece } from "@/lib/import/events";
 import "@/components/import/review.css";
 import { ChispaLoader } from "@/components/mascot/chispa-loader";
@@ -28,8 +28,10 @@ import { errorText, pillButton, primaryButton, textLink } from "./brand-ui";
  *      que eligió la IA llega precargado; se quita, se agrega (también piezas de su perfil o por link) y se ordena.
  *      Esto manda sobre la IA: arma las píldoras, los links /p/<slug>/<nicho> y el orden de las piezas. Sin vista
  *      previa en la pantalla: un botón flotante "Preview" abre un modal con la vista previa (Contenido y Media kit).
- *   2. Plantilla: lista compacta + vista previa grande y fiel, con sus datos reales (r2, C1).
- *   3. Paleta: la de su foto (recomendada) o una de las curadas, con la misma vista previa (C4).
+ *   2. Servicios (11.12 · ronda 6 13.6): llegan las sugerencias de la IA (de sus captions y las marcas que menciona);
+ *      la creadora las usa, edita o quita, y no se sigue con sugerencias sin revisar. Solo se envía lo confirmado.
+ *   3. Plantilla: lista compacta + vista previa grande y fiel, con sus datos reales (r2, C1).
+ *   4. Paleta: la de su foto (recomendada) o una de las curadas, con la misma vista previa (C4).
  * Arriba, la fila de métricas (7.2): Seguidores, Interacciones promedio y ER, con su base.
  * Generar llama a /api/import/confirm con esas decisiones; mientras tanto, Chispa acompaña (C5).
  *
@@ -96,8 +98,9 @@ export function ImportReview({ draft, onGenerated, onStartOver, onUnauthorized }
     })),
   );
   const [nicheError, setNicheError] = useState<string | null>(null);
-  // Spec 11.12: tarjetas de servicio del creador (mínimo 1 antes de generar).
-  const [services, setServices] = useState<ServiceCard[]>(() => [{ key: "s-1", title: "", description: "" }]);
+  // Spec 11.12 · ronda 6 13.6: tarjetas de servicio (mínimo 1 antes de generar). Arrancan con las sugerencias de la
+  // IA, por revisar; si no hay (la IA falló o es un borrador anterior), con una vacía.
+  const [services, setServices] = useState<ServiceCard[]>(() => initialServiceCards(draft.suggestedServices ?? []));
   const [serviceError, setServiceError] = useState<string | null>(null);
   // Spec 11.5: piezas agregadas por link en esta sesión (la más nueva primero).
   const [linkPieces, setLinkPieces] = useState<DraftPiece[]>([]);
@@ -203,8 +206,17 @@ export function ImportReview({ draft, onGenerated, onStartOver, onUnauthorized }
     return true;
   }
 
-  /** Spec 11.12: al menos una tarjeta con título. */
+  /** Spec 11.12 · ronda 6 13.6: ninguna sugerencia sin revisar y al menos una tarjeta con título. */
   function validateServices(): boolean {
+    const pending = pendingSuggestions(services);
+    if (pending > 0) {
+      setServiceError(
+        pending === 1
+          ? "Te queda 1 sugerencia por revisar: tócale «Usar» o «Quitar»."
+          : `Te quedan ${pending} sugerencias por revisar: tócales «Usar» o «Quitar» (o «Usar todas»).`,
+      );
+      return false;
+    }
     if (!services.some((card) => card.title.trim())) {
       setServiceError("Agrega al menos un servicio: un título y, si quieres, un link o una descripción.");
       return false;
@@ -237,8 +249,9 @@ export function ImportReview({ draft, onGenerated, onStartOver, onUnauthorized }
       niches: niches.map((niche) => ({ label: niche.label })),
       selection: livePieces.map((piece) => ({ id: piece.id, niche: slugOf(piece.nicheKey) })),
       design: { template, palette },
+      // 13.6: solo las tarjetas confirmadas por la creadora (una sugerencia sin revisar nunca sale del navegador).
       services: services
-        .filter((card) => card.title.trim())
+        .filter((card) => !card.suggested && card.title.trim())
         .map((card) => ({ title: card.title.trim(), description: card.description.trim() })),
       ...(retry ? { retry: true } : {}),
     });
@@ -414,7 +427,16 @@ export function ImportReview({ draft, onGenerated, onStartOver, onUnauthorized }
             <p className="mt-2 mb-5 text-sm text-muted">
               Cómo trabaja con marcas, en tarjetas: un título y un link o una descripción. Al menos una.
             </p>
-            <ServicesStep cards={services} onChange={setServices} newKey={newKey} error={serviceError} />
+            <ServicesStep
+              cards={services}
+              onChange={(cards) => {
+                setServices(cards);
+                if (serviceError) setServiceError(null);
+              }}
+              newKey={newKey}
+              error={serviceError}
+              brands={draft.brandMentions ?? []}
+            />
           </section>
         )}
 

@@ -4,6 +4,7 @@ import { z } from "zod";
 import { ConflictError, GenerationFailedError, InvalidInputError, NotFoundError } from "@/lib/errors";
 import { titleFromCaption } from "@/lib/instagram/snapshot";
 import { computeEngagementRate } from "@/lib/portfolio/engagement";
+import { captionMentions } from "@/lib/portfolio/mentions";
 import { creatorMetrics } from "@/lib/portfolio/metrics";
 import { nicheFromLabel, type NicheDef } from "@/lib/portfolio/niches";
 import { createPortfolio, getPortfolio } from "@/lib/portfolio/repository";
@@ -42,6 +43,10 @@ import type { DraftPiece, DraftPreview } from "./events";
  * FALLIDO: se registra en drafts/<id>.failure.json (se crea sin condición, así se puede registrar aunque la
  * escritura condicional sea justo lo que falla) y desde ahí el servidor responde un error terminal, no 409.
  * El creador puede pedir otro intento a propósito (retry). El estado se consulta en GET /api/import/status.
+ *
+ * Ronda 6 · 13.6: la vista previa del borrador trae las formas de colaborar que sugirió la IA y las @marcas que la
+ * creadora menciona en sus captions. Solo son sugerencias: al generar, el servidor guarda únicamente los servicios
+ * que manda el cliente (los que ella confirmó), nunca los de la IA.
  */
 
 const DRAFT_TTL_MS = 24 * 60 * 60 * 1000;
@@ -185,6 +190,14 @@ function toPreview(draft: StoredDraft): DraftPreview {
     engagementRate,
     metrics: creatorMetrics(snapshot, engagementRate),
     pieceLimits: { min: LIMITS.minPieces, max: LIMITS.maxPieces },
+    // Ronda 6 · 13.6: sugerencias de servicios (de sus captions y las marcas que menciona) y esas @marcas como contexto.
+    suggestedServices: (generated?.services ?? [])
+      .slice(0, LIMITS.maxServices)
+      .map(({ title, description }) => ({ title, description })),
+    brandMentions: captionMentions(
+      snapshot.posts.map((post) => post.caption),
+      [draft.username, snapshot.username],
+    ),
     aiWritten: generated !== null,
     warnings: draft.warnings,
   };
@@ -382,7 +395,8 @@ export async function confirmDraft(input: ConfirmImportInput): Promise<ConfirmOu
   const slugs = new Set(niches.map((niche) => niche.slug));
   const pieces = selectedPieces(draft, input, slugs);
   // Spec 11.12: el paso de Servicios va antes de generar y es obligatorio (mínimo 1 tarjeta). Clientes anteriores a
-  // esta ronda (sin `selection`) no lo mandan: siguen como antes.
+  // esta ronda (sin `selection`) no lo mandan: siguen como antes. 13.6: solo llegan las tarjetas que la creadora
+  // confirmó (las sugerencias de la IA sin revisar no salen del navegador).
   const services = input.services?.filter((service) => service.title.trim()) ?? [];
   if (input.selection && services.length === 0) invalidAt(["services"], "Agrega al menos un servicio: un título y, si quieres, un link o una descripción.");
 

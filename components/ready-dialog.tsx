@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
 import { PalettePicker, TemplatePicker } from "@/components/design/design-pickers";
+import { QrCard } from "@/components/share/qr-card";
 import type { ImportResult } from "@/lib/import/events";
 import { resolvePalette } from "@/lib/palette/palettes";
 import { TEMPLATE_INFO, type Design } from "@/lib/portfolio/design";
@@ -133,7 +134,7 @@ export function ReadyDialog({
 
         <MagicLinkSection slug={result.slug} />
 
-        <ShareSection url={url} name={resolved.name} />
+        <ShareSection url={url} name={resolved.name} slug={result.slug} photoUrl={resolved.photo?.url ?? null} />
 
         {warnings.length > 0 && (
           <ul className="mt-5 space-y-1 text-sm text-accent-ink">
@@ -328,48 +329,22 @@ function DesignSection({ result, onResultChange }: { result: ImportResult; onRes
 }
 
 /**
- * Spec 12.4 y 12.5: compartir por WhatsApp (texto pre-llenado + link) y un QR del link para eventos, descargable en
- * PNG, con ?ref=qr para medir cuántas visitas llegan por QR (12.9).
+ * Spec 12.4 · 12.5 · ronda 6 13.7: compartir por WhatsApp (texto pre-llenado + link) y la tarjeta de presentación con
+ * QR (foto + nombre + QR con ?ref=qr + link), descargable en PNG de verdad (components/share/qr-card.tsx).
  */
-function ShareSection({ url, name }: { url: string; name: string }) {
-  const [qr, setQr] = useState<string | null>(null);
-  const qrUrl = `${url}?ref=qr`;
+function ShareSection({ url, name, slug, photoUrl }: { url: string; name: string; slug: string; photoUrl: string | null }) {
   const whatsapp = `https://wa.me/?text=${encodeURIComponent(`Mira mi portafolio de UGC: ${url}?ref=whatsapp`)}`;
-
-  useEffect(() => {
-    let alive = true;
-    void import("qrcode")
-      .then((QRCode) => QRCode.toDataURL(qrUrl, { width: 1024, margin: 2, color: { dark: "#0e110b", light: "#ffffff" } }))
-      .then((data) => alive && setQr(data))
-      .catch(() => {});
-    return () => {
-      alive = false;
-    };
-  }, [qrUrl]);
 
   return (
     <div className="mt-7 border-t border-line pt-5" data-testid="ready-share">
       <p className={fieldLabel}>Compártelo</p>
-      <div className="mt-3 flex flex-wrap items-start gap-4">
+      <div className="mt-3">
         <a href={whatsapp} target="_blank" rel="noopener noreferrer" className={pillButton} data-testid="ready-whatsapp">
           Compartir por WhatsApp<span className="sr-only"> (se abre en otra pestaña)</span>
         </a>
-        <figure className="flex items-center gap-3">
-          {qr ? (
-            // eslint-disable-next-line @next/next/no-img-element -- QR generado en el navegador (data URL)
-            <img src={qr} alt={`Código QR del portafolio de ${name}`} width={88} height={88} className="rounded-lg border border-line" />
-          ) : (
-            <span aria-hidden="true" className="block size-[88px] rounded-lg border border-line bg-sand" />
-          )}
-          <figcaption className="text-sm">
-            <span className="block text-muted">QR para eventos</span>
-            {qr && (
-              <a href={qr} download={`qr-${name.toLowerCase().replace(/[^a-z0-9]+/gi, "-")}.png`} className="font-semibold underline underline-offset-4" data-testid="ready-qr">
-                Descargar PNG
-              </a>
-            )}
-          </figcaption>
-        </figure>
+      </div>
+      <div className="mt-5">
+        <QrCard name={name} url={url} photoUrl={photoUrl} slug={slug} />
       </div>
     </div>
   );

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { ConfigError } from "@/lib/errors";
 import { isTimeoutError } from "@/lib/import/errors";
 import { EMOJI, truncateWords } from "@/lib/instagram/snapshot";
+import { captionMentions } from "@/lib/portfolio/mentions";
 import { MAX_NICHES, nicheFromLabel, type NicheDef } from "@/lib/portfolio/niches";
 import { LIMITS, type InstagramPost, type Service } from "@/lib/portfolio/schema";
 
@@ -22,6 +23,10 @@ import { LIMITS, type InstagramPost, type Service } from "@/lib/portfolio/schema
  * como "mejor esfuerzo": el mismo contenido recibe siempre las mismas etiquetas. Igual son SUGERENCIAS: la creadora
  * las confirma o corrige en "Nichos y piezas" antes de generar (components/import/confirm-pickers.tsx), y lo que
  * ella confirma es lo único que se aplica.
+ *
+ * Ronda 6 · 13.6: las formas de colaborar salen de sus captions y de las @marcas que menciona (marcas_mencionadas,
+ * lib/portfolio/mentions.ts). Son sugerencias: el paso Servicios las muestra como tales y la creadora las usa,
+ * edita o quita; solo se publica lo que confirma.
  */
 
 export const GROQ_MODEL = "openai/gpt-oss-120b"; // soporta JSON estricto y escribe bien en español
@@ -62,6 +67,7 @@ export type PortfolioCopy = {
   niches: NicheDef[];
   /** Sugerencias por id de post. Puede faltar alguno: se usa el título de respaldo. */
   pieces: Map<string, { title: string; niche: string | null }>;
+  /** Formas de colaborar SUGERIDAS (13.6): la creadora las revisa antes de que se publiquen. */
   services: Service[];
 };
 
@@ -91,11 +97,17 @@ export async function writePortfolioCopy(input: CopyInput): Promise<PortfolioCop
 const TYPE_LABEL: Record<InstagramPost["type"], string> = { image: "foto", video: "reel", carousel: "carrusel" };
 
 function buildMessages(input: CopyInput, refs: { ref: string; post: CopyInput["posts"][number] }[]) {
+  // 13.6: las @marcas que menciona en sus textos (sin su propia cuenta). Una pista, no una colaboración probada.
+  const mentions = captionMentions(
+    input.posts.map((post) => post.caption),
+    [input.username],
+  );
   const profile = {
     nombre: input.name,
     usuario: input.username,
     bio: input.biography.slice(0, 300),
     categoria: input.category,
+    marcas_mencionadas: mentions.map((handle) => `@${handle}`),
     publicaciones: refs.map(({ ref, post }) => ({
       id: ref,
       tipo: TYPE_LABEL[post.type],
@@ -123,9 +135,9 @@ function buildMessages(input: CopyInput, refs: { ref: string; post: CopyInput["p
    - id: el id de la publicación.
    - title: de 2 a 5 palabras, máximo 40 caracteres, que describan la pieza como trabajo de portafolio. Mayúscula inicial y sin punto final. Ejemplo: "Rutina de noche con sérum".
    - niche: el id del nicho al que pertenece ("n1", "n2" o "n3") o "ninguno" si no encaja con claridad en ninguno.
-4. services: de 3 a 4 formas de colaborar que esta creadora puede ofrecer a marcas según su contenido:
+4. services: de 3 a 4 formas de colaborar que esta creadora puede ofrecer a marcas. Son SUGERENCIAS que ella va a revisar, editar o borrar antes de publicar, así que deben salir de lo que se ve en sus publicaciones (texto y hashtags) y del tipo de marcas que menciona (marcas_mencionadas), no de suposiciones:
    - title: de 2 a 4 palabras, máximo 32 caracteres. Ejemplo: "Videos UGC para anuncios".
-   - description: una frase de máximo 90 caracteres, concreta y sin cifras ni precios.
+   - description: una frase de máximo 90 caracteres, concreta y sin cifras ni precios. Si ayuda, nombra el rubro de las marcas que menciona (ej.: "para marcas de skincare"), pero no escribas @usuarios ni digas que ya trabajó con ellas: una mención no prueba una colaboración.
 
 <perfil>
 ${JSON.stringify(profile, null, 2)}
@@ -296,10 +308,11 @@ function parseCopy(content: string, refs: { ref: string; post: CopyInput["posts"
   const used = new Set([...pieces.values()].map((piece) => piece.niche));
   const niches = [...nicheByRef.values()].filter((niche) => used.has(niche.slug));
 
+  // 13.6: sin @usuarios en las sugerencias (por si el modelo los escribe igual).
   const services = parsed.data.services
     .map((service) => ({
-      title: truncateWords(cleanLine(service.title).replace(/[.。]+$/, ""), LIMITS.serviceTitle),
-      description: truncateWords(cleanLine(service.description), LIMITS.serviceDescription),
+      title: truncateWords(cleanLine(service.title).replace(/@[\w.]+/g, "").replace(/[.。]+$/, "").trim(), LIMITS.serviceTitle),
+      description: truncateWords(cleanLine(service.description).replace(/@[\w.]+/g, "").replace(/\s+/g, " ").trim(), LIMITS.serviceDescription),
     }))
     .filter((service) => service.title.length >= 3)
     .slice(0, LIMITS.maxServices);
