@@ -5,6 +5,8 @@ import {
   Avatar,
   ContactPill,
   copyrightYear,
+  HireLink,
+  KitLink,
   NicheSuffix,
   PieceLink,
   pieceMeta,
@@ -18,10 +20,11 @@ import {
 
 /*
  * Plantilla Minimal: restricción editorial de la referencia Kima, con implementación propia.
- * En escritorio, una columna fija a la izquierda (quién es, disponibilidad, cifras con el
+ * En escritorio, una columna fija a la izquierda (quién es, disponibilidad, CTAs, cifras con el
  * Engagement Rate primero, servicios numerados, contacto) y a la derecha un mosaico del trabajo
  * que se mueve con el scroll. En el celular, lo mismo en una sola columna.
  * Divisores finos, un solo acento, fotos en grises que toman color al pasar el mouse.
+ * Ronda 6 · 13.9: "Trabaja conmigo" (sólido, con flecha) y "Ver media kit" (contorno).
  */
 export function MinimalTemplate({ portfolio, variant, filter }: TemplateProps) {
   const { name, bio, valueProp, stats, services, pieces, photo } = portfolio;
@@ -43,12 +46,12 @@ export function MinimalTemplate({ portfolio, variant, filter }: TemplateProps) {
               <span className="min-status__dot" aria-hidden="true" />
               Disponible para colaborar.
             </p>
-            {hasContact && (
-              <a className="min-cta" href={email ? email.href : `#${id("contacto")}`}>
-                Trabajemos juntos
+            <div className="min-actions">
+              <HireLink view={view} className="min-cta">
                 <ArrowIcon direction="right" size={16} />
-              </a>
-            )}
+              </HireLink>
+              <KitLink view={view} className={view.hire ? "min-cta min-cta--ghost" : "min-cta"} />
+            </div>
 
             {(er || stats.length > 0) && (
               <dl className="min-stats">

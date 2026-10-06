@@ -4,6 +4,8 @@ import { NichePills } from "./niche-filter";
 import {
   ContactPill,
   copyrightYear,
+  HireLink,
+  KitLink,
   NicheSuffix,
   PieceLink,
   pieceMeta,
@@ -20,6 +22,7 @@ import {
  * oscura del color profundo de la paleta, el nombre en mayúsculas a tamaño display, el Engagement
  * Rate enorme al lado de la propuesta de valor y el trabajo como una lista numerada de revista
  * (número, título grande, cifra, miniatura). Un solo acento, usado solo para detalles.
+ * Ronda 6 · 13.9: bajo el hero, "Trabaja conmigo" (sólido en blanco) y "Ver media kit" (contorno).
  */
 export function EditorialTemplate({ portfolio, variant, filter, coverEdit }: TemplateProps) {
   const { name, bio, valueProp, stats, services, pieces } = portfolio;
@@ -74,6 +77,17 @@ export function EditorialTemplate({ portfolio, variant, filter, coverEdit }: Tem
                 </div>
               )}
             </div>
+            {/* 13.9: principal "Trabaja conmigo" y secundario "Ver media kit". */}
+            <ul className="ed-links ed-actions" aria-label="Acciones">
+              {view.hire && (
+                <li>
+                  <HireLink view={view} className="ed-link ed-link--solid" />
+                </li>
+              )}
+              <li>
+                <KitLink view={view} className={view.hire ? "ed-link" : "ed-link ed-link--solid"} />
+              </li>
+            </ul>
             {stats.length > 0 && (
               <dl className="ed-stats">
                 {stats.map((stat) => (

@@ -1,0 +1,41 @@
+/*
+ * Ronda 6 · 13.9: los CTAs "Trabaja conmigo" y "Ver media kit" en las 4 plantillas. Cada plantilla usa sus botones de
+ * siempre (Creator: pf-btn; Bio: bio-link; Minimal: min-cta; Editorial: ed-link); aquí solo va lo que no existía.
+ * Fuera de capa a propósito: gana a las reglas de app/portfolio-templates.css (@layer components) sin !important.
+ * Contraste: tinta sobre el fondo de la paleta y el fondo profundo de Editorial sobre blanco (pares ≥ 7:1 verificados
+ * en lib/palette/palettes.ts).
+ */
+
+/* Minimal: los dos CTAs en fila; el secundario, en contorno. */
+.min-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.min-cta--ghost {
+  border: 1.5px solid var(--pf-ink);
+  background: transparent;
+  color: var(--pf-ink);
+}
+
+/* Editorial: el principal, sólido en blanco (con el texto del fondo profundo). */
+.ed-actions {
+  margin-top: 28px;
+}
+.ed-link--solid {
+  border-color: #ffffff;
+  background: #ffffff;
+  color: var(--pf-work);
+  font-weight: 600;
+}
+.ed-link--solid:hover {
+  background: transparent;
+  color: #ffffff;
+}
+
+/* Bio: la lista de CTAs, separada de la de contacto. */
+.bio-ctas {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}

@@ -1,5 +1,6 @@
 import { DEFAULT_DESIGN, type Design } from "./design";
 import { computeEngagementRate } from "./engagement";
+import type { Gender } from "./gender";
 import { creatorMetrics, type CreatorMetric } from "./metrics";
 import { resolveNiches, type NicheDef } from "./niches";
 import type { Contact, EngagementRate, InstagramPost, Piece, Portfolio, Service, StoredImage, VideoLink } from "./schema";
@@ -42,6 +43,11 @@ export type ResolvedPortfolio = {
   metrics: CreatorMetric[];
   /** Plantilla y paleta (v2 · M2). */
   design: Design;
+  /**
+   * Ronda 6 · 13.8 / 13.11: el género que eligió (adapta los textos de WhatsApp); null = neutro. Opcional en el tipo
+   * para no romper vistas previas que armen este objeto a mano.
+   */
+  gender?: Gender | null;
   pieces: ResolvedPiece[];
 };
 
@@ -92,6 +98,7 @@ export function resolvePortfolio(doc: Portfolio): ResolvedPortfolio {
     engagementRate,
     metrics: creatorMetrics(ig, engagementRate),
     design: doc.design ?? DEFAULT_DESIGN,
+    gender: manual.gender ?? null,
     pieces,
   };
 }

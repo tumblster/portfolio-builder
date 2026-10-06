@@ -21,13 +21,15 @@ import { publicPath } from "@/lib/portfolio/slug";
  *  - página: sale de la URL, y las píldoras la cambian sin recargar;
  *  - vista previa: lo maneja el editor (`niche` + `onNicheChange`).
  *
- * Ronda 30/09 · 7.3: la página tiene dos vistas con un toggle arriba (components/portfolio/portfolio-views.tsx):
- *  - SOBRE MÍ (por defecto): la plantilla de siempre, sin las cifras del perfil ni el ER (ajuste 10: las vistas de
+ * Ronda 30/09 · 7.3 (nombres de 13.23 · 4): la página tiene dos vistas con un control arriba
+ * (components/portfolio/portfolio-views.tsx):
+ *  - CONTENIDO (por defecto): la plantilla de siempre, sin las cifras del perfil ni el ER (ajuste 10: las vistas de
  *    cada pieza sí se muestran) y sin el selector de nichos (ese queda para la vista previa del studio);
  *  - MEDIA KIT: components/portfolio/media-kit.tsx, con las 3 métricas. Link directo: /p/<slug>#media-kit.
+ * Ronda 6: el header recibe el género (13.8, textos de WhatsApp) y pinta el badge "Hecho con Supercreador" (13.17).
  */
 
-/** "Sobre mí" no lleva las cifras del perfil ni el ER (viven en el Media Kit); las vistas de cada pieza sí. */
+/** "Contenido" no lleva las cifras del perfil ni el ER (viven en el Media Kit); las vistas de cada pieza sí. */
 function withoutMetrics(portfolio: ResolvedPortfolio): ResolvedPortfolio {
   return { ...portfolio, stats: [], engagementRate: null };
 }
@@ -81,6 +83,8 @@ export function PublicPortfolio(props: PublicPortfolioProps) {
         contactId: contactLinks(portfolio.contact).length > 0 ? "pf-page-contacto" : null,
         // 12.6: "Hablemos" abre WhatsApp con el número que el creador puso en el editor.
         whatsapp: portfolio.contact.whatsapp?.replace(/\D/g, "") || null,
+        // 13.8: los textos de WhatsApp según el género que eligió; sin dato, en neutro.
+        gender: portfolio.gender ?? null,
       }}
     />
   );

@@ -5,6 +5,8 @@ import {
   Avatar,
   ContactPill,
   copyrightYear,
+  HireLink,
+  KitLink,
   NicheSuffix,
   PieceLink,
   pieceMeta,
@@ -21,6 +23,8 @@ import {
  * Una columna centrada (~420 px) sobre un degradado que deriva despacio; avatar grande, nombre,
  * Engagement Rate justo debajo, botones de contacto a todo el ancho, el trabajo como tarjetas
  * (miniatura + título + flecha) y los nichos en una barra flotante abajo, siempre a mano.
+ * Ronda 6 · 13.9: bajo la cabecera, los dos CTAs ("Trabaja conmigo" sólido y "Ver media kit"); los links de
+ * contacto van después, todos iguales (el sólido es el CTA principal).
  */
 export function BioTemplate({ portfolio, variant, filter, coverEdit }: TemplateProps) {
   const { name, bio, valueProp, stats, services, pieces, photo } = portfolio;
@@ -56,11 +60,23 @@ export function BioTemplate({ portfolio, variant, filter, coverEdit }: TemplateP
             {bio && <p className="bio-text">{bio}</p>}
           </header>
 
+          {/* 13.9: principal "Trabaja conmigo" y secundario "Ver media kit". */}
+          <ul className="bio-links bio-ctas" aria-label="Acciones">
+            {view.hire && (
+              <li>
+                <HireLink view={view} className="bio-link bio-link--solid" />
+              </li>
+            )}
+            <li>
+              <KitLink view={view} className={view.hire ? "bio-link" : "bio-link bio-link--solid"} />
+            </li>
+          </ul>
+
           {hasContact && (
             <ul id={id("contacto")} className="bio-links" aria-label="Contacto">
-              {links.map((link, index) => (
+              {links.map((link) => (
                 <li key={link.kind}>
-                  <ContactPill link={link} className={index === 0 ? "bio-link bio-link--solid" : "bio-link"} />
+                  <ContactPill link={link} className="bio-link" />
                 </li>
               ))}
             </ul>
