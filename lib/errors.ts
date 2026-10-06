@@ -7,6 +7,8 @@ export class HttpError extends Error {
     readonly status: number,
     readonly code: string,
     message: string,
+    /** Datos extra que viajan en `error` junto al mensaje (p. ej. `retryAt`). */
+    readonly details: Record<string, unknown> = {},
   ) {
     super(message);
     this.name = new.target.name;
@@ -25,9 +27,22 @@ export class NotFoundError extends HttpError {
   }
 }
 
+/**
+ * La generación del portafolio falló y el borrador quedó en estado fallido (ronda 30/09 · 7.4 b). Es terminal: el
+ * servidor no vuelve a responder 409 por ese borrador; el creador puede pedir otro intento (retry) a propósito.
+ */
+export class GenerationFailedError extends HttpError {
+  constructor(message = "Tu portafolio no terminó de generarse. Inténtalo de nuevo.", details: Record<string, unknown> = {}) {
+    super(500, "generation_failed", message, details);
+  }
+}
+
 export class ConflictError extends HttpError {
-  constructor(message = "Este portafolio cambió mientras lo editabas. Recarga para ver la versión más reciente.") {
-    super(409, "conflict", message);
+  constructor(
+    message = "Este portafolio cambió mientras lo editabas. Recarga para ver la versión más reciente.",
+    details: Record<string, unknown> = {},
+  ) {
+    super(409, "conflict", message, details);
   }
 }
 
@@ -62,7 +77,7 @@ export function errorResponse(error: unknown): Response {
     );
   }
   if (error instanceof HttpError) {
-    return jsonResponse({ error: { code: error.code, message: error.message } }, { status: error.status });
+    return jsonResponse({ error: { ...error.details, code: error.code, message: error.message } }, { status: error.status });
   }
   console.error(error);
   return jsonResponse(

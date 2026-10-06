@@ -1,0 +1,68 @@
+/*
+ * Embeds oficiales para ver una pieza sin salir de la página (spec 3.1 / 7.1, ajuste 30/09: sin autoplay).
+ * Sin dependencias: lo usan el reproductor (components/reel/inline-reel.tsx) y la prueba de humo.
+ * El play es SIEMPRE manual, en todas las plataformas: el embed se carga en la página (iframe) y la persona le da
+ * play dentro del reproductor oficial. Aunque TikTok o YouTube lo permitan, no se pide autoplay (autoplay=0 donde
+ * existe el parámetro). Instagram, además, mide al menos 326 px de ancho: el reproductor lo escala para que quepa.
+ * Nada se descarga ni se aloja aquí (no self-hosting en esta fase).
+ */
+
+export type Embed = {
+  src: string;
+  platform: "instagram" | "tiktok" | "youtube";
+  /** Siempre false: el play es manual en todas las plataformas (ajuste 30/09). */
+  autoplay: false;
+  /** Ancho natural del embed (px): Instagram no baja de 326. null = se adapta al espacio. */
+  naturalWidth: number | null;
+};
+
+export function embedFor(link: { platform: string; url: string }): Embed | null {
+  let url: URL;
+  try {
+    url = new URL(link.url);
+  } catch {
+    return null;
+  }
+  const path = url.pathname;
+  if (link.platform === "instagram") {
+    const code = /\/(?:p|reel|reels|tv)\/([A-Za-z0-9_-]+)/.exec(path)?.[1];
+    // Experimento 01/10: los reels usan /reel/{code}/embed para probar si el player
+    // reproduce inline en móvil (/p/ bota a la app de IG al dar play). Si no funciona,
+    // el fallback es botón "Ver en Instagram" (decisión pendiente de prueba en device real).
+    const isReel = /\/(?:reel|reels|tv)\//.test(path);
+    return code
+      ? {
+          src: isReel ? `https://www.instagram.com/reel/${code}/embed/` : `https://www.instagram.com/p/${code}/embed/`,
+          platform: "instagram",
+          autoplay: false,
+          naturalWidth: 326,
+        }
+      : null;
+  }
+  if (link.platform === "tiktok") {
+    const id = /\/video\/(\d+)/.exec(path)?.[1];
+    return id
+      ? {
+          src: `https://www.tiktok.com/player/v1/${id}?autoplay=0&music_info=0&description=0&rel=0`,
+          platform: "tiktok",
+          autoplay: false,
+          naturalWidth: null,
+        }
+      : null;
+  }
+  if (link.platform === "youtube") {
+    const id =
+      url.searchParams.get("v") ??
+      /^\/(?:shorts|embed|live)\/([A-Za-z0-9_-]{6,})/.exec(path)?.[1] ??
+      (url.hostname.endsWith("youtu.be") ? path.slice(1).split("/")[0] : null);
+    return id
+      ? {
+          src: `https://www.youtube-nocookie.com/embed/${id}?autoplay=0&playsinline=1&rel=0`,
+          platform: "youtube",
+          autoplay: false,
+          naturalWidth: null,
+        }
+      : null;
+  }
+  return null;
+}

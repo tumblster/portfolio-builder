@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useRef, useState } from "react";
-import { NICHES, NICHE_LABELS, type Niche } from "@/lib/portfolio/niches";
+import type { NicheDef } from "@/lib/portfolio/niches";
 import { LIMITS, parseVideoLink, type StoredImage } from "@/lib/portfolio/schema";
 import { errorText, fieldLabel, textInput } from "../ui";
 import type { FieldErrors, PieceDraft } from "./form-model";
@@ -12,6 +12,8 @@ type PieceEditorProps = {
   piece: PieceDraft;
   index: number;
   total: number;
+  /** Nichos del portafolio (los que la pieza puede usar). */
+  niches: readonly NicheDef[];
   errors: FieldErrors;
   onChange: (patch: Partial<PieceDraft>) => void;
   onMove: (direction: -1 | 1) => void;
@@ -23,7 +25,7 @@ type CoverState = { status: "idle" } | { status: "loading" } | { status: "note" 
 
 const COVER_DELAY_MS = 700;
 
-export function PieceEditor({ piece, index, total, errors, onChange, onMove, onRemove, onPending }: PieceEditorProps) {
+export function PieceEditor({ piece, index, total, niches, errors, onChange, onMove, onRemove, onPending }: PieceEditorProps) {
   const [cover, setCover] = useState<CoverState>({ status: "idle" });
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const lastRequested = useRef<string | null>(null);
@@ -84,7 +86,7 @@ export function PieceEditor({ piece, index, total, errors, onChange, onMove, onR
             onClick={() => onMove(-1)}
             disabled={index === 0}
             aria-label={`Subir la pieza ${number}`}
-            className="flex size-tap items-center justify-center rounded-full text-muted transition hover:text-white disabled:opacity-30"
+            className="flex size-tap items-center justify-center rounded-full text-muted transition hover:text-ink disabled:opacity-30"
           >
             ↑
           </button>
@@ -93,14 +95,14 @@ export function PieceEditor({ piece, index, total, errors, onChange, onMove, onR
             onClick={() => onMove(1)}
             disabled={index === total - 1}
             aria-label={`Bajar la pieza ${number}`}
-            className="flex size-tap items-center justify-center rounded-full text-muted transition hover:text-white disabled:opacity-30"
+            className="flex size-tap items-center justify-center rounded-full text-muted transition hover:text-ink disabled:opacity-30"
           >
             ↓
           </button>
           <button
             type="button"
             onClick={onRemove}
-            className="flex min-h-tap items-center px-2 text-sm text-muted transition hover:text-white"
+            className="flex min-h-tap items-center px-2 text-sm text-muted transition hover:text-ink"
           >
             Quitar
           </button>
@@ -127,7 +129,7 @@ export function PieceEditor({ piece, index, total, errors, onChange, onMove, onR
       )}
 
       <div className="mt-4 flex items-start gap-4">
-        <div className="relative aspect-[4/5] w-20 shrink-0 overflow-hidden rounded-lg bg-ink ring-1 ring-line">
+        <div className="relative aspect-[4/5] w-20 shrink-0 overflow-hidden rounded-lg bg-sand ring-1 ring-line">
           {piece.image && <Image src={piece.image.url} alt="" fill sizes="80px" className="object-cover" />}
         </div>
         <div className="min-w-0 flex-1 space-y-2">
@@ -141,7 +143,7 @@ export function PieceEditor({ piece, index, total, errors, onChange, onMove, onR
             <button
               type="button"
               onClick={() => onChange({ image: null, imageSource: null })}
-              className="flex min-h-tap items-center text-sm text-muted transition hover:text-white"
+              className="flex min-h-tap items-center text-sm text-muted transition hover:text-ink"
             >
               Quitar imagen
             </button>
@@ -174,7 +176,7 @@ export function PieceEditor({ piece, index, total, errors, onChange, onMove, onR
         {error("videoUrl") && <p className={errorText}>{error("videoUrl")}</p>}
         {cover.status === "loading" && <p className="text-muted">Buscando la portada…</p>}
         {cover.status === "note" && <p className="text-muted">{cover.message}</p>}
-        {cover.status === "error" && <p className="text-amber">{cover.message}</p>}
+        {cover.status === "error" && <p className="text-accent-ink">{cover.message}</p>}
       </div>
 
       <label htmlFor={id("niche")} className={`${fieldLabel} mt-4`}>
@@ -183,16 +185,27 @@ export function PieceEditor({ piece, index, total, errors, onChange, onMove, onR
       <select
         id={id("niche")}
         value={piece.niche ?? ""}
-        onChange={(event) => onChange({ niche: (event.target.value || null) as Niche | null })}
+        onChange={(event) => onChange({ niche: event.target.value || null })}
+        aria-invalid={error("niche") ? true : undefined}
+        aria-describedby={error("niche") ? id("niche-error") : undefined}
         className={`${textInput} mt-2`}
       >
-        <option value="">Sin nicho</option>
-        {NICHES.map((niche) => (
-          <option key={niche} value={niche}>
-            {NICHE_LABELS[niche]}
+        <option value="">Sin nicho (solo en Todo)</option>
+        {niches.map((niche) => (
+          <option key={niche.slug} value={niche.slug}>
+            {niche.label}
           </option>
         ))}
+        {/* Un nicho que ya no existe (no debería pasar): se muestra para poder cambiarlo. */}
+        {piece.niche && !niches.some((niche) => niche.slug === piece.niche) && (
+          <option value={piece.niche}>{piece.niche} (no disponible)</option>
+        )}
       </select>
+      {error("niche") && (
+        <p id={id("niche-error")} className={`${errorText} mt-2`}>
+          {error("niche")}
+        </p>
+      )}
     </fieldset>
   );
 }

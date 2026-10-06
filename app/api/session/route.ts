@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { CREATOR_COOKIE, CREATOR_SESSION_MAX_AGE, creatorSessionToken, isValidCreatorKey } from "@/lib/auth";
 import { errorResponse, jsonResponse, readJsonBody } from "@/lib/errors";
+import { PORTFOLIO_COOKIE } from "@/lib/magic-link";
 import { requestOrigin } from "@/lib/request";
 
 const bodySchema = z.object({
@@ -38,5 +39,6 @@ export async function POST(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   const response = NextResponse.json({ ok: true }, { headers: { "Cache-Control": "no-store" } });
   response.cookies.set(CREATOR_COOKIE, "", { ...cookieOptions(request), maxAge: 0 });
+  response.cookies.set(PORTFOLIO_COOKIE, "", { ...cookieOptions(request), maxAge: 0 }); // y el magic link (11.8)
   return response;
 }

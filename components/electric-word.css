@@ -1,0 +1,55 @@
+/*
+ * Electricidad sobre una palabra (ajuste 1; components/electric-word.tsx genera los arcos y su ritmo).
+ * 7 SVG apilados sobre la palabra (115 % de su ancho, centrados), cada uno un fotograma de la descarga, y un
+ * resplandor ambiente detrás de las letras. Solo se anima la OPACIDAD (pasos, sin interpolar): nada de layout ni
+ * de filtros animados, compuesto en la GPU. Brasa #FC3300 con núcleo incandescente.
+ */
+.electric-word {
+  --arc: #fc3300;
+  --arc-core: #fff4ee;
+  isolation: isolate;
+}
+.electric-arcs__frame {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 115%;
+  height: auto;
+  aspect-ratio: 460 / 150;
+  overflow: visible;
+  transform: translate(-50%, -52%);
+  pointer-events: none;
+  opacity: 0;
+}
+.electric-arcs__frame path {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.electric-arcs__glow path {
+  stroke: var(--arc);
+  stroke-width: 7px;
+  opacity: 0.7;
+}
+.electric-arcs__bolt path {
+  stroke: var(--arc);
+  stroke-width: 1.6px;
+}
+.electric-arcs__core path {
+  stroke: var(--arc-core);
+  stroke-width: 0.7px;
+}
+/* Resplandor ambiente detrás de las letras: la palabra "se ilumina" con cada ráfaga. */
+.electric-glow {
+  position: absolute;
+  z-index: -1;
+  inset: -18% -8%;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgb(252 51 0 / 0.28), rgb(252 51 0 / 0));
+  opacity: 0.35;
+  pointer-events: none;
+}
+/* Quieto (reducir movimiento): el primer fotograma, visible y sin parpadeo. */
+.electric-arcs__frame--0 {
+  opacity: 1;
+}

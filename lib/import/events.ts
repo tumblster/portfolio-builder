@@ -1,5 +1,23 @@
+import type { NicheDef } from "@/lib/portfolio/niches";
 import type { ResolvedPortfolio } from "@/lib/portfolio/resolve";
-import type { StoredImage } from "@/lib/portfolio/schema";
+import type { CreatorMetric } from "@/lib/portfolio/metrics";
+import type { EngagementRate, StoredImage } from "@/lib/portfolio/schema";
+
+export type DraftPiece = {
+  id: string;
+  title: string;
+  image: StoredImage | null;
+  niche: string | null;
+  isVideo: boolean;
+  /** Qué es en Instagram (10.2): el visor lo aclara en los carruseles (se importa su portada). */
+  kind: "video" | "image" | "carousel";
+  /** Spec 11.5: autor del post agregado por link (oEmbed). */
+  author?: string | null;
+  /** El post original en Instagram (spec 11.3: "verlo completo" de un carrusel). */
+  postUrl: string | null;
+  /** Su video, para verlo en línea (ajuste 5); null si es una foto. */
+  video: { platform: "tiktok" | "instagram" | "youtube"; url: string } | null;
+};
 
 /*
  * Contrato entre POST /api/import y la pantalla de importación.
@@ -11,7 +29,7 @@ import type { StoredImage } from "@/lib/portfolio/schema";
  *   {"type":"ping"}                    latido, se ignora
  */
 
-export const IMPORT_STEPS = ["scrape", "images", "ai", "save"] as const;
+export const IMPORT_STEPS = ["scrape", "images", "ai"] as const;
 export type ImportStep = (typeof IMPORT_STEPS)[number];
 
 export type ImportErrorCode =
@@ -37,17 +55,41 @@ export type ImportEvent =
   /** Latido cada 10 s mientras se espera a Apify o a Groq: evita que una red móvil corte la conexión por inactividad. */
   | { type: "ping" }
   | { type: "step"; step: ImportStep }
-  | {
-      type: "done";
-      url: string;
-      slug: string;
-      username: string;
-      aiWritten: boolean;
-      resolved: ResolvedPortfolio;
-      warnings: string[];
-    }
+  /** v2 · M2: la importación terminó y espera la confirmación del creador (nichos, plantilla, paleta). */
+  | { type: "draft"; draft: DraftPreview }
   | { type: "manual"; reason: "private_profile" | "not_enough_posts"; message: string; prefill: ManualPrefill }
   | { type: "error"; code: ImportErrorCode; message: string };
 
 /** Llave en sessionStorage para pasar los datos al formulario manual. */
 export const MANUAL_PREFILL_KEY = "supercreador:prefill-manual";
+
+/** Lo que el creador revisa antes de generar (paso "nichos → plantilla → paleta"). */
+export type DraftPreview = {
+  draftId: string;
+  username: string;
+  name: string;
+  photo: StoredImage | null;
+  /** Nichos que sugirió la IA, cada uno con al menos una pieza: los chips pre-marcados. */
+  suggestedNiches: NicheDef[];
+  /** Las que eligió la IA, en su orden: los chips iniciales de piezas. */
+  pieces: DraftPiece[];
+  /** Ronda 30/09 · 7.1: el resto de sus publicaciones con imagen ("De tu perfil"), para sumarlas como chips. */
+  profilePosts: DraftPiece[];
+  engagementRate: EngagementRate | null;
+  /** Seguidores, Interacciones promedio y ER, listos para mostrar (7.2). */
+  metrics: CreatorMetric[];
+  /** Cuántas piezas puede tener el portafolio (LIMITS): el selector lo respeta sin cargar el esquema completo. */
+  pieceLimits: { min: number; max: number };
+  aiWritten: boolean;
+  warnings: string[];
+};
+
+/** Respuesta de /api/import/confirm: el portafolio ya generado (modal "Portafolio listo"). */
+export type ImportResult = {
+  url: string;
+  slug: string;
+  username: string;
+  revision: number;
+  resolved: ResolvedPortfolio;
+  warnings: string[];
+};

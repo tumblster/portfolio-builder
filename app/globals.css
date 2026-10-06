@@ -1,57 +1,58 @@
 /*
- * Supercreador · Portfolio Builder — sistema visual
- * Fuente de verdad: PRD §7.2 paleta · §7.3 tipografía · §7.4 componentes · §7.6 movimiento.
- * La interfaz es OSCURA (§7.2 y §7.5): nada de fondos blancos o claros.
+ * Supercreador · Portfolio Builder — sistema visual de la HERRAMIENTA (studio), v2 · M4.
+ * Tokens tomados de la referencia StoryFluence con implementación propia: titulares display en MAYÚSCULAS
+ * (Anton), fondo crema, tinta negra cálida, acento naranja-rojo, píldoras con sombra dura desplazada,
+ * secciones aireadas y reveals. Sin collage: es una herramienta y tiene que ser limpia.
+ * La PÁGINA PÚBLICA usa su propio sistema (portfolio.css + paletas): nada de aquí la alcanza.
  */
 @import "tailwindcss";
+@import "./portfolio.css";
+@import "./portfolio-templates.css";
 
-/* ── Tokens de marca ──────────────────────────────────────────────
- * `--color-*: initial` borra la paleta por defecto de Tailwind: en este
- * proyecto solo existen los colores del PRD. Una clase como `text-gray-400`
- * o `bg-blue-500` no genera nada, así nadie se sale de la paleta sin querer.
- * `static` publica todas las variables en :root para poder usarlas también
- * desde CSS propio o estilos en línea, p. ej. var(--color-violet).
+/* ── Tokens ────────────────────────────────────────────────────────
+ * `--color-*: initial` borra la paleta por defecto de Tailwind: solo existen estos colores.
+ *
+ * Contraste (regla de la Fase 1: TODO texto ≥ 7:1; verificado en scripts/smoke y en el navegador):
+ *   ink sobre cream 17,7 · sobre paper 19,6 · sobre sand 15,6 · sobre highlight 16,1
+ *   muted sobre cream 9,3 · paper 10,3 · sand 8,2 · highlight 8,6
+ *   accent-ink sobre cream 8,6 · paper 9,4 · highlight 7,9       cream sobre ink 17,7
+ *   success sobre cream 8,9 · paper 9,8 · highlight 8,2
+ * El acento #FC3300 NO lleva texto encima ni es color de texto: ningún color llega a 7:1 sobre él
+ * (el negro da 5,1:1) y él sobre crema da 3,4:1. Vive en sombras duras, marcas, ✦ y el anillo de foco
+ * (≥ 3:1, lo que pide WCAG para lo que no es texto). Para texto de acento: accent-ink.
  */
 @theme static {
   --color-*: initial;
 
-  /* Base */
-  --color-ink: #16163a; /* fondo índigo profundo */
-  --color-panel: rgb(30 30 78 / 0.55); /* cards: índigo oscuro semitransparente */
-  --color-line: rgb(196 181 253 / 0.14); /* bordes sutiles */
+  --color-cream: #f5f5e7; /* fondo */
+  --color-sand: #e8e7d3; /* bloques secundarios, miniaturas vacías, solo lectura */
+  --color-paper: #ffffff; /* tarjetas y campos */
+  --color-ink: #0e110b; /* texto, bordes fuertes, botón principal */
+  --color-muted: #3f4236; /* texto secundario */
+  --color-line: rgb(14 17 11 / 0.16); /* divisores finos */
+  --color-accent: #fc3300; /* SOLO gráfico: sombras, marcas, foco */
+  --color-accent-ink: #8a1c00; /* acento como texto (y errores) */
+  --color-highlight: #ffe4d8; /* opción elegida */
+  --color-success: #1a4d27; /* confirmaciones */
+  --color-white: #ffffff;
 
-  /* Marca */
-  --color-violet: #8b5cf6; /* acentos, links, tabs activos */
-  --color-fuchsia: #d946ef; /* gradientes y detalles de energía */
-  --color-lilac: #c4b5fd; /* violeta claro: highlights, badges */
-  --color-cyan: #a5f3fc; /* acentos puntuales */
-  --color-amber: #fbbf24; /* amarillo eléctrico: solo detalles mínimos */
+  /* Forma */
+  --radius-card: 1.75rem; /* 28 px */
+  --radius-field: 1rem;
+  --spacing-tap: 2.75rem; /* 44 px: tap target mínimo → min-h-tap, size-tap */
 
-  /* Texto */
-  --color-white: #ffffff; /* principal */
-  --color-muted: #a2a2b8; /* secundario */
+  /* Sombras duras desplazadas (el sello de la referencia) */
+  --shadow-hard: 4px 4px 0 0 var(--color-ink);
+  --shadow-hard-sm: 3px 3px 0 0 var(--color-ink);
+  --shadow-accent: 4px 4px 0 0 var(--color-accent);
+  --shadow-panel: 6px 6px 0 0 var(--color-ink);
 
-  /* Acento por nicho */
-  --color-belleza: #d946ef;
-  --color-lifestyle: #8b5cf6;
-  --color-viajes: #fbbf24;
-
-  /* Forma (§7.4) */
-  --radius-card: 1.25rem; /* 20 px, rango del PRD 16–24 */
-  --radius-button: 0.875rem; /* 14 px, rango del PRD 12–16 */
-  --spacing-tap: 2.75rem; /* 44 px, tap target mínimo → h-tap, min-h-tap, size-tap */
-
-  /* Glow violeta suave para elementos activos → shadow-glow */
-  --shadow-glow: 0 0 0 1px rgb(139 92 246 / 0.45), 0 12px 40px -12px rgb(139 92 246 / 0.7);
-
-  /* Movimiento (§7.6): 200–400 ms, easing suave. Premium = restraint. */
+  /* Movimiento */
   --ease-premium: cubic-bezier(0.22, 1, 0.36, 1);
-  --default-transition-duration: 250ms;
+  --default-transition-duration: 200ms;
   --default-transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
-
   --animate-pop: pop 320ms cubic-bezier(0.34, 1.3, 0.64, 1) both; /* al agregar piezas */
-  --animate-reveal: reveal 400ms cubic-bezier(0.22, 1, 0.36, 1) both; /* entradas en cascada */
-  --animate-marquee: marquee 40s linear infinite; /* banda de nichos */
+  --animate-reveal: reveal 400ms cubic-bezier(0.22, 1, 0.36, 1) both;
 
   @keyframes pop {
     from {
@@ -63,7 +64,6 @@
       transform: scale(1);
     }
   }
-
   @keyframes reveal {
     from {
       opacity: 0;
@@ -74,132 +74,150 @@
       transform: translateY(0);
     }
   }
-
-  @keyframes marquee {
-    from {
-      transform: translate3d(0, 0, 0);
-    }
-    to {
-      transform: translate3d(-50%, 0, 0);
-    }
-  }
 }
 
-/* Valores que dependen de variables definidas en tiempo de ejecución:
- * las fuentes las inyecta next/font en <html> y --accent cambia por nicho. */
 @theme inline {
-  --font-serif: var(--font-fraunces), ui-serif, Georgia, serif;
+  --font-display: var(--font-anton), "Arial Narrow", Impact, sans-serif;
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-fragment), ui-monospace, SFMono-Regular, Menlo, monospace;
-
-  /* Acento dinámico → text-accent, bg-accent/15, border-accent/40… */
-  --color-accent: var(--accent);
-  /* El acento aclarado, para TEXTO: el violeta puro no llega al contraste mínimo
-   * (4.5:1) sobre el índigo en letra chica; mezclado con blanco sí, en los tres nichos. */
-  --color-accent-soft: color-mix(in oklab, var(--accent) 65%, white);
-}
-
-/* Registrar --accent como color permite animar el cambio de nicho
- * (transición de 300 ms en §7.4) en vez de que salte de golpe. */
-@property --accent {
-  syntax: "<color>";
-  inherits: true;
-  initial-value: #8b5cf6;
 }
 
 @layer base {
   html {
-    background-color: var(--color-ink);
-    color: var(--color-white);
-    color-scheme: dark;
-    scrollbar-color: rgb(196 181 253 / 0.25) transparent;
+    background-color: var(--color-cream);
+    color: var(--color-ink);
+    color-scheme: light;
     -webkit-tap-highlight-color: transparent;
   }
-
   body {
-    isolation: isolate;
     min-height: 100dvh;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
 
-  /* Degradado radial ambiental (§7.2): destellos púrpura/magenta arriba,
-   * resplandor turquesa sutil abajo. Capa fija detrás de todo el contenido
-   * (funciona en iOS, a diferencia de background-attachment: fixed). */
-  body::before {
-    content: "";
-    position: fixed;
-    inset: 0;
-    z-index: -1;
-    pointer-events: none;
-    background:
-      radial-gradient(60% 45% at 12% -8%, rgb(139 92 246 / 0.34), transparent 70%),
-      radial-gradient(45% 38% at 92% -4%, rgb(217 70 239 / 0.24), transparent 70%),
-      radial-gradient(70% 45% at 50% 112%, rgb(165 243 252 / 0.11), transparent 70%);
-  }
-
-  /* Titulares (§7.3 y §7.6): serif elegante, grandes, con confianza. */
-  h1,
-  h2,
-  h3 {
-    font-family: var(--font-serif);
+  /* Jerarquía (solo en la herramienta): H1 y H2 en display MAYÚSCULAS; H3 es el subtítulo en sans. */
+  .studio :where(h1, h2) {
+    /* La pila directa: con @theme inline, Tailwind no emite --font-display como variable. */
+    font-family: var(--font-anton), "Arial Narrow", Impact, sans-serif;
     font-weight: 400;
-    line-height: 1.05;
-    letter-spacing: -0.02em;
+    line-height: 0.92;
+    letter-spacing: 0.005em;
+    text-transform: uppercase;
     text-wrap: balance;
   }
-
-  p {
+  .studio :where(h3) {
+    font-weight: 700;
+    line-height: 1.25;
+    letter-spacing: -0.01em;
+  }
+  .studio :where(p) {
     text-wrap: pretty;
   }
-
-  :focus-visible {
-    outline: 2px solid var(--color-lilac);
+  .studio :focus-visible {
+    outline: 3px solid var(--color-accent);
     outline-offset: 3px;
   }
-
-  ::selection {
-    background-color: rgb(217 70 239 / 0.35);
-    color: var(--color-white);
+  .studio ::selection {
+    background-color: var(--color-highlight);
+    color: var(--color-ink);
   }
-
-  ::placeholder {
+  .studio ::placeholder {
     color: var(--color-muted);
-    opacity: 0.7;
+    opacity: 1;
   }
 
-  /* Si hay una barra de acciones fija abajo (editor), que el foco y el scroll
-   * nunca dejen un campo escondido detrás de ella. */
+  /* Si hay una barra de acciones fija abajo (editor), el foco nunca queda escondido detrás. */
   html:has([data-sticky-actions]) {
     scroll-padding-bottom: 9rem;
   }
-
-  /* Acento por nicho: cualquier contenedor con data-niche re-tematiza
-   * a todos sus hijos que usen las clases *-accent. */
-  [data-niche] {
-    transition: --accent 300ms var(--ease-premium);
-  }
-  [data-niche="belleza"] {
-    --accent: var(--color-belleza);
-  }
-  [data-niche="lifestyle"] {
-    --accent: var(--color-lifestyle);
-  }
-  [data-niche="viajes"] {
-    --accent: var(--color-viajes);
+  /* Con un modal abierto ("Portafolio listo"), la página de atrás no se desliza. */
+  html:has(dialog[data-modal][open]) {
+    overflow: hidden;
   }
 }
 
-/* Card de marca (§7.4): índigo semitransparente, borde sutil, radio 20 px. */
+/* ── Escala tipográfica (una sola, para todas las pantallas) ─────── */
+/* H1 de cada pantalla interior. */
+@utility title-1 {
+  font-size: clamp(3rem, 11vw, 5rem);
+  line-height: 0.9;
+}
+/* H2 de sección. */
+@utility title-2 {
+  font-size: clamp(2.25rem, 7vw, 3.5rem);
+  line-height: 0.92;
+}
+/* H2 dentro de tarjetas y pasos. */
+@utility title-3 {
+  font-size: 2rem;
+  line-height: 0.95;
+}
+/* Etiqueta sobre un título: sans en mayúsculas espaciadas, con un punto de acento (gráfico). */
+@utility eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.625rem;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  &::before {
+    content: "";
+    width: 0.625rem;
+    height: 0.625rem;
+    border-radius: 999px;
+    background: var(--color-accent);
+    box-shadow: 1.5px 1.5px 0 0 var(--color-ink);
+  }
+}
+/* Texto de entrada bajo un H1. */
+@utility lead {
+  font-size: 1.125rem;
+  line-height: 1.55;
+  color: var(--color-muted);
+  @media (width >= 40rem) {
+    font-size: 1.25rem;
+  }
+}
+
+/* ── Espaciado ───────────────────────────────────────────────────────
+ * Escala única (múltiplos de 4 px de Tailwind). Pantallas interiores: page-y. Landing: section-y
+ * (96 px en el celular → 160 px en escritorio, el aire de la referencia). */
+@utility page-y {
+  padding-top: 2.5rem;
+  padding-bottom: 6rem;
+  @media (width >= 40rem) {
+    padding-top: 4rem;
+  }
+}
+@utility section-y {
+  padding-top: 6rem;
+  padding-bottom: 6rem;
+  @media (width >= 48rem) {
+    padding-top: 10rem;
+    padding-bottom: 10rem;
+  }
+}
+
+/* ── Superficies ─────────────────────────────────────────────────── */
+/* Tarjeta: blanca, borde de tinta y sombra dura. */
 @utility panel {
-  background-color: var(--color-panel);
-  border: 1px solid var(--color-line);
+  background-color: var(--color-paper);
+  border: 2px solid var(--color-ink);
   border-radius: var(--radius-card);
+  box-shadow: var(--shadow-panel);
 }
 
-/* Degradado de marca (§7.2): CTA primario violeta → fucsia. */
-@utility bg-brand {
-  background-image: linear-gradient(135deg, var(--color-violet), var(--color-fuchsia));
+/* Reveal al hacer scroll, solo con CSS. Donde el navegador no lo soporta (o con "reducir movimiento"),
+ * el contenido simplemente está: nunca queda oculto. */
+@utility reveal-on-scroll {
+  @supports (animation-timeline: view()) {
+    @media (prefers-reduced-motion: no-preference) {
+      animation: reveal linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 40%;
+    }
+  }
 }
 
 /* Si la persona pidió menos movimiento en su sistema, se respeta en todo el sitio. */

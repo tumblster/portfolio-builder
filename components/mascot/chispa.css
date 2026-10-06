@@ -1,0 +1,91 @@
+/*
+ * Chispa (v2 · M4-rev, dirección definitiva): animación sutil. El parpadeo aplasta cada ojo hasta una
+ * línea y vuelve; la sonrisa "respira" (se ensancha y se asienta despacio). Solo transform. Con
+ * "reducir movimiento", quieta.
+ */
+.mascot-eye,
+.mascot-mouth {
+  transform-box: fill-box;
+}
+.mascot-eye {
+  transform-origin: 50% 55%;
+}
+.mascot-mouth {
+  transform-origin: 50% 0%;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .mascot-eye {
+    animation: mascot-blink 5.6s ease-in-out infinite;
+  }
+  .mascot-eye + .mascot-eye {
+    animation-delay: 50ms;
+  }
+  .mascot-mouth {
+    animation: mascot-breathe 3.8s ease-in-out infinite;
+  }
+}
+@keyframes mascot-blink {
+  0%,
+  90%,
+  100% {
+    transform: scaleY(1);
+  }
+  93% {
+    transform: scaleY(0.08);
+  }
+  96% {
+    transform: scaleY(1);
+  }
+}
+@keyframes mascot-breathe {
+  0%,
+  100% {
+    transform: scale(1, 1);
+  }
+  50% {
+    transform: scale(1.045, 0.965);
+  }
+}
+
+/* Chispa quieta (decorativa), p. ej. en /acceso: sin parpadeo ni respiración aunque se permita movimiento. */
+.mascot-static .mascot-eye,
+.mascot-static .mascot-mouth {
+  animation: none;
+}
+
+/* Carga con Chispa (components/mascot/chispa-loader.tsx, C5): las caras se relevan con fundido + pop. */
+.chispa-loader {
+  position: relative;
+  display: block;
+  flex-shrink: 0;
+  width: 5.5rem;
+  aspect-ratio: 1;
+  color: var(--color-ink);
+}
+.chispa-loader svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.chispa-loader [data-face] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 200ms ease;
+}
+.chispa-loader [data-face][data-active] {
+  opacity: 1;
+  animation: chispa-pop 280ms ease-out;
+}
+.chispa-loader [data-face]:not([data-active]) * {
+  animation-play-state: paused;
+}
+@keyframes chispa-pop {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  45% {
+    transform: scale(1.08);
+  }
+}

@@ -1,5 +1,5 @@
 import "server-only";
-import { BlobError, BlobNotFoundError, BlobPreconditionFailedError, get, head, put } from "@vercel/blob";
+import { BlobError, BlobNotFoundError, BlobPreconditionFailedError, del, get, head, list, put } from "@vercel/blob";
 import type { Storage } from "./index";
 
 /*
@@ -7,6 +7,11 @@ import type { Storage } from "./index";
  *  - Los JSON se leen con useCache: false, que va directo al origen y garantiza
  *    ver la última versión justo después de guardar (solo existe en tiendas privadas).
  *  - Las ediciones usan ifMatch (etag): si alguien guardó en medio, no se pisa.
+ *  - Spec 10.1: el etag para ifMatch es el CANÓNICO de la API (el de head() / put()), no el header HTTP ETag de la
+ *    descarga (el de get()). El SDK solo documenta como válidos para ifMatch los de head, put y list; el de get es
+ *    para ifNoneMatch (lecturas 304) y puede venir en otro formato (entre comillas o débil W/"…"). Con el de get,
+ *    toda escritura condicional respondía 412: "La escritura condicional del borrador falló sin que otra petición
+ *    lo tomara (etag)", y nunca se generaba nada. Verificable en el deployment: GET /api/import/health?roundtrip=1.
  *  - Las imágenes no son públicas por URL directa: se sirven por /media/[file].
  */
 
@@ -30,10 +35,20 @@ export const blobStorage: Storage = {
   name: "blob",
 
   async readJson(pathname) {
+    // Primero el etag canónico (head), DESPUÉS el contenido. En ese orden, si el archivo cambia entre medio, el
+    // contenido leído es más nuevo que el etag y la escritura condicional falla (412) en vez de pisar algo: nunca se
+    // pierde un cambio. El diseño del candado no cambia.
+    let meta: Awaited<ReturnType<typeof head>>;
+    try {
+      meta = await head(pathname);
+    } catch (error) {
+      if (error instanceof BlobNotFoundError) return null;
+      throw error;
+    }
     const result = await get(pathname, { access: "private", useCache: false });
     if (!result || result.statusCode !== 200) return null;
     const text = await new Response(result.stream).text();
-    return { data: JSON.parse(text), etag: result.blob.etag };
+    return { data: JSON.parse(text), etag: meta.etag };
   },
 
   async createJson(pathname, data) {
@@ -83,4 +98,59 @@ export const blobStorage: Storage = {
     if (!result || result.statusCode !== 200) return null;
     return { body: result.stream, contentType: result.blob.contentType, size: result.blob.size };
   },
+  async list(prefix) {
+    const paths: string[] = [];
+    let cursor: string | undefined;
+    do {
+      const page = await list({ prefix, cursor, limit: 1000 });
+      paths.push(...page.blobs.map((blob) => blob.pathname));
+      cursor = page.hasMore ? page.cursor : undefined;
+    } while (cursor);
+    return paths;
+  },
+  async deleteJson(pathname) {
+    await del(pathname);
+  },
 };
+
+/**
+ * Autodiagnóstico de escrituras condicionales en el Blob store real (spec 10.1), para verificar la causa en el
+ * deployment: compara el etag de head() con el de get() y prueba ifMatch con cada uno. Escribe solo en
+ * health/etag-check.json. Lo expone GET /api/import/health?roundtrip=1 (con sesión).
+ */
+export async function diagnoseBlobEtags(): Promise<Record<string, unknown>> {
+  const pathname = "health/etag-check.json";
+  const write = (n: number, ifMatch?: string) =>
+    put(pathname, JSON.stringify({ n, at: new Date().toISOString() }), {
+      access: "private",
+      contentType: "application/json",
+      addRandomSuffix: false,
+      cacheControlMaxAge: JSON_CACHE_SECONDS,
+      ...(ifMatch ? { ifMatch } : { allowOverwrite: true }),
+    });
+  const attempt = async (n: number, ifMatch: string) => {
+    try {
+      await write(n, ifMatch);
+      return "ok";
+    } catch (error) {
+      return error instanceof BlobPreconditionFailedError ? "412 (precondición fallida)" : `error: ${String(error)}`;
+    }
+  };
+  const putEtag = (await write(0)).etag;
+  const headEtag = (await head(pathname)).etag;
+  const got = await get(pathname, { access: "private", useCache: false });
+  const getEtag = got?.blob.etag ?? "";
+  const writeWithGetEtag = await attempt(1, getEtag);
+  const freshHead = (await head(pathname)).etag;
+  const writeWithHeadEtag = await attempt(2, freshHead);
+  const staleWrite = await attempt(3, freshHead); // ya no es la versión actual: debe rechazarse
+  return {
+    putEtag,
+    headEtag,
+    getEtag,
+    sameEtag: headEtag === getEtag,
+    writeWithGetEtag,
+    writeWithHeadEtag,
+    staleWriteRejected: staleWrite.startsWith("412"),
+  };
+}

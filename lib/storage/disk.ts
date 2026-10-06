@@ -87,4 +87,16 @@ export const diskStorage: Storage = {
       throw error;
     }
   },
+  async list(prefix) {
+    try {
+      const entries = await fs.readdir(resolveInside(prefix), { withFileTypes: true });
+      return entries.filter((entry) => entry.isFile()).map((entry) => `${prefix.replace(/\/?$/, "/")}${entry.name}`);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return [];
+      throw error;
+    }
+  },
+  async deleteJson(relative) {
+    await fs.rm(resolveInside(relative), { force: true });
+  },
 };

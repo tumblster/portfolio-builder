@@ -1,5 +1,13 @@
 import { z } from "zod";
-import { NICHES } from "./niches";
+import {
+  MAX_NICHES,
+  NICHE_LABEL_MAX,
+  NICHE_SLUG_MAX,
+  NICHE_SLUG_PATTERN,
+  RESERVED_NICHE_SLUGS,
+  resolveNiches,
+} from "./niches";
+import { DEFAULT_DESIGN, PALETTE_IDS, TEMPLATES } from "./design";
 import { slugSchema } from "./slug";
 
 /*
@@ -18,10 +26,14 @@ import { slugSchema } from "./slug";
  * `pieces` es la selección final que se muestra (3 a 6, en orden). Cada pieza
  * recuerda si vino de Instagram o se agregó a mano, y puede llevar un nicho.
  *
+ * v2: cada portafolio tiene sus propios nichos (hasta 3, detectados por la IA) y sus
+ * servicios ("formas de colaborar"). Ambos siguen la misma regla manual → IA. Los JSON de la
+ * v1 (schemaVersion 1) se leen igual y se guardan como v2 en su siguiente edición.
+ *
  * Este archivo no depende del servidor: el formulario también lo puede usar.
  */
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 export const LIMITS = {
   name: 80,
@@ -31,13 +43,54 @@ export const LIMITS = {
   minPieces: 3,
   maxPieces: 6,
   instagramPosts: 12,
+  serviceTitle: 40,
+  serviceDescription: 120,
+  maxServices: 4,
 } as const;
 
 const utcDate = z.iso.datetime(); // ISO 8601 en UTC, p. ej. 2026-09-28T15:04:05.000Z
 
-// ── Nichos ──────────────────────────────────────────────────────────
-export { NICHES, NICHE_LABELS, type Niche } from "./niches";
-export const nicheSchema = z.enum(NICHES, { error: "Nicho inválido: usa belleza, lifestyle o viajes." });
+// ── Nichos (propios de cada portafolio) ─────────────────────────────
+export { LEGACY_NICHES, MAX_NICHES, type NicheDef } from "./niches";
+
+/** Slug de un nicho, tal como va en la URL: /p/<slug>/<nicho>. */
+export const nicheSlugSchema = z
+  .string({ error: "Nicho inválido." })
+  .max(NICHE_SLUG_MAX, { error: "Nicho inválido." })
+  .regex(NICHE_SLUG_PATTERN, { error: "Nicho inválido." });
+
+export const nicheDefSchema = z.object({
+  slug: nicheSlugSchema.refine((slug) => !RESERVED_NICHE_SLUGS.includes(slug), {
+    error: '"todo" está reservado para la versión general.',
+  }),
+  label: z.string().trim().min(1, { error: "El nicho necesita un nombre." }).max(NICHE_LABEL_MAX),
+});
+
+export const nichesSchema = z
+  .array(nicheDefSchema)
+  .max(MAX_NICHES, { error: `Hasta ${MAX_NICHES} nichos por portafolio.` })
+  .refine((niches) => new Set(niches.map((niche) => niche.slug)).size === niches.length, {
+    error: "Hay dos nichos con el mismo link.",
+  });
+
+// ── Servicios ("formas de colaborar") ───────────────────────────────
+export const serviceSchema = z.object({
+  title: z
+    .string({ error: "Ponle un nombre al servicio." })
+    .trim()
+    .min(1, { error: "Ponle un nombre al servicio." })
+    .max(LIMITS.serviceTitle, { error: `El nombre admite hasta ${LIMITS.serviceTitle} caracteres.` }),
+  description: z
+    .string()
+    .trim()
+    .max(LIMITS.serviceDescription, { error: `La descripción admite hasta ${LIMITS.serviceDescription} caracteres.` })
+    .default(""),
+});
+export type Service = z.output<typeof serviceSchema>;
+
+export const servicesSchema = z
+  .array(serviceSchema)
+  .max(LIMITS.maxServices, { error: `Puedes mostrar hasta ${LIMITS.maxServices} servicios.` });
 
 // ── Imágenes ────────────────────────────────────────────────────────
 /** Nombre que el servidor le da a cada imagen guardada: <uuid>.webp */
@@ -56,6 +109,8 @@ export const storedImageSchema = z.object({
   width: z.number().int().positive().optional(),
   height: z.number().int().positive().optional(),
   alt: z.string().trim().max(200).optional(),
+  /** v2 · M2: color dominante (#rrggbb), para la paleta "de su foto". Ausente en imágenes anteriores. */
+  swatch: z.string().regex(/^#[0-9a-f]{6}$/i).optional(),
 });
 export type StoredImage = z.infer<typeof storedImageSchema>;
 
@@ -167,7 +222,7 @@ export const pieceSchema = z
     id: z.string().min(1).max(64),
     origin: z.enum(PIECE_ORIGINS),
     title: z.string().trim().min(1).max(LIMITS.pieceTitle),
-    niche: nicheSchema.nullable(), // etiqueta opcional: sube primero en la versión de su nicho
+    niche: nicheSlugSchema.nullable(), // nicho de la pieza (uno de los del portafolio); null = solo en "Todo"
     image: storedImageSchema.nullable(), // foto, o portada si es video
     video: videoLinkSchema.nullable(),
     sourcePostId: z.string().max(64).optional(), // id del post de Instagram, si vino de ahí
@@ -186,7 +241,7 @@ export const pieceInputSchema = z
       .trim()
       .min(1, { error: "Ponle un título a la pieza." })
       .max(LIMITS.pieceTitle, { error: `El título admite hasta ${LIMITS.pieceTitle} caracteres.` }),
-    niche: nicheSchema.nullable().default(null),
+    niche: nicheSlugSchema.nullable().default(null),
     image: storedImageSchema.nullable().default(null),
     videoUrl: z.string().trim().max(500).nullable().default(null),
   })
@@ -255,7 +310,7 @@ export type InstagramSnapshot = z.infer<typeof instagramSnapshotSchema>;
 export const generatedPieceSchema = z.object({
   sourcePostId: z.string().min(1).max(64),
   title: z.string().trim().min(1).max(LIMITS.pieceTitle),
-  niche: nicheSchema.nullable(),
+  niche: nicheSlugSchema.nullable(),
 });
 export type GeneratedPiece = z.infer<typeof generatedPieceSchema>;
 
@@ -266,6 +321,10 @@ export const generatedContentSchema = z.object({
   valueProp: z.string().trim().min(1).max(LIMITS.valueProp),
   /** Sugerencias de la IA por post. Se copian a `pieces`, que es lo que se edita. */
   pieces: z.array(generatedPieceSchema).max(LIMITS.instagramPosts).default([]),
+  /** v2: nichos detectados en el contenido. Ausente en portafolios de la v1. */
+  niches: nichesSchema.optional(),
+  /** v2: formas de colaborar sugeridas. Ausente en portafolios de la v1. */
+  services: servicesSchema.optional(),
 });
 export type GeneratedContent = z.infer<typeof generatedContentSchema>;
 
@@ -283,21 +342,58 @@ export const manualDataSchema = z.object({
     .max(LIMITS.bio, { error: `La bio admite hasta ${LIMITS.bio} caracteres.` })
     .optional(),
   photo: storedImageSchema.nullable().optional(), // null = sin foto
+  /** Foto del banner del hero (ajuste 7). Ausente o null = el banner usa la foto de perfil o la primera pieza. */
+  cover: storedImageSchema.nullable().optional(),
   valueProp: z
     .string()
     .trim()
     .max(LIMITS.valueProp, { error: `La propuesta de valor admite hasta ${LIMITS.valueProp} caracteres.` })
     .optional(),
   contact: contactSchema.optional(),
+  /** Reemplaza los nichos de la IA (editor, M3). */
+  niches: nichesSchema.optional(),
+  /** Reemplaza los servicios de la IA. [] = no mostrar el bloque. */
+  services: servicesSchema.optional(),
 });
 export type ManualData = z.infer<typeof manualDataSchema>;
+
+// ── Diseño e indicadores (v2 · M2) ─────────────────────────────────
+/** Plantilla y paleta del portafolio: se eligen antes de generarlo y se cambian cuando se quiera. */
+export const designSchema = z.object({
+  template: z.enum(TEMPLATES, { error: "Elige una de las 4 plantillas." }),
+  palette: z.enum(PALETTE_IDS, { error: "Elige una de las paletas." }),
+});
+
+/**
+ * Engagement Rate con la base de su cálculo (lib/portfolio/engagement.ts). Es un dato reutilizable
+ * del modelo: se muestra en el portafolio y mañana junto al nombre de cada creadora en un pool.
+ */
+export const engagementRateSchema = z.object({
+  /** Fracción: 0,048 = 4,8 %. */
+  rate: z.number().gt(0).max(1),
+  /** Sobre qué se divide: vistas de los reels o seguidores (si no hay vistas). */
+  basis: z.enum(["views", "followers"]),
+  /** Qué interacciones suma (Instagram no publica compartidos ni guardados). */
+  interactions: z.array(z.enum(["likes", "comments", "shares", "saves"])).min(1),
+  /** Cuántas publicaciones entraron al cálculo, y de qué tipo. */
+  sample: z.number().int().positive(),
+  sampleKind: z.enum(["reels", "posts"]),
+});
+export type EngagementRate = z.infer<typeof engagementRateSchema>;
+
+/** Indicadores calculados al importar (se guardan para no recalcularlos en cada lectura). */
+export const insightsSchema = z.object({
+  engagementRate: engagementRateSchema.nullable(),
+  computedAt: utcDate,
+});
 
 // ── Documento completo ──────────────────────────────────────────────
 export const PORTFOLIO_SOURCES = ["instagram", "manual"] as const;
 
 export const portfolioSchema = z
   .object({
-    schemaVersion: z.literal(SCHEMA_VERSION),
+    // Se aceptan JSON de la v1; al guardarse de nuevo quedan como v2 (los campos nuevos son opcionales).
+    schemaVersion: z.literal([1, SCHEMA_VERSION]).transform((): typeof SCHEMA_VERSION => SCHEMA_VERSION),
     slug: slugSchema,
     revision: z.number().int().positive(), // sube en cada guardado; evita pisar cambios ajenos
     createdAt: utcDate,
@@ -307,12 +403,31 @@ export const portfolioSchema = z
     generated: generatedContentSchema.nullable(),
     manual: manualDataSchema,
     pieces: z.array(pieceSchema).min(LIMITS.minPieces).max(LIMITS.maxPieces),
+    /** v2 · M2. Ausente (portafolios anteriores) = Creator + Crema y acero, como en el M1. */
+    design: designSchema.optional(),
+    /** v2 · M2. Ausente = se calcula al leer, desde la captura de Instagram. */
+    insights: insightsSchema.optional(),
+    /** Spec 11.9: archivado por inactividad (soft-delete). null/ausente = publicado. Se reactiva con 1 clic. */
+    archivedAt: utcDate.nullable().optional(),
   })
   .refine((doc) => Boolean(doc.manual.name || doc.instagram?.fullName || doc.instagram?.username), {
     error: "El portafolio necesita un nombre.",
     path: ["manual", "name"],
+  })
+  .superRefine((doc, ctx) => {
+    // Cada pieza solo puede usar un nicho que el portafolio tenga.
+    const available = new Set(resolveNiches(doc).map((niche) => niche.slug));
+    doc.pieces.forEach((piece, index) => {
+      if (piece.niche !== null && !available.has(piece.niche)) {
+        ctx.addIssue({
+          code: "custom",
+          message: "Este portafolio no tiene ese nicho. Elige uno de la lista.",
+          path: ["pieces", index, "niche"],
+        });
+      }
+    });
   });
-export type Portfolio = z.infer<typeof portfolioSchema>;
+export type Portfolio = z.output<typeof portfolioSchema>;
 
 // ── Entradas de la API ──────────────────────────────────────────────
 /** Crear a mano (fallback "prefiero llenarlo manual", RF-01). */
@@ -334,6 +449,8 @@ export const createPortfolioInputSchema = z.object({
     .max(LIMITS.valueProp, { error: `La propuesta de valor admite hasta ${LIMITS.valueProp} caracteres.` })
     .default(""),
   contact: contactSchema.default({}),
+  services: servicesSchema.default([]),
+  design: designSchema.default(DEFAULT_DESIGN),
   pieces: piecesInputSchema,
 });
 export type CreatePortfolioInput = z.output<typeof createPortfolioInputSchema>;
@@ -347,8 +464,46 @@ export const updatePortfolioInputSchema = z
     revision: z.number({ error: "Falta la revisión (revision) que estás editando." }).int().positive(),
     manual: manualDataSchema.optional(),
     pieces: piecesInputSchema.optional(),
+    /** Cambiar plantilla o paleta: no toca ningún otro dato. */
+    design: designSchema.optional(),
   })
-  .refine((input) => input.manual !== undefined || input.pieces !== undefined, {
+  .refine((input) => input.manual !== undefined || input.pieces !== undefined || input.design !== undefined, {
     error: "No hay cambios para guardar.",
   });
 export type UpdatePortfolioInput = z.output<typeof updatePortfolioInputSchema>;
+
+/**
+ * Generar el portafolio de una importación (v2 · M2), después de que el creador confirmó los
+ * nichos y eligió plantilla y paleta. Los nichos se mandan por nombre: el slug de cada link sale
+ * del nombre (igual en el navegador y aquí), y las piezas apuntan a esos slugs.
+ */
+export const confirmImportInputSchema = z.object({
+  draftId: z.uuid({ error: "La importación no es válida. Vuelve a importar el perfil." }),
+  niches: z
+    .array(
+      z.object({
+        label: z
+          .string()
+          .trim()
+          .min(1, { error: "Escribe el nombre del nicho." })
+          .max(NICHE_LABEL_MAX, { error: `El nombre del nicho admite hasta ${NICHE_LABEL_MAX} caracteres.` }),
+      }),
+    )
+    .max(MAX_NICHES, { error: `Puedes tener hasta ${MAX_NICHES} nichos.` }),
+  /** Nicho de cada pieza, por id de pieza del borrador; null = solo en "Todo". (Clientes anteriores a la ronda 30/09.) */
+  pieceNiches: z.record(z.string().max(100), nicheSlugSchema.nullable()).optional(),
+  /**
+   * Ronda 30/09 · 7.1: las piezas elegidas, en el orden de los chips (ids del borrador o de "De tu perfil"), cada una
+   * con su nicho. Si viene, manda sobre pieceNiches.
+   */
+  selection: z
+    .array(z.object({ id: z.string().min(1).max(64), niche: nicheSlugSchema.nullable() }))
+    .max(LIMITS.instagramPosts)
+    .optional(),
+  /** Reintentar a propósito un borrador que quedó fallido (7.4 b). */
+  retry: z.boolean().optional(),
+  /** Spec 11.12: las tarjetas de servicio del creador (obligatorias desde esta ronda: mínimo 1). */
+  services: servicesSchema.optional(),
+  design: designSchema,
+});
+export type ConfirmImportInput = z.output<typeof confirmImportInputSchema>;

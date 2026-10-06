@@ -3,16 +3,20 @@ import { z } from "zod";
 import { ConfigError } from "@/lib/errors";
 import { isTimeoutError } from "@/lib/import/errors";
 import { EMOJI, truncateWords } from "@/lib/instagram/snapshot";
-import { LIMITS, NICHES, type InstagramPost, type Niche } from "@/lib/portfolio/schema";
+import { MAX_NICHES, nicheFromLabel, type NicheDef } from "@/lib/portfolio/niches";
+import { LIMITS, type InstagramPost, type Service } from "@/lib/portfolio/schema";
 
 /*
  * Textos del portafolio con Groq, en UNA sola llamada:
  *  - la propuesta de valor (1 frase),
- *  - un título corto y un nicho sugerido para cada pieza.
+ *  - hasta 3 nichos reales detectados en el contenido (v2),
+ *  - un título corto y el nicho de cada pieza,
+ *  - 3 o 4 formas de colaborar con marcas (v2).
  *
  * Usa salida estructurada en modo estricto: el modelo solo puede responder con
- * JSON que cumple el esquema (ids de los posts enviados, nichos válidos).
- * Igual se valida con zod, porque el esquema no limita largos.
+ * JSON que cumple el esquema (ids de los posts enviados, ids de nicho n1…n3).
+ * Igual se valida con zod, porque el esquema no limita largos. El slug de cada nicho
+ * no lo escribe el modelo: sale de su nombre con slugify, así siempre es seguro para URL.
  */
 
 export const GROQ_MODEL = "openai/gpt-oss-120b"; // soporta JSON estricto y escribe bien en español
@@ -45,8 +49,11 @@ export type CopyInput = {
 export type PortfolioCopy = {
   model: string;
   valueProp: string;
+  /** Nichos con al menos una pieza, en el orden que los propuso el modelo. */
+  niches: NicheDef[];
   /** Sugerencias por id de post. Puede faltar alguno: se usa el título de respaldo. */
-  pieces: Map<string, { title: string; niche: Niche | null }>;
+  pieces: Map<string, { title: string; niche: string | null }>;
+  services: Service[];
 };
 
 /** Error que vale la pena reintentar (red, 429, 5xx, respuesta que no pasó la validación). */
@@ -99,10 +106,17 @@ function buildMessages(input: CopyInput, refs: { ref: string; post: CopyInput["p
   const user = `Escribe los textos del portafolio UGC de esta creadora.
 
 1. value_prop: UNA frase en primera persona, de máximo 110 caracteres, que diga qué contenido crea y qué logra para las marcas. Tono de ejemplo: "Creo videos de skincare que se sienten reales y hacen que la gente quiera probar el producto."
-2. pieces: una entrada por cada publicación, en el mismo orden:
+2. niches: de 1 a 3 nichos REALES que se vean en sus publicaciones (no en la bio sola), del más fuerte al más débil:
+   - id: "n1", "n2" o "n3", en ese orden.
+   - name: 1 o 2 palabras, máximo 20 caracteres, con mayúscula inicial. Si el contenido calza, usa exactamente "Belleza" (maquillaje, skincare, cabello, uñas, perfumes), "Lifestyle" (día a día, hogar, moda, bienestar) o "Viajes" (destinos, hoteles, paisajes, vuelos). Si no calza con esos, nómbralo por lo que es: "Fitness", "Cocina", "Maternidad", "Tecnología", "Mascotas"…
+   - No inventes nichos para completar tres: si solo hay uno, devuelve uno.
+3. pieces: una entrada por cada publicación, en el mismo orden:
    - id: el id de la publicación.
    - title: de 2 a 5 palabras, máximo 40 caracteres, que describan la pieza como trabajo de portafolio. Mayúscula inicial y sin punto final. Ejemplo: "Rutina de noche con sérum".
-   - niche: "belleza" (maquillaje, skincare, cabello, uñas, perfumes), "viajes" (destinos, hoteles, paisajes, vuelos), "lifestyle" (día a día, hogar, moda, comida, fitness, bienestar, tecnología) o "ninguno" si no encaja con claridad.
+   - niche: el id del nicho al que pertenece ("n1", "n2" o "n3") o "ninguno" si no encaja con claridad en ninguno.
+4. services: de 3 a 4 formas de colaborar que esta creadora puede ofrecer a marcas según su contenido:
+   - title: de 2 a 4 palabras, máximo 32 caracteres. Ejemplo: "Videos UGC para anuncios".
+   - description: una frase de máximo 90 caracteres, concreta y sin cifras ni precios.
 
 <perfil>
 ${JSON.stringify(profile, null, 2)}
@@ -114,11 +128,25 @@ ${JSON.stringify(profile, null, 2)}
   ];
 }
 
+const NICHE_REFS = ["n1", "n2", "n3"] as const;
+
 function responseSchema(refs: string[]) {
   return {
     type: "object",
     properties: {
       value_prop: { type: "string" },
+      niches: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            id: { type: "string", enum: [...NICHE_REFS] },
+            name: { type: "string" },
+          },
+          required: ["id", "name"],
+          additionalProperties: false,
+        },
+      },
       pieces: {
         type: "array",
         items: {
@@ -126,14 +154,26 @@ function responseSchema(refs: string[]) {
           properties: {
             id: { type: "string", enum: refs },
             title: { type: "string" },
-            niche: { type: "string", enum: [...NICHES, "ninguno"] },
+            niche: { type: "string", enum: [...NICHE_REFS, "ninguno"] },
           },
           required: ["id", "title", "niche"],
           additionalProperties: false,
         },
       },
+      services: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            title: { type: "string" },
+            description: { type: "string" },
+          },
+          required: ["title", "description"],
+          additionalProperties: false,
+        },
+      },
     },
-    required: ["value_prop", "pieces"],
+    required: ["value_prop", "niches", "pieces", "services"],
     additionalProperties: false,
   };
 }
@@ -149,7 +189,7 @@ async function callGroq(messages: ReturnType<typeof buildMessages>, schema: Retu
         model: GROQ_MODEL,
         messages,
         temperature: 0.5,
-        max_completion_tokens: 2048,
+        max_completion_tokens: 3072, // v2: además de títulos, nichos y servicios
         reasoning_effort: "low", // tarea corta: razonar poco = respuesta en ~2 s
         include_reasoning: false,
         response_format: {
@@ -192,7 +232,9 @@ async function callGroq(messages: ReturnType<typeof buildMessages>, schema: Retu
 // ── Validación de la respuesta ──────────────────────────────────────
 const outputSchema = z.object({
   value_prop: z.string(),
+  niches: z.array(z.object({ id: z.string(), name: z.string() })).default([]),
   pieces: z.array(z.object({ id: z.string(), title: z.string(), niche: z.string() })),
+  services: z.array(z.object({ title: z.string(), description: z.string() })).default([]),
 });
 
 /** Quita emojis, hashtags y comillas envolventes; deja una sola línea. */
@@ -221,17 +263,38 @@ function parseCopy(content: string, refs: { ref: string; post: CopyInput["posts"
     throw new RetryableError(`Propuesta de valor fuera de rango (${valueProp.length} caracteres).`);
   }
 
+  // Nichos: n1…n3 → { slug, label }. Se descartan los repetidos, los vacíos y "todo".
+  const nicheByRef = new Map<string, NicheDef>();
+  for (const candidate of parsed.data.niches) {
+    const niche = nicheFromLabel(cleanLine(candidate.name));
+    if (!niche || nicheByRef.has(candidate.id) || !(NICHE_REFS as readonly string[]).includes(candidate.id)) continue;
+    if ([...nicheByRef.values()].some((existing) => existing.slug === niche.slug)) continue;
+    nicheByRef.set(candidate.id, niche);
+    if (nicheByRef.size === MAX_NICHES) break;
+  }
+
   const idByRef = new Map(refs.map(({ ref, post }) => [ref, post.id]));
-  const pieces = new Map<string, { title: string; niche: Niche | null }>();
+  const pieces = new Map<string, { title: string; niche: string | null }>();
   for (const piece of parsed.data.pieces) {
     const postId = idByRef.get(piece.id);
     const title = truncateWords(cleanLine(piece.title).replace(/[.。]+$/, ""), TITLE_MAX);
     if (!postId || !title || pieces.has(postId)) continue;
-    const niche = (NICHES as readonly string[]).includes(piece.niche) ? (piece.niche as Niche) : null;
-    pieces.set(postId, { title, niche });
+    pieces.set(postId, { title, niche: nicheByRef.get(piece.niche)?.slug ?? null });
   }
 
-  return { model: GROQ_MODEL, valueProp, pieces };
+  // Solo quedan los nichos que tienen alguna pieza: una píldora sin trabajos no sirve.
+  const used = new Set([...pieces.values()].map((piece) => piece.niche));
+  const niches = [...nicheByRef.values()].filter((niche) => used.has(niche.slug));
+
+  const services = parsed.data.services
+    .map((service) => ({
+      title: truncateWords(cleanLine(service.title).replace(/[.。]+$/, ""), LIMITS.serviceTitle),
+      description: truncateWords(cleanLine(service.description), LIMITS.serviceDescription),
+    }))
+    .filter((service) => service.title.length >= 3)
+    .slice(0, LIMITS.maxServices);
+
+  return { model: GROQ_MODEL, valueProp, niches, pieces, services };
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>

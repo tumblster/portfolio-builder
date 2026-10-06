@@ -19,9 +19,9 @@ export function LogoutButton() {
       type="button"
       onClick={logout}
       disabled={leaving}
-      className="flex min-h-tap items-center px-1 font-mono text-xs text-muted transition hover:text-white disabled:opacity-60"
+      className="flex min-h-tap items-center px-2 text-sm font-semibold text-muted underline-offset-4 hover:text-ink hover:underline hover:decoration-accent hover:decoration-2 disabled:opacity-60"
     >
-      {leaving ? "saliendo…" : "salir"}
+      {leaving ? "Saliendo…" : "Salir"}
     </button>
   );
 }

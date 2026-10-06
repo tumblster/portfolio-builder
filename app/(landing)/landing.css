@@ -1,0 +1,338 @@
+/*
+ * Landing (v2 · M4-rev). Solo se carga en "/". Colores: los tokens del studio (app/globals.css) y dos
+ * de la landing. Contraste de texto ≥ 7:1:
+ *   crema sobre brasa 11,9 · arena sobre brasa 10,5 · niebla sobre tinta 11,3 · niebla sobre carbón 10,2
+ *   crema sobre tinta 17,7 · arena sobre tinta 15,0 (el bloque del cierre es negro desde la ronda 30/09 · 8.3)
+ * El acento #FC3300 nunca lleva texto: vive en el foco, el borde 3D de los botones y los detalles del cierre.
+ * La animación de Chispa vive con ella (components/mascot/chispa.css), para poder usarla después en el studio.
+ */
+.landing {
+  /* Bloque del CTA final (8.3): negro (la tinta), no vino. Crema sobre tinta 17,7:1 · arena sobre tinta 15:1. */
+  --landing-ember: var(--color-ink);
+  --landing-coal: #1a1e16; /* tarjeta dentro del bloque oscuro */
+  --landing-mist: #c9c8b6; /* texto secundario sobre tinta */
+}
+html:has(.landing) {
+  scroll-padding-top: 5.5rem; /* la navegación es fija */
+}
+@media (prefers-reduced-motion: no-preference) {
+  html:has(.landing) {
+    scroll-behavior: smooth;
+  }
+}
+/* H1 del hero (r3 · 3): Inter Tight SemiBold, y TMJ SOLO en "superpoderes". Las variables las pone next/font
+ * (lib/fonts/landing.ts) solo en ese titular. TMJ es más angosta y liviana: a 1,22 em su altura de x
+ * y su peso visual calzan con la línea (verificado con capturas en escritorio y celular). */
+.landing-h1 {
+  font-family: var(--font-inter-tight), var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+}
+.landing-h1 .landing-tmj {
+  font-family: var(--font-tmj), var(--font-inter-tight), ui-sans-serif, system-ui, sans-serif;
+  font-size: 1.22em;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+.landing :focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 3px;
+}
+
+/* ── Hero: un solo elemento de Chispa, reubicado por ancho ─────────────
+ * Celular: la cara es el bloque visual del hero, centrada arriba (160 px) y separada del titular: entre su
+ * mentón y el H1 quedan ≥ 48 px (su propio aire de lienzo + el margen); el texto va centrado debajo. Tablet y escritorio: dos columnas,
+ * copy y columna visual; en la visual, la cara arriba presentando la mini-mock, que pasa por delante y tapa
+ * apenas el borde inferior de la sonrisa (--face: ancho de la cara; su aire de abajo es el 25,5 % del lienzo). */
+.landing-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: "face" "copy" "mock";
+}
+.landing-hero__copy {
+  grid-area: copy;
+}
+.landing-hero__face {
+  grid-area: face;
+  justify-self: center;
+  width: 10rem;
+  margin-bottom: 1rem;
+}
+.landing-hero__mock {
+  grid-area: mock;
+  justify-self: center;
+  width: min(100%, 17rem);
+  margin-top: 4rem;
+}
+@media (width >= 48rem) {
+  .landing-hero {
+    --face: 16rem;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 18rem);
+    grid-template-areas: "copy face" "copy mock";
+    column-gap: 3rem;
+  }
+  .landing-hero__copy {
+    align-self: center;
+  }
+  .landing-hero__face {
+    width: var(--face);
+    margin: 0;
+  }
+  .landing-hero__mock {
+    position: relative;
+    z-index: 1;
+    width: 82%;
+    margin-top: calc(var(--face) * -0.255 - 1rem);
+  }
+}
+@media (width >= 64rem) {
+  .landing-hero {
+    --face: 18.75rem; /* 300 px */
+    grid-template-columns: minmax(0, 1fr) minmax(0, 21rem);
+    column-gap: 4rem;
+  }
+  .landing-hero__mock {
+    width: 16rem;
+  }
+}
+
+/* Después del hero, el contenido usa todo el ancho menos una columna derecha angosta (15rem): por ahí baja la
+ * carita viajera en escritorio, pegada al contenido en vez de tapar el texto. */
+.landing-column {
+  margin-right: 1.75rem; /* celular: el borde derecho es el carril de la carita viajera (52 px) */
+}
+@media (width >= 48rem) {
+  .landing-column {
+    max-width: calc(100% - 15rem);
+    margin-right: 0;
+  }
+}
+
+/* ── Carita viajera (components/mascot/mascot-traveler.tsx, B1) ──────────
+ * Un solo elemento fijo del tamaño del lienzo de Chispa (330 px): el JS lo ubica y lo escala solo con transform.
+ * Invisible hasta que se desprende del hero; mientras viaja, la cara del hero se esconde (visibility: sin mover
+ * nada) y el mark del footer espera a que la cara llegue para cruzarse con ella. */
+.mascot-traveler {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 30; /* sobre el contenido y el botón flotante; bajo la navegación fija */
+  width: 330px;
+  height: 330px;
+  color: var(--color-ink);
+  transform-origin: 0 0;
+  pointer-events: none;
+  visibility: hidden;
+  will-change: transform;
+}
+.mascot-traveler[data-ready]:not([data-state="hero"]) {
+  visibility: visible;
+}
+.mascot-traveler__pop {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transition: opacity 260ms ease;
+}
+/* El logo la absorbe: la cara se funde mientras el mark aparece (y al revés si se vuelve a subir). */
+.mascot-traveler[data-state="absorbed"] .mascot-traveler__pop {
+  opacity: 0;
+}
+.mascot-traveler svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.mascot-traveler [data-face] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 200ms ease;
+}
+.mascot-traveler [data-face][data-active] {
+  opacity: 1;
+}
+.mascot-traveler [data-face]:not([data-active]) * {
+  animation-play-state: paused;
+}
+/* Para calzar exacto con el mark, la sonrisa deja de "respirar" al aterrizar. */
+.mascot-traveler:is([data-state="landing"], [data-state="absorbed"], [data-state="leaving"]) .mascot-mouth {
+  animation: none;
+}
+html[data-mascot-traveling] [data-hero-mascot] {
+  visibility: hidden;
+}
+[data-mascot-target] {
+  transition: opacity 260ms ease;
+}
+html[data-mascot-hide-mark] [data-mascot-target] {
+  opacity: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .mascot-traveler {
+    display: none;
+  }
+}
+
+/* ── Botón flotante del piloto (components/landing/pilot-float.tsx, B6) ─── */
+.pilot-float {
+  position: fixed;
+  z-index: 20; /* por debajo de la carita viajera */
+  bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+  left: 50%;
+  display: inline-flex;
+  align-items: center;
+  height: 3rem;
+  padding: 0 1.5rem;
+  border-radius: 999px;
+  background: var(--color-ink);
+  color: var(--color-cream);
+  font-size: 0.9375rem;
+  font-weight: 500;
+  white-space: nowrap;
+  box-shadow: 0 10px 24px -12px rgb(14 17 11 / 0.5);
+  opacity: 0;
+  visibility: hidden;
+  transform: translate(-50%, 0.75rem);
+  transition:
+    opacity 220ms ease,
+    transform 320ms cubic-bezier(0.22, 1, 0.36, 1),
+    visibility 0s linear 320ms;
+}
+.pilot-float[data-visible] {
+  opacity: 1;
+  visibility: visible;
+  transform: translate(-50%, 0);
+  transition:
+    opacity 220ms ease,
+    transform 320ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.pilot-float:hover {
+  background: #2a2e24;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pilot-float,
+  .pilot-float[data-visible] {
+    transform: translate(-50%, 0);
+    transition: none;
+  }
+}
+
+/* Botones primarios con profundidad (B9): viven en components/landing/brand.css (también los usa /crear). */
+
+/* ── Cierre del piloto (B9): base oscura con degradado hacia un rojo más vivo y detalles en el acento ─── */
+.landing-ember {
+  border-top: 4px solid var(--color-accent);
+  background: var(--landing-ember);
+}
+
+/* ── Roadmap (B5): timeline vertical, una línea y un nodo por herramienta ─── */
+.landing-roadmap {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding-left: 2.25rem;
+}
+.landing-roadmap::before {
+  content: "";
+  position: absolute;
+  top: 1.75rem;
+  bottom: 1.75rem;
+  left: 0.6875rem;
+  width: 2px;
+  border-radius: 2px;
+  background: var(--color-line);
+}
+.landing-roadmap__item {
+  position: relative;
+}
+.landing-roadmap__node {
+  position: absolute;
+  top: 2.125rem;
+  left: -2.25rem;
+  width: 1.5rem;
+  height: 1.5rem;
+  border: 2px solid var(--color-ink);
+  border-radius: 999px;
+  background: var(--color-cream);
+}
+.landing-roadmap__item[data-roadmap-status="Disponible ahora"] .landing-roadmap__node {
+  background: var(--color-accent);
+}
+@media (width >= 48rem) {
+  .landing-roadmap {
+    gap: 2rem;
+    padding-left: 3rem;
+  }
+  .landing-roadmap::before {
+    left: 0.6875rem;
+  }
+  .landing-roadmap__node {
+    top: 2.625rem;
+    left: -3rem;
+  }
+}
+
+/* ── Mock del hero que muta (ronda 30/09 · 8.1, components/landing/hero-morph.tsx) ─────────────────────────
+ * 6 estados (plantilla × paleta reales) apilados. Cada uno se ve 3 s y se funde con el siguiente (~450 ms,
+ * con una leve escala): un ciclo de 18 s, solo opacidad y transform. El diseño de la vista previa mide 20 rem de
+ * ancho; zoom lo lleva al ancho del hero (17 rem en el celular, 16 rem desde tablet). */
+.hero-morph {
+  position: relative;
+  width: 20rem;
+  height: 29rem;
+  margin-inline: auto;
+  overflow: hidden;
+  border: 2px solid var(--color-ink);
+  border-radius: 1.75rem;
+  background: var(--color-paper);
+  box-shadow: 6px 6px 0 rgb(14 17 11 / 0.12);
+  zoom: 0.85;
+}
+@media (width >= 48rem) {
+  .hero-morph {
+    zoom: 0.8;
+  }
+}
+.hero-morph__layer {
+  position: absolute;
+  inset: 0;
+}
+/* Sin brillo en los skeleton del hero: son 6 capas y solo una se ve. */
+.hero-morph .tpv-sk::after {
+  display: none;
+}
+.hero-morph__layer:not(:first-child) {
+  opacity: 0;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .hero-morph__layer,
+  .hero-morph__layer:not(:first-child) {
+    opacity: 0;
+    will-change: opacity, transform;
+    /* La primera arranca ya a la vista (retraso negativo); las demás esperan su turno cada 3 s. */
+    animation: hero-morph 18s linear infinite;
+    animation-delay: calc(var(--i) * 3s - 1s);
+    animation-fill-mode: backwards;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-morph__layer:not(:first-child) {
+    display: none;
+  }
+}
+@keyframes hero-morph {
+  0% {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  2.5%,
+  16.7% {
+    opacity: 1;
+    transform: none;
+  }
+  19.2%,
+  100% {
+    opacity: 0;
+    transform: scale(1.02);
+  }
+}

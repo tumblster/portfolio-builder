@@ -32,6 +32,10 @@ export interface Storage {
   /** Guarda una imagen nueva (los nombres son únicos y nunca se sobrescriben). */
   putMedia(file: string, bytes: Uint8Array, contentType: string): Promise<void>;
   getMedia(file: string): Promise<StoredMedia | null>;
+  /** Rutas de los archivos bajo un prefijo de carpeta (p. ej. "portfolios/"). Spec 11.9 (limpieza por inactividad). */
+  list(prefix: string): Promise<string[]>;
+  /** Borra un archivo si existe (si no, no hace nada). Spec 11.9. */
+  deleteJson(path: string): Promise<void>;
 }
 
 export function getStorage(): Storage {

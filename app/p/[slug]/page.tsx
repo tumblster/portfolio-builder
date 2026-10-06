@@ -1,11 +1,13 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { notFound } from "next/navigation";
+import { ArchivedPortfolio } from "@/components/portfolio/archived-portfolio";
 import { PublicPortfolio } from "@/components/public-portfolio";
+import { portfolioMetadata, portfolioViewport } from "@/lib/portfolio/metadata";
 import { loadPublicPortfolio } from "@/lib/portfolio/public";
 
 /*
- * Página pública del portafolio (RF-03): abierta, sin clave. Es la versión general
- * (acento violeta); las de cada nicho viven en /p/<slug>/<nicho>.
+ * Página pública del portafolio (RF-03): abierta, sin clave. Es la versión general ("Todo");
+ * cada nicho tiene además su propio link, /p/<slug>/<nicho>, con la misma página filtrada.
  * Se genera en su primera visita y queda en caché (ISR): las siguientes cargas
  * salen directo de la CDN. Al crear o editar un portafolio se invalida al
  * instante (lib/portfolio/repository.ts); `revalidate` es solo la red de seguridad.
@@ -16,24 +18,18 @@ export async function generateStaticParams() {
   return []; // ninguno en el build: cada portafolio se genera en su primera visita
 }
 
-const NO_INDEX = { index: false, follow: false } as const; // se comparte por link, no por Google
-
 export async function generateMetadata({ params }: PageProps<"/p/[slug]">): Promise<Metadata> {
-  const portfolio = await loadPublicPortfolio((await params).slug);
-  if (!portfolio) return { title: "Portafolio no encontrado", robots: NO_INDEX };
+  return portfolioMetadata(await loadPublicPortfolio((await params).slug), null);
+}
 
-  const title = `${portfolio.name} · Portafolio UGC`;
-  const description = portfolio.valueProp || portfolio.bio || "Portafolio UGC";
-  return {
-    title: { absolute: title },
-    description,
-    robots: NO_INDEX,
-    openGraph: { title, description, type: "profile" },
-  };
+export async function generateViewport({ params }: PageProps<"/p/[slug]">): Promise<Viewport> {
+  return portfolioViewport(await loadPublicPortfolio((await params).slug));
 }
 
 export default async function PublicPortfolioPage({ params }: PageProps<"/p/[slug]">) {
   const portfolio = await loadPublicPortfolio((await params).slug);
   if (!portfolio) notFound();
+  // Spec 11.9 / 12.3: archivado por inactividad → "No disponible temporalmente" (los datos siguen guardados).
+  if (portfolio.archivedAt) return <ArchivedPortfolio />;
   return <PublicPortfolio portfolio={portfolio} />;
 }

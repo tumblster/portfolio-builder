@@ -7,7 +7,7 @@ export function Avatar({ photo, name }: { photo: StoredImage | null; name: strin
     return (
       <span
         aria-hidden="true"
-        className="flex size-16 shrink-0 items-center justify-center rounded-full bg-ink font-serif text-2xl text-lilac ring-1 ring-line"
+        className="flex size-16 shrink-0 items-center justify-center rounded-full bg-sand font-display text-2xl text-success ring-1 ring-line"
       >
         {name.trim().charAt(0).toLocaleUpperCase("es")}
       </span>

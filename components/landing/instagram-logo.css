@@ -1,0 +1,16 @@
+/*
+ * Wordmark de Instagram dentro de una línea de texto (r3 · 1). Medidas del PNG
+ * (components/instagram-wordmark.png):
+ * su línea de base está al 67,7 % del alto (el 32,3 % restante es el descendente de la "g").
+ * - Alto 1,15 em: la parte sobre la línea de base (~0,78 em) mide como las mayúsculas del texto.
+ * - vertical-align −0,37 em (= 32,3 % de 1,15 em): la base del logo cae justo en la del texto.
+ * - Ancho por aspect-ratio (296 / 84 ≈ 4 em), casi lo mismo que la palabra escrita: no cambia el corte de línea.
+ */
+.instagram-logo {
+  display: inline-block;
+  height: 1.15em;
+  aspect-ratio: 296 / 84;
+  margin: 0 0.06em;
+  vertical-align: -0.37em;
+  background: url("../instagram-wordmark.png") center / contain no-repeat;
+}

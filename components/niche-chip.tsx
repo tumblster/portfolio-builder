@@ -1,13 +1,8 @@
-import { NICHE_LABELS, type Niche } from "@/lib/portfolio/niches";
-
-/** El color sale del acento del nicho (data-niche en globals.css). */
-export function NicheChip({ niche }: { niche: Niche }) {
+/** Etiqueta del nicho de una pieza. Los nichos son propios de cada portafolio: un solo estilo neutro. */
+export function NicheChip({ label }: { label: string }) {
   return (
-    <span
-      data-niche={niche}
-      className="shrink-0 rounded-full border border-accent/40 bg-accent/10 px-2.5 py-0.5 text-xs text-accent"
-    >
-      {NICHE_LABELS[niche]}
+    <span className="max-w-[10rem] shrink-0 truncate rounded-full border border-ink bg-highlight px-2.5 py-0.5 text-xs text-success">
+      {label}
     </span>
   );
 }

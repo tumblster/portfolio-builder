@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { ConflictError, NotFoundError } from "@/lib/errors";
 import { getStorage } from "@/lib/storage";
+import { LEGACY_NICHES, resolveNiches } from "./niches";
 import { SCHEMA_VERSION, portfolioSchema, type Piece, type PieceInput, type Portfolio } from "./schema";
 import { publicPaths, slugCandidates, slugify, slugSchema } from "./slug";
 
@@ -16,12 +17,14 @@ const nowUtc = () => new Date().toISOString();
 
 /**
  * Las páginas públicas (/p/<slug> y sus versiones por nicho) quedan en caché (ISR).
- * Tras cada escritura se invalidan todas para que el cambio se vea al instante.
+ * Tras cada escritura se invalidan todas para que el cambio se vea al instante: las de
+ * los nichos de antes y de después del cambio, y siempre las tres de la v1.
  * Va sin el segundo argumento ("page" / "layout"): ese solo aplica a rutas con
  * [segmentos], no a una URL concreta.
  */
-function refreshPublicPages(slug: string): void {
-  for (const path of publicPaths(slug)) {
+function refreshPublicPages(slug: string, ...docs: Portfolio[]): void {
+  const niches = [...LEGACY_NICHES, ...docs.flatMap((doc) => resolveNiches(doc))].map((niche) => niche.slug);
+  for (const path of publicPaths(slug, niches)) {
     try {
       revalidatePath(path);
     } catch (error) {
@@ -41,7 +44,8 @@ function parseStored(data: unknown, slug: string): Portfolio {
   return parsed.data;
 }
 
-export type NewPortfolio = Pick<Portfolio, "source" | "instagram" | "generated" | "manual" | "pieces">;
+export type NewPortfolio = Pick<Portfolio, "source" | "instagram" | "generated" | "manual" | "pieces"> &
+  Partial<Pick<Portfolio, "design" | "insights">>;
 
 /**
  * Crea el portafolio y le reserva un link único a partir del nombre o usuario:
@@ -61,7 +65,7 @@ export async function createPortfolio(data: NewPortfolio, slugFrom: string): Pro
       ...data,
     });
     if (await storage.createJson(docPath(slug), portfolio)) {
-      refreshPublicPages(slug);
+      refreshPublicPages(slug, portfolio);
       return portfolio;
     }
   }
@@ -101,7 +105,7 @@ export async function updatePortfolio(
     updatedAt: nowUtc(),
   });
   if (!(await storage.replaceJson(docPath(slug), next, stored.etag))) throw new ConflictError();
-  refreshPublicPages(slug);
+  refreshPublicPages(slug, current, next);
   return next;
 }
 
@@ -120,4 +124,38 @@ export function toStoredPieces(inputs: PieceInput[], existing: Piece[] = []): Pi
       ...(previous?.sourcePostId ? { sourcePostId: previous.sourcePostId } : {}),
     };
   });
+}
+
+/**
+ * Borra un portafolio (spec 11.9: limpieza por inactividad) y deja de servir sus páginas públicas. Las imágenes que
+ * subió quedan en el almacenamiento (deuda aceptada en DEPLOY.md). Devuelve false si no existía.
+ */
+export async function deletePortfolio(slug: string): Promise<boolean> {
+  const doc = await getPortfolio(slug);
+  if (!doc) return false;
+  await getStorage().deleteJson(docPath(slug));
+  refreshPublicPages(slug, doc);
+  return true;
+}
+
+/**
+ * Spec 11.9: archiva (soft-delete: se despublica, los datos quedan) o reactiva un portafolio. Reactivar cuenta como
+ * actividad (updatedAt). Escritura condicional con un reintento; devuelve el documento resultante o null si no existe.
+ */
+export async function setArchived(slug: string, archived: boolean): Promise<Portfolio | null> {
+  const storage = getStorage();
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const stored = await storage.readJson(docPath(slug));
+    if (!stored) return null;
+    const current = parseStored(stored.data, slug);
+    const now = new Date().toISOString();
+    const next = portfolioSchema.parse(
+      archived ? { ...current, archivedAt: now } : { ...current, archivedAt: null, updatedAt: now },
+    );
+    if (await storage.replaceJson(docPath(slug), next, stored.etag)) {
+      refreshPublicPages(slug, next);
+      return next;
+    }
+  }
+  throw new ConflictError();
 }

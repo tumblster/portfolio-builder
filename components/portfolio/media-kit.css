@@ -1,0 +1,444 @@
+/*
+ * Toggle SOBRE MÍ / MEDIA KIT y la vista Media Kit (ronda 30/09 · 7.3). Colores de la paleta del portafolio
+ * (--pf-*, que llegan en el style de .pf-views): los mismos pares que ya cumplen ≥ 7:1 en las plantillas
+ * (tinta y texto secundario sobre el fondo; blanco sobre la tinta). El acento solo decora.
+ */
+.pf-views {
+  --pf-switch-h: 3.5rem;
+}
+/* Header único en 2 filas (11.6): las vistas empiezan debajo; en Media kit la fila 2 se colapsa y el header se
+   compacta. Las barras propias de las plantillas no se muestran. */
+.pf-views {
+  --pf-row1: 3.5rem;
+  --pf-row2: 2.875rem;
+  --pf-bar-h: var(--pf-row1);
+}
+.pf-views[data-view="about"][data-has-niches] {
+  --pf-bar-h: calc(var(--pf-row1) + var(--pf-row2));
+}
+.pf-views__panel {
+  padding-top: var(--pf-bar-h);
+}
+.pf-views .pf-nav,
+.pf-views .ed-top {
+  display: none;
+}
+.pf-views .min-side {
+  top: var(--pf-bar-h);
+  max-height: calc(100dvh - var(--pf-bar-h));
+}
+.pf-views [id] {
+  scroll-margin-top: calc(var(--pf-bar-h) + 12px);
+}
+.pf-views__kit {
+  min-height: 100dvh;
+  background: var(--pf-bg);
+  color: var(--pf-ink);
+}
+
+.pf-bar {
+  position: fixed;
+  z-index: 40;
+  top: 0;
+  right: 0;
+  left: 0;
+  background: color-mix(in srgb, var(--pf-bg) 88%, transparent);
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--pf-ink) 12%, transparent);
+  -webkit-backdrop-filter: blur(14px) saturate(1.4);
+  backdrop-filter: blur(14px) saturate(1.4);
+  font-family: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
+}
+.pf-bar__row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  height: var(--pf-row1);
+  padding: 0 max(0.75rem, calc((100vw - 64rem) / 2));
+}
+.pf-bar__avatar {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--pf-beige);
+  color: var(--pf-display);
+  font-weight: 700;
+}
+.pf-bar__avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+/* 12.7: el ojito con las vistas, junto a la foto. */
+.pf-bar__views {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 0.25rem;
+  color: var(--pf-muted);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+.pf-bar__views svg {
+  width: 1rem;
+  height: 1rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+}
+/* Control segmentado "Contenido | Media kit". */
+.pf-seg {
+  display: inline-grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.125rem;
+  margin: 0 auto;
+  padding: 0.1875rem;
+  border: 1px solid color-mix(in srgb, var(--pf-ink) 16%, transparent);
+  border-radius: 999px;
+  background: #ffffff;
+}
+.pf-seg button {
+  min-height: 2.25rem;
+  padding: 0 0.75rem;
+  border-radius: 999px;
+  color: var(--pf-muted);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.pf-seg button[aria-selected="true"] {
+  background: var(--pf-ink);
+  color: #ffffff;
+}
+.pf-seg button:focus-visible {
+  outline: 3px solid var(--pf-accent);
+  outline-offset: 2px;
+}
+/* Fila 2: se colapsa con animación al pasar a Media kit. */
+.pf-bar__row2 {
+  display: grid;
+  grid-template-rows: 1fr;
+  opacity: 1;
+  transition:
+    grid-template-rows 240ms ease,
+    opacity 200ms ease;
+}
+.pf-views[data-view="kit"] .pf-bar__row2 {
+  grid-template-rows: 0fr;
+  opacity: 0;
+}
+.pf-bar__row2-inner {
+  min-height: 0;
+  overflow: hidden;
+}
+.pf-views__panel {
+  transition: padding-top 240ms ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pf-bar__row2,
+  .pf-views__panel {
+    transition: none;
+  }
+}
+.pf-bar__chips {
+  height: var(--pf-row2);
+  padding: 0 max(0.75rem, calc((100vw - 64rem) / 2));
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.pf-bar__chips::-webkit-scrollbar {
+  display: none;
+}
+/* Fundidos cuando los chips no caben: nunca un corte seco (11.6). */
+.pf-bar__chips[data-scrolled] {
+  mask-image: linear-gradient(90deg, transparent 0, #000 1.75rem);
+}
+.pf-bar__chips[data-more] {
+  mask-image: linear-gradient(90deg, #000 calc(100% - 1.75rem), transparent 100%);
+}
+.pf-bar__chips[data-scrolled][data-more] {
+  mask-image: linear-gradient(90deg, transparent 0, #000 1.75rem, #000 calc(100% - 1.75rem), transparent 100%);
+}
+.pf-bar__chips ul {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  width: max-content;
+  height: 100%;
+  margin: 0;
+  padding: 0 0.125rem 0.375rem;
+  list-style: none;
+}
+.pf-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.25rem;
+  padding: 0 0.875rem;
+  border: 1px solid color-mix(in srgb, var(--pf-ink) 16%, transparent);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.72);
+  color: var(--pf-ink);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  white-space: nowrap;
+  text-decoration: none;
+}
+/* El elegido: solo trazado (outline), sin relleno de color. */
+.pf-chip[aria-current="page"] {
+  border: 2px solid var(--pf-ink);
+  background: transparent;
+  font-weight: 700;
+}
+.pf-chip:focus-visible,
+.pf-bar__cta:focus-visible,
+.pf-bar__avatar:focus-visible,
+.pf-share__whatsapp:focus-visible {
+  outline: 3px solid var(--pf-accent);
+  outline-offset: 2px;
+}
+.pf-bar__cta {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  min-height: 2.5rem;
+  padding: 0 1rem;
+  border-radius: 999px;
+  background: var(--pf-ink);
+  color: #ffffff;
+  font-size: 0.875rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+/* 12.4: compartir por WhatsApp, al final del portafolio. */
+.pf-share {
+  display: flex;
+  justify-content: center;
+  margin: 0;
+  padding: 1.5rem 1rem 2.5rem;
+  background: var(--pf-bg);
+}
+.pf-share__whatsapp {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+  padding: 0 1.25rem;
+  border: 1px solid color-mix(in srgb, var(--pf-ink) 22%, transparent);
+  border-radius: 999px;
+  background: #ffffff;
+  color: var(--pf-ink);
+  font-weight: 700;
+  text-decoration: none;
+}
+@media (width < 380px) {
+  .pf-seg button {
+    padding: 0 0.5rem;
+  }
+  .pf-bar__cta {
+    padding: 0 0.75rem;
+  }
+}
+
+/* ── Media Kit ─────────────────────────────────────────────── */
+.mk {
+  width: 100%;
+  max-width: 46rem;
+  margin: 0 auto;
+  padding: 2rem 1rem 5rem;
+  font-family: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
+}
+.mk-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.625rem;
+  text-align: center;
+}
+.mk-avatar {
+  box-shadow: 0 0 0 4px #ffffff, 0 0 0 5px color-mix(in srgb, var(--pf-ink) 16%, transparent);
+}
+.mk-name {
+  margin: 0.5rem 0 0;
+  font-size: clamp(1.75rem, 6vw, 2.5rem);
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+  overflow-wrap: anywhere;
+}
+.mk-tags {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.375rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.mk-tags li {
+  padding: 0.3125rem 0.75rem;
+  border-radius: 999px;
+  background: var(--pf-accent-soft);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+.mk-handle {
+  margin: 0;
+  color: var(--pf-muted);
+}
+.mk-section {
+  margin-top: 2.5rem;
+}
+.mk-h2 {
+  margin: 0 0 0.875rem;
+  color: var(--pf-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.mk-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+  gap: 0.75rem;
+  margin: 0;
+}
+.mk-metric {
+  min-width: 0;
+  padding: 1rem 1.125rem;
+  border: 1px solid color-mix(in srgb, var(--pf-ink) 14%, transparent);
+  border-radius: 1.25rem;
+  background: #ffffff;
+}
+.mk-metric dt {
+  display: flex;
+  align-items: center;
+  gap: 0.4375rem;
+  color: var(--pf-muted);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+.mk-metric dt::before {
+  content: "";
+  width: 0.4375rem;
+  height: 0.4375rem;
+  border-radius: 999px;
+  background: var(--pf-accent);
+}
+.mk-metric__value {
+  margin: 0.25rem 0 0;
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+}
+.mk-metric__basis {
+  margin: 0.375rem 0 0;
+  color: var(--pf-muted);
+  font-size: 0.75rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.mk-platforms {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.mk-platforms li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.75rem;
+}
+.mk-platform {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.75rem;
+  padding: 0 1rem;
+  border: 1px solid color-mix(in srgb, var(--pf-ink) 18%, transparent);
+  border-radius: 999px;
+  background: #ffffff;
+  color: var(--pf-ink);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.mk-platform__meta {
+  color: var(--pf-muted);
+  font-size: 0.875rem;
+}
+.mk-pieces {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+@media (width >= 40rem) {
+  .mk-pieces {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+.mk-piece {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  color: var(--pf-ink);
+  text-decoration: none;
+}
+.mk-piece__media {
+  position: relative;
+  display: block;
+  aspect-ratio: 4 / 5;
+  overflow: hidden;
+  border-radius: 1rem;
+  background: var(--pf-beige);
+}
+.mk-piece__img {
+  object-fit: cover;
+}
+.mk-piece__title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+.mk-piece__meta {
+  color: var(--pf-muted);
+  font-size: 0.75rem;
+}
+.mk-about {
+  margin: 0;
+  font-size: 1.0625rem;
+  line-height: 1.65;
+  white-space: pre-line;
+}
+.mk-cta-wrap {
+  margin: 2.75rem 0 0;
+  text-align: center;
+}
+.mk-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 3.25rem;
+  padding: 0 2rem;
+  border-radius: 999px;
+  background: var(--pf-ink);
+  color: #ffffff;
+  font-weight: 700;
+  text-decoration: none;
+  box-shadow: 0 4px 0 var(--pf-accent);
+}
+.mk-cta:focus-visible,
+.mk-piece:focus-visible,
+.mk-platform:focus-visible {
+  outline: 3px solid var(--pf-accent);
+  outline-offset: 3px;
+}
