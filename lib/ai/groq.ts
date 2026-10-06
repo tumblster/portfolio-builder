@@ -17,6 +17,11 @@ import { LIMITS, type InstagramPost, type Service } from "@/lib/portfolio/schema
  * JSON que cumple el esquema (ids de los posts enviados, ids de nicho n1…n3).
  * Igual se valida con zod, porque el esquema no limita largos. El slug de cada nicho
  * no lo escribe el modelo: sale de su nombre con slugify, así siempre es seguro para URL.
+ *
+ * Ronda 6 · 13.21: el etiquetado es determinista. Temperatura 0 (sin azar) y una semilla fija, que Groq respeta
+ * como "mejor esfuerzo": el mismo contenido recibe siempre las mismas etiquetas. Igual son SUGERENCIAS: la creadora
+ * las confirma o corrige en "Nichos y piezas" antes de generar (components/import/confirm-pickers.tsx), y lo que
+ * ella confirma es lo único que se aplica.
  */
 
 export const GROQ_MODEL = "openai/gpt-oss-120b"; // soporta JSON estricto y escribe bien en español
@@ -24,6 +29,10 @@ const ENDPOINT = "https://api.groq.com/openai/v1/chat/completions";
 const REQUEST_TIMEOUT_MS = 25_000;
 const MAX_ATTEMPTS = 2;
 const TITLE_MAX = 60;
+/** 13.21: sin azar al elegir cada palabra. */
+const TEMPERATURE = 0;
+/** 13.21: misma semilla en cada llamada → misma respuesta para el mismo contenido. No cambiarla sin motivo. */
+const SEED = 2026;
 
 function readKey(): string {
   const key = process.env.GROQ_API_KEY?.trim();
@@ -188,7 +197,8 @@ async function callGroq(messages: ReturnType<typeof buildMessages>, schema: Retu
       body: JSON.stringify({
         model: GROQ_MODEL,
         messages,
-        temperature: 0.5,
+        temperature: TEMPERATURE, // 13.21: determinista
+        seed: SEED, // 13.21: misma semilla → misma respuesta (mejor esfuerzo del proveedor)
         max_completion_tokens: 3072, // v2: además de títulos, nichos y servicios
         reasoning_effort: "low", // tarea corta: razonar poco = respuesta en ~2 s
         include_reasoning: false,

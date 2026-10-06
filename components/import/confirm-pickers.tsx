@@ -1,10 +1,19 @@
 "use client";
 
 import Image from "next/image";
-import { useId, useRef, useState } from "react";
+import { useId, useRef, useState, type FormEvent } from "react";
 import { ChipList } from "@/components/chips/chip-list";
 import { Combobox, type ComboOption } from "@/components/chips/combobox";
 import type { DraftPiece } from "@/lib/import/events";
+import {
+  INSTAGRAM_LINKS_SOON,
+  LINK_INVALID,
+  LINK_ONLY_TIKTOK,
+  instagramLinkBlocked,
+  isTikTokHost,
+  linkHost,
+  normalizeLink,
+} from "@/lib/import/link-sources";
 import { MAX_NICHES, nicheFromLabel } from "@/lib/portfolio/niches";
 import { NICHE_TAXONOMY, foldText } from "@/lib/portfolio/niche-taxonomy";
 import { InlineReel } from "@/components/reel/inline-reel";
@@ -17,13 +26,17 @@ import { embedFor } from "@/lib/portfolio/embed";
  * - Nichos: chips precargados con lo que sugirió la IA + un campo con autocompletado sobre la taxonomía (y lo que
  *   sugirió la IA). Hasta 3. Se puede agregar uno propio ("Agregar «…»"), validado igual que siempre.
  * - Piezas: chips precargados con las que eligió la IA (con miniatura y su nicho) + autocompletado por título +
- *   "De tu perfil": la grilla de todas sus publicaciones importadas con un + en cada una.
+ *   "Tus últimos 12 contenidos" (antes "De tu perfil"): la grilla de sus publicaciones importadas con un + en cada una.
  * En los dos: × para quitar, asa y Alt + flechas para ordenar, Backspace con el campo vacío quita el último. El
  * foco vuelve al campo al quitar. El orden es el de elección: nunca se reordena solo.
+ *
+ * Ronda 6 · 13.4: la sección de la grilla lleva los textos exactos del dueño ("Tus últimos 12 contenidos" y "¿No ves
+ * el que buscas? Pégalo por link ↓"), explica en simple dónde aparece lo agregado y nunca muestra jerga técnica.
+ * Agregar por link acepta solo videos de TikTok; los links de Instagram siguen ocultos (lib/import/link-sources.ts).
  */
 
 export type NicheChip = { key: string; label: string };
-/** `pending`: la sumó desde "De tu perfil" y no traía nicho: su selector pide "Elegir nicho…" (spec 11.4). */
+/** `pending`: la sumó desde la grilla o por link y no traía nicho: su selector pide "Elegir nicho…" (spec 11.4). */
 export type PieceChip = { id: string; nicheKey: string | null; pending?: boolean };
 
 export function Thumb({ piece, size = 48 }: { piece: DraftPiece; size?: number }) {
@@ -69,7 +82,7 @@ function TileBadge({ kind }: { kind: "video" | "image" | "carousel" }) {
   );
 }
 
-/** Spec 11.5: cuántas piezas muestra "De tu perfil" de entrada y cuántas suma cada "VER MÁS". */
+/** Spec 11.5: cuántas piezas muestra la grilla de entrada y cuántas suma cada "VER MÁS". */
 export const PROFILE_PAGE = 12;
 
 const move = <T,>(list: T[], from: number, to: number) => {
@@ -243,50 +256,81 @@ export function NichePicker(props: {
 export function PiecePicker(props: {
   pieces: PieceChip[];
   onChange: (pieces: PieceChip[]) => void;
-  /** Todas las piezas elegibles, las de la IA primero. */
+  /** Todas las piezas elegibles: las agregadas por link primero, luego las de la IA y las de su perfil. */
   pool: DraftPiece[];
   niches: NicheChip[];
   limits: { min: number; max: number };
   error: string | null;
   onError: (message: string | null) => void;
-  /** Spec 11.5: "Agregar por link" (oEmbed) necesita el borrador; la pieza nueva vuelve por onLinkPiece. */
+  /** Spec 11.5: "Agregar por link" necesita el borrador; la pieza nueva vuelve por onLinkPiece. */
   draftId: string;
   onLinkPiece: (piece: DraftPiece) => void;
 }) {
   const { pieces, onChange, onError, limits } = props;
+  const uid = useId();
+  const inputRef = useRef<HTMLInputElement>(null);
+  // Spec 11.5: la grilla muestra 12 por defecto y "VER MÁS" suma de a 12 (las imágenes cargan perezosas).
+  const [shown, setShown] = useState(PROFILE_PAGE);
   const [link, setLink] = useState("");
   const [linkState, setLinkState] = useState<{ busy: boolean; message: string | null }>({ busy: false, message: null });
+  const byId = new Map(props.pool.map((piece) => [piece.id, piece]));
+  const chosen = new Set(pieces.map((piece) => piece.id));
+  const full = pieces.length >= limits.max;
+  const titleOf = (id: string) => byId.get(id)?.title ?? "Pieza";
+  // 13.4: si pega un link de Instagram (aún oculto), se le dice al instante y no se llama a nada.
+  const instagramPasted = instagramLinkBlocked(link);
 
-  async function addByLink(event: React.FormEvent) {
+  async function addByLink(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!link.trim()) return;
+    const raw = link.trim();
+    if (!raw || linkState.busy) return;
+    if (instagramLinkBlocked(raw)) {
+      setLinkState({ busy: false, message: INSTAGRAM_LINKS_SOON });
+      return;
+    }
+    const host = linkHost(raw);
+    if (!host) {
+      setLinkState({ busy: false, message: LINK_INVALID });
+      return;
+    }
+    if (!isTikTokHost(host)) {
+      setLinkState({ busy: false, message: LINK_ONLY_TIKTOK });
+      return;
+    }
     setLinkState({ busy: true, message: null });
     try {
       const response = await fetch("/api/import/link", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ draftId: props.draftId, url: link.trim() }),
+        body: JSON.stringify({ draftId: props.draftId, url: normalizeLink(raw) }),
       });
       const data = await response.json().catch(() => null);
       if (!response.ok || !data?.piece) {
-        setLinkState({ busy: false, message: data?.error?.message ?? "No pudimos agregar ese post. Intenta de nuevo." });
+        // Solo se muestran los mensajes pensados para la creadora; cualquier otro error, uno simple y sin jerga.
+        const message =
+          data?.error?.code === "invalid_input" && typeof data.error.message === "string"
+            ? data.error.message
+            : "No pudimos agregar ese video. Intenta de nuevo en un momento.";
+        setLinkState({ busy: false, message });
         return;
       }
-      props.onLinkPiece(data.piece as DraftPiece);
+      const piece = data.piece as DraftPiece;
+      const already = chosen.has(piece.id);
+      props.onLinkPiece(piece);
       setLink("");
-      setLinkState({ busy: false, message: `Agregada: «${(data.piece as DraftPiece).title}».` });
+      // Dónde quedó, en simple: al final de sus piezas (arriba) y primero en la grilla de abajo.
+      setLinkState({
+        busy: false,
+        message: already
+          ? `«${piece.title}» ya estaba en tus piezas.`
+          : full
+            ? `«${piece.title}» quedó primero en esta lista. Ya tienes ${limits.max} piezas: quita una para sumarlo.`
+            : `Listo: «${piece.title}» se sumó al final de tus piezas.`,
+      });
     } catch {
       setLinkState({ busy: false, message: "Se cortó la conexión. Intenta de nuevo." });
     }
   }
-  const uid = useId();
-  const inputRef = useRef<HTMLInputElement>(null);
-  // Spec 11.5: "De tu perfil" muestra 12 por defecto y "VER MÁS" suma de a 12 (las imágenes cargan perezosas).
-  const [shown, setShown] = useState(PROFILE_PAGE);
-  const byId = new Map(props.pool.map((piece) => [piece.id, piece]));
-  const chosen = new Set(pieces.map((piece) => piece.id));
-  const full = pieces.length >= limits.max;
-  const titleOf = (id: string) => byId.get(id)?.title ?? "Pieza";
 
   // El chip de nicho que corresponde a un nicho de la IA (por su slug), si el creador lo tiene elegido.
   const keyForSlug = (slug: string | null) =>
@@ -365,7 +409,7 @@ export function PiecePicker(props: {
           onAfterRemove={() => requestAnimationFrame(() => inputRef.current?.focus())}
           layout="stack"
           idPrefix={`${uid}-piece`}
-          emptyText="Sin piezas todavía: súmalas desde «De tu perfil»."
+          emptyText="Sin piezas todavía: súmalas desde «Tus últimos 12 contenidos», aquí abajo."
         />
       </div>
       <div className="mt-3">
@@ -386,33 +430,50 @@ export function PiecePicker(props: {
         </p>
       )}
 
-      <h4 className="mt-6 text-sm font-semibold tracking-[0.12em] text-muted uppercase">De tu perfil</h4>
-      {/* Spec 11.5: un post público de Instagram o TikTok, por su link (oEmbed: portada, título y autor). */}
-      <form onSubmit={addByLink} className="mt-3 flex flex-wrap gap-2" data-add-by-link>
-        <label htmlFor={`${uid}-link`} className="sr-only">
-          Agregar por link: pega la URL de un post público de Instagram o TikTok
-        </label>
-        <input
-          id={`${uid}-link`}
-          type="url"
-          inputMode="url"
-          value={link}
-          onChange={(event) => setLink(event.target.value)}
-          placeholder="Agregar por link: pega un post de Instagram o TikTok"
-          className="combo__input min-w-0 flex-1 basis-64"
-        />
-        <button
-          type="submit"
-          disabled={linkState.busy || !link.trim()}
-          className="inline-flex min-h-13 items-center rounded-2xl border border-ink bg-ink px-4 text-sm font-semibold text-cream disabled:opacity-50"
-        >
-          {linkState.busy ? "Buscando…" : "Agregar"}
-        </button>
-      </form>
-      <p aria-live="polite" className="mt-1 min-h-5 text-sm text-muted" data-add-by-link-status>
-        {linkState.message}
-      </p>
-      <ul className="mt-3 grid grid-cols-2 gap-3 min-[26rem]:grid-cols-3 sm:grid-cols-4" data-profile-grid>
+      {/* 13.4: título y subtítulo con los textos exactos del dueño; abajo, el link y en simple dónde aparece. */}
+      <div className="mt-8" data-add-by-link-section>
+        <h4 id={`${uid}-profile`} className="text-base font-semibold">
+          Tus últimos 12 contenidos
+        </h4>
+        <p className="mt-1 text-sm text-muted">
+          ¿No ves el que buscas? Pégalo por link <span aria-hidden="true">↓</span>
+        </p>
+        <form onSubmit={addByLink} className="mt-3 flex flex-wrap gap-2" data-add-by-link>
+          <label htmlFor={`${uid}-link`} className="sr-only">
+            Link de tu video de TikTok
+          </label>
+          <input
+            id={`${uid}-link`}
+            type="text"
+            inputMode="url"
+            autoComplete="off"
+            autoCapitalize="none"
+            spellCheck={false}
+            value={link}
+            onChange={(event) => {
+              setLink(event.target.value);
+              setLinkState((state) => (state.message ? { ...state, message: null } : state));
+            }}
+            placeholder="Pega aquí el link de tu video de TikTok"
+            aria-describedby={`${uid}-link-help`}
+            className="combo__input min-w-0 flex-1 basis-64"
+          />
+          <button
+            type="submit"
+            disabled={linkState.busy || !link.trim() || instagramPasted}
+            className="inline-flex min-h-13 items-center rounded-2xl border border-ink bg-ink px-4 text-sm font-semibold text-cream disabled:opacity-50"
+          >
+            {linkState.busy ? "Buscando…" : "Agregar"}
+          </button>
+        </form>
+        <p id={`${uid}-link-help`} className="mt-2 text-sm text-muted" data-add-by-link-help>
+          Lo que agregues por link se suma al final de tus piezas, arriba, y aparece primero en esta lista.
+        </p>
+        <p aria-live="polite" className="mt-1 min-h-5 text-sm font-semibold text-ink" data-add-by-link-status>
+          {instagramPasted ? INSTAGRAM_LINKS_SOON : linkState.message}
+        </p>
+      </div>
+      <ul aria-labelledby={`${uid}-profile`} className="mt-3 grid grid-cols-2 gap-3 min-[26rem]:grid-cols-3 sm:grid-cols-4" data-profile-grid>
         {props.pool.slice(0, shown).map((piece) => {
           const added = chosen.has(piece.id);
           return (

@@ -25,9 +25,9 @@ import { errorText, pillButton, primaryButton, textLink } from "./brand-ui";
 /*
  * Antes de generar (v2 · M2): el creador corrige lo que sugirió la IA y elige cómo se ve.
  *   1. Nichos y piezas (ronda 30/09 · 7.1): dos selectores con chips (components/import/confirm-pickers.tsx). Lo
- *      que eligió la IA llega precargado; se quita, se agrega (también piezas de su perfil) y se ordena. Esto manda
- *      sobre la IA: arma las píldoras, los links /p/<slug>/<nicho> y el orden de las piezas. Sin vista previa en
- *      la pantalla: un botón flotante "Preview" abre un modal con la vista previa (Sobre mí y Media kit).
+ *      que eligió la IA llega precargado; se quita, se agrega (también piezas de su perfil o por link) y se ordena.
+ *      Esto manda sobre la IA: arma las píldoras, los links /p/<slug>/<nicho> y el orden de las piezas. Sin vista
+ *      previa en la pantalla: un botón flotante "Preview" abre un modal con la vista previa (Contenido y Media kit).
  *   2. Plantilla: lista compacta + vista previa grande y fiel, con sus datos reales (r2, C1).
  *   3. Paleta: la de su foto (recomendada) o una de las curadas, con la misma vista previa (C4).
  * Arriba, la fila de métricas (7.2): Seguidores, Interacciones promedio y ER, con su base.
@@ -99,7 +99,7 @@ export function ImportReview({ draft, onGenerated, onStartOver, onUnauthorized }
   // Spec 11.12: tarjetas de servicio del creador (mínimo 1 antes de generar).
   const [services, setServices] = useState<ServiceCard[]>(() => [{ key: "s-1", title: "", description: "" }]);
   const [serviceError, setServiceError] = useState<string | null>(null);
-  // Spec 11.5: piezas agregadas por link (oEmbed) en esta sesión.
+  // Spec 11.5: piezas agregadas por link en esta sesión (la más nueva primero).
   const [linkPieces, setLinkPieces] = useState<DraftPiece[]>([]);
   const [pieceError, setPieceError] = useState<string | null>(null);
   const [template, setTemplate] = useState<TemplateId>(DEFAULT_DESIGN.template);
@@ -114,7 +114,7 @@ export function ImportReview({ draft, onGenerated, onStartOver, onUnauthorized }
   // Tras un fallo de generación, el próximo "Generar" le pide al servidor otro intento a propósito (7.4 b).
   const retryNext = useRef(false);
   const [previewOpen, setPreviewOpen] = useState(false);
-  // Switch "Sobre mí | Media kit" de la vista previa: uno solo para los pasos y el modal (ajuste 9).
+  // Switch "Contenido | Media kit" de la vista previa: uno solo para los pasos y el modal (ajuste 9).
   const [previewView, setPreviewView] = useState<PreviewView>("about");
   // Espacio de la barra de progreso en el navbar de /crear (ajuste 6). La revisión solo existe en el navegador.
   // Con useSyncExternalStore: null en el servidor y el elemento real ya en el navegador (sin desajuste al hidratar).
@@ -148,7 +148,8 @@ export function ImportReview({ draft, onGenerated, onStartOver, onUnauthorized }
       ),
     [pieces, nicheKeys],
   );
-  const pool = useMemo(() => [...draft.pieces, ...draft.profilePosts, ...linkPieces], [draft.pieces, draft.profilePosts, linkPieces]);
+  // 13.4: lo agregado por link va primero en la grilla, así se ve al instante (no queda escondido tras "Ver más").
+  const pool = useMemo(() => [...linkPieces, ...draft.pieces, ...draft.profilePosts], [linkPieces, draft.pieces, draft.profilePosts]);
   const colors = resolvePalette(palette, draft.photo);
 
   // Datos reales de la creadora para las vistas previas. Estable entre renders (están memoizadas).
@@ -194,7 +195,7 @@ export function ImportReview({ draft, onGenerated, onStartOver, onUnauthorized }
       slugs.add(parsed.slug);
     }
     if (livePieces.length < draft.pieceLimits.min) {
-      setPieceError(`Elige al menos ${draft.pieceLimits.min} piezas: súmalas desde «De tu perfil».`);
+      setPieceError(`Elige al menos ${draft.pieceLimits.min} piezas: súmalas desde «Tus últimos 12 contenidos».`);
       return false;
     }
     setNicheError(null);
@@ -393,7 +394,7 @@ export function ImportReview({ draft, onGenerated, onStartOver, onUnauthorized }
                 onError={setPieceError}
                 draftId={draft.draftId}
                 onLinkPiece={(piece) => {
-                  setLinkPieces((current) => (current.some((item) => item.id === piece.id) ? current : [...current, piece]));
+                  setLinkPieces((current) => (current.some((item) => item.id === piece.id) ? current : [piece, ...current]));
                   setPieces((current) =>
                     current.some((item) => item.id === piece.id) || current.length >= draft.pieceLimits.max
                       ? current
@@ -568,7 +569,18 @@ function StepProgress({ step }: { step: number }) {
   );
 }
 
-/** Modal de vista previa (7.1): la misma vista previa con su switch "Sobre mí | Media kit", en un diálogo. */
+/**
+ * Modal de vista previa (7.1): la misma vista previa con su switch "Contenido | Media kit", en un diálogo.
+ *
+ * Ronda 6 · 13.5: cambiar de vista NO cierra el modal; solo cambia el contenido. El bug: el efecto que abría el
+ * <dialog> dependía de onClose, una función nueva en cada render. Al cambiar de vista se re-ejecutaba, su limpieza
+ * llamaba a close() y el evento "close" (que llega después, en otra tarea) desmontaba el modal. Ahora:
+ * - se abre UNA vez al montarse (sin dependencias); si ya está abierto (doble montaje de StrictMode), no se toca;
+ * - "close" se escucha con el prop onClose de React, que siempre usa el manejador vigente, sin efectos;
+ * - la limpieza no llama a close(): al desmontarse, el <dialog> sale del documento y de la capa superior sin
+ *   disparar "close".
+ * Se cierra solo con "Cerrar", Escape o un tap fuera del cuadro.
+ */
 function PreviewModal(props: {
   onClose: () => void;
   template: TemplateId;
@@ -580,18 +592,10 @@ function PreviewModal(props: {
 }) {
   const uid = useId();
   const dialog = useRef<HTMLDialogElement>(null);
-  const { onClose } = props;
   useEffect(() => {
     const node = dialog.current;
-    if (!node) return;
-    node.showModal();
-    const close = () => onClose();
-    node.addEventListener("close", close);
-    return () => {
-      node.removeEventListener("close", close);
-      if (node.open) node.close();
-    };
-  }, [onClose]);
+    if (node && !node.open) node.showModal();
+  }, []);
 
   return (
     <dialog
@@ -599,6 +603,7 @@ function PreviewModal(props: {
       aria-labelledby={`${uid}-title`}
       className="preview-modal"
       data-preview-modal
+      onClose={props.onClose}
       onClick={(event) => event.target === event.currentTarget && dialog.current?.close()}
     >
       <div className="preview-modal__body">

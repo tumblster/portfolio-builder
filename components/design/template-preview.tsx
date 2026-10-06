@@ -11,8 +11,8 @@ import "./template-preview.css";
  * la estructura de cada plantilla, los datos reales de la creadora (nombre, nichos, miniaturas de sus piezas),
  * videos 16:9 con play y los textos largos como skeleton (barras con brillo).
  *
- * Ronda 30/09 · 7.3: es la vista "Sobre mí", que ya no lleva métricas (el ER vive en el Media Kit). El Media Kit
- * tiene su propia vista previa (MediaKitPreview).
+ * Ronda 30/09 · 7.3: es la vista «Contenido» (13.23: antes se llamaba «Sobre mí»), que ya no lleva métricas (el ER
+ * vive en el Media Kit). El Media Kit tiene su propia vista previa (MediaKitPreview).
  *
  * La paleta se aplica con los MISMOS roles que usan las plantillas reales (app/portfolio*.css), así lo que se ve
  * es lo que sale: fondo, tinta del texto y de los botones (el acento nunca lleva texto: regla 7:1), bloques
@@ -233,7 +233,7 @@ function Body({ template, data }: { template: TemplateId; data: PreviewData }) {
 
 /**
  * Vista previa del Media Kit (ronda 30/09 · 7.3), con la misma paleta: cabecera (avatar, nombre, nicho), las 3
- * métricas, plataformas, piezas destacadas, el párrafo "Sobre mí" y "Trabaja conmigo".
+ * métricas, plataformas, piezas destacadas, el párrafo «Sobre mí» (la sección About del kit) y "Trabaja conmigo".
  */
 export const MediaKitPreview = memo(function MediaKitPreview({ palette, data }: { palette: Palette; data: PreviewData }) {
   const metrics = data.metrics ?? [];
@@ -331,11 +331,13 @@ export function TemplatePreviewStage({
   );
 }
 
+/** "about" es la vista Contenido (el id se conserva para no romper a quien ya lo usa); "kit", el Media kit. */
 export type PreviewView = "about" | "kit";
 
 /**
- * Vista previa con el switch "Sobre mí | Media kit" (7.3 y ajuste 9): el mismo toggle del portafolio público, y la
- * vista previa cambia en vivo. El estado vive en quien la usa, así se mantiene entre pasos y en el modal.
+ * Vista previa con el switch "Contenido | Media kit" (7.3, ajuste 9 y 13.23: el mismo nombre que en el portafolio
+ * público), y la vista previa cambia en vivo. El estado vive en quien la usa, así se mantiene entre pasos y en el
+ * modal.
  */
 export function PreviewViews({
   template,
@@ -358,7 +360,7 @@ export function PreviewViews({
       <div role="tablist" aria-label="Vista del portafolio" className="tpv-switch">
         {(
           [
-            ["about", "Sobre mí"],
+            ["about", "Contenido"],
             ["kit", "Media kit"],
           ] as const
         ).map(([id, label]) => (
