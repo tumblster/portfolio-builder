@@ -19,6 +19,9 @@ export type DraftPiece = {
   video: { platform: "tiktok" | "instagram" | "youtube"; url: string } | null;
 };
 
+/** Ronda 6 · 13.6: una forma de colaborar que sugirió la IA (la creadora la revisa antes de publicarla). */
+export type SuggestedService = { title: string; description: string };
+
 /*
  * Contrato entre POST /api/import y la pantalla de importación.
  * La respuesta es un stream NDJSON: un evento JSON por línea.
@@ -80,6 +83,14 @@ export type DraftPreview = {
   metrics: CreatorMetric[];
   /** Cuántas piezas puede tener el portafolio (LIMITS): el selector lo respeta sin cargar el esquema completo. */
   pieceLimits: { min: number; max: number };
+  /**
+   * Ronda 6 · 13.6: las formas de colaborar que propuso la IA a partir de sus captions y de las marcas que menciona.
+   * Solo sugerencias: el paso Servicios las muestra como tales y nada se publica sin la confirmación de la creadora.
+   * Opcional: los borradores anteriores a esta ronda no lo traen.
+   */
+  suggestedServices?: SuggestedService[];
+  /** Ronda 6 · 13.6: las @cuentas que menciona en sus captions (sin la propia), como contexto de las sugerencias. */
+  brandMentions?: string[];
   aiWritten: boolean;
   warnings: string[];
 };
