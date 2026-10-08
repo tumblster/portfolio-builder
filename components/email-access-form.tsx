@@ -4,8 +4,8 @@ import { useId, useState } from "react";
 import { fieldLabel, pillButton, textInput } from "./brand-ui";
 
 /*
- * Spec 12.1: el correo ES la cuenta. Quien ya tiene portafolio entra con su correo: le llega un magic link por cada
- * uno (sin contraseña, sin Google). La respuesta es siempre la misma, exista o no el correo.
+ * Spec 12.1 · ronda 6 13.14: el correo ES la cuenta. Quien ya tiene portafolio entra con su correo: le llega un link
+ * a "Mis portafolios" (sin contraseña, sin Google). La respuesta es siempre la misma, exista o no el correo.
  */
 export function EmailAccessForm() {
   const uid = useId();
@@ -49,7 +49,7 @@ export function EmailAccessForm() {
         </button>
       </div>
       <p aria-live="polite" className="mt-2 text-sm text-muted">
-        {state === "sent" && "Si ese correo tiene un portafolio, te llegó un link para entrar (vale 30 días)."}
+        {state === "sent" && "Si ese correo tiene portafolios, te llegó un link para entrar a «Mis portafolios» (vale 30 días)."}
         {state === "error" && "No pudimos enviarlo. Revisa el correo e intenta de nuevo."}
       </p>
     </form>
