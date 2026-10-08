@@ -1,14 +1,25 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useDeferredValue, useMemo, useState, useSyncExternalStore, type FormEvent, type ReactNode } from "react";
+import {
+  useDeferredValue,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+  type FormEvent,
+  type ReactNode,
+  type SetStateAction,
+} from "react";
 import { MANUAL_PREFILL_KEY, type ManualPrefill } from "@/lib/import/events";
 import { PalettePicker, TemplatePicker } from "@/components/design/design-pickers";
 import { resolvePalette } from "@/lib/palette/palettes";
+import type { BrandPartnerDraft, CaseStudyDraft } from "@/lib/portfolio/media-kit-drafts";
 import { nichesWithPieces } from "@/lib/portfolio/niches";
 import { LIMITS } from "@/lib/portfolio/schema";
 import { Avatar } from "../avatar";
+import { BrandPartnersField } from "../brand-partners-field";
 import { PublicPortfolio } from "../public-portfolio";
+import { CaseStudiesField } from "./case-studies-field";
 import { Completeness } from "./completeness";
 import { CoverEditButton } from "./cover-edit-button";
 import { errorText, fieldLabel, pillButton, primaryButton, textInput } from "../ui";
@@ -21,6 +32,7 @@ import {
   formFromPortfolio,
   formFromPrefill,
   issuesToErrors,
+  newPieceKey,
   serviceDraft,
   toCreatePayload,
   toPreview,
@@ -43,6 +55,7 @@ import { PieceEditor } from "./piece-editor";
  * Móvil: pestañas Formulario / Vista previa. Escritorio: formulario a la izquierda, vista a la derecha.
  * v2: la vista previa es la plantilla Creator; se puede mirar por nicho (Todo + los nichos con
  * piezas) y el formulario suma "servicios" (formas de colaborar).
+ * Ronda 6 · 13.19 / 13.20 (solo al editar): Brand Partners y Case studies, lo que muestra el Media kit.
  */
 
 export type EditorProps = { mode: "create" } | { mode: "edit"; baseline: Baseline };
@@ -110,6 +123,7 @@ function EditorForm({ initial, initialBaseline }: { initial: FormState; initialB
   const [previewNiche, setPreviewNiche] = useState<string | null>(null);
   const isEdit = baseline !== null;
   const extras = baseline?.extras ?? NO_EXTRAS;
+  const imported = baseline?.imported ?? [];
 
   // Tras el primer intento de guardar, los errores se recalculan mientras se corrige.
   const clientErrors = useMemo(() => (submitted ? validateForm(form, baseline) : {}), [submitted, form, baseline]);
@@ -196,6 +210,21 @@ function EditorForm({ initial, initialBaseline }: { initial: FormState; initialB
     );
     touched();
   }
+  // 13.19 / 13.20: con forma de setState (el logo de una marca llega después, sobre el estado vigente).
+  function setBrandPartners(action: SetStateAction<BrandPartnerDraft[]>) {
+    setForm((current) => ({
+      ...current,
+      brandPartners: typeof action === "function" ? action(current.brandPartners) : action,
+    }));
+    touched();
+  }
+  function setCaseStudies(action: SetStateAction<CaseStudyDraft[]>) {
+    setForm((current) => ({
+      ...current,
+      caseStudies: typeof action === "function" ? action(current.caseStudies) : action,
+    }));
+    touched();
+  }
   const trackPending = (delta: 1 | -1) => setPending((count) => Math.max(0, count + delta));
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -246,8 +275,9 @@ function EditorForm({ initial, initialBaseline }: { initial: FormState; initialB
       router.push(`/editar/${data.portfolio.slug}?creado=1`);
       return;
     }
+    // Lo importado y las menciones no cambian al guardar: se conservan.
     setBaseline({
-      slug: baseline.slug,
+      ...baseline,
       revision: data.portfolio.revision,
       form: formFromPortfolio(data.resolved),
       manual: data.portfolio.manual,
@@ -451,6 +481,53 @@ function EditorForm({ initial, initialBaseline }: { initial: FormState; initialB
               </button>
             </div>
           </section>
+
+          {isEdit && (
+            <section aria-labelledby="seccion-marcas" className="mt-12" data-editor-brands>
+              <h2 id="seccion-marcas" className="title-2">
+                Brand Partners
+              </h2>
+              <p className="mt-2 text-sm text-muted">
+                Las marcas con las que trabajaste. Aparecen en tu Media kit, solo las que agregues aquí (hasta{" "}
+                {LIMITS.maxBrandPartners}).
+              </p>
+              <div className="mt-5">
+                <BrandPartnersField
+                  partners={form.brandPartners}
+                  setPartners={setBrandPartners}
+                  detected={baseline?.mentions ?? []}
+                  newKey={newPieceKey}
+                  onPending={trackPending}
+                  error={errors.brandPartners ?? null}
+                  errors={errors}
+                />
+              </div>
+            </section>
+          )}
+
+          {isEdit && imported.length > 0 && (
+            <section aria-labelledby="seccion-casos" className="mt-12" data-editor-cases>
+              <h2 id="seccion-casos" className="title-2">
+                Case studies
+              </h2>
+              <p className="mt-2 mb-5 text-sm text-muted">
+                Campañas que hiciste con marcas, sobre tus publicaciones importadas. Aparecen en tu Media kit.
+              </p>
+              <CaseStudiesField
+                imported={imported}
+                cases={form.caseStudies}
+                setCases={setCaseStudies}
+                brandNames={form.brandPartners.map((partner) => partner.name.trim()).filter(Boolean)}
+                errors={errors}
+                onPending={trackPending}
+              />
+              {errors.caseStudies && (
+                <p data-error-focus tabIndex={-1} className={`${errorText} mt-4 outline-none`}>
+                  {errors.caseStudies}
+                </p>
+              )}
+            </section>
+          )}
 
           <section aria-labelledby="seccion-contacto" className="mt-12 space-y-5">
             <h2 id="seccion-contacto" className="title-2">

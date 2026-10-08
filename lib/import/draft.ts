@@ -5,7 +5,7 @@ import { ConflictError, GenerationFailedError, InvalidInputError, NotFoundError 
 import { titleFromCaption } from "@/lib/instagram/snapshot";
 import { computeEngagementRate } from "@/lib/portfolio/engagement";
 import type { Gender } from "@/lib/portfolio/gender";
-import { captionMentions } from "@/lib/portfolio/mentions";
+import { detectBrandMentions } from "@/lib/portfolio/mentions";
 import { creatorMetrics } from "@/lib/portfolio/metrics";
 import { nicheFromLabel, type NicheDef } from "@/lib/portfolio/niches";
 import { createPortfolio, getPortfolio } from "@/lib/portfolio/repository";
@@ -49,6 +49,8 @@ import type { DraftPiece, DraftPreview } from "./events";
  * creadora menciona en sus captions. Solo son sugerencias: al generar, el servidor guarda únicamente los servicios
  * que manda el cliente (los que ella confirmó), nunca los de la IA.
  * Ronda 6 · 13.11 / 13.15: el género que eligió en el onboarding queda en el portafolio (manual.gender).
+ * Ronda 6 · 13.19: esas mismas @menciones (de los últimos 12 contenidos y de los links agregados) son las marcas
+ * candidatas de "Brand partners"; al generar solo se guardan las que ella confirmó (manual.brandPartners).
  */
 
 const DRAFT_TTL_MS = 24 * 60 * 60 * 1000;
@@ -196,8 +198,10 @@ function toPreview(draft: StoredDraft): DraftPreview {
     suggestedServices: (generated?.services ?? [])
       .slice(0, LIMITS.maxServices)
       .map(({ title, description }) => ({ title, description })),
-    brandMentions: captionMentions(
-      snapshot.posts.map((post) => post.caption),
+    // 13.6 / 13.19 (a): las @menciones de sus últimos 12 contenidos y de los links agregados (sin la propia). Son
+    // candidatas: en Brand partners solo se guardan las que la creadora confirme.
+    brandMentions: detectBrandMentions(
+      [...snapshot.posts.map((post) => post.caption), ...draft.linkPieces.map((piece) => piece.title)],
       [draft.username, snapshot.username],
     ),
     aiWritten: generated !== null,
@@ -405,6 +409,8 @@ export async function confirmDraft(input: ConfirmImportInput, options: { gender?
   // confirmó (las sugerencias de la IA sin revisar no salen del navegador).
   const services = input.services?.filter((service) => service.title.trim()) ?? [];
   if (input.selection && services.length === 0) invalidAt(["services"], "Agrega al menos un servicio: un título y, si quieres, un link o una descripción.");
+  // 13.19: las marcas que ella confirmó en la revisión (opcional). Una mención sin confirmar nunca llega aquí.
+  const brandPartners = input.brandPartners ?? [];
 
   // Se reclama el borrador antes de crear: si llegan dos confirmaciones a la vez, solo una genera.
   // Con el etag de la lectura: si otra petición reclamó (o liberó un candado vencido) en medio, esta pierde.
@@ -437,10 +443,11 @@ export async function confirmDraft(input: ConfirmImportInput, options: { gender?
         instagram: draft.snapshot,
         generated: draft.generated,
         // Los nichos confirmados son la fuente de verdad (mandan sobre los de la IA, que quedan en `generated`).
-        // 13.11: el género del onboarding, si vino.
+        // 13.11: el género del onboarding, si vino. 13.19: las marcas confirmadas, si hay.
         manual: {
           niches,
           ...(services.length > 0 ? { services } : {}),
+          ...(brandPartners.length > 0 ? { brandPartners } : {}),
           ...(options.gender ? { gender: options.gender } : {}),
         },
         pieces,

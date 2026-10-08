@@ -1,7 +1,8 @@
 "use client";
 
-import { startTransition, useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { startTransition, useEffect, useId, useMemo, useRef, useState, useSyncExternalStore, type SetStateAction } from "react";
 import { createPortal } from "react-dom";
+import { BrandPartnersField } from "@/components/brand-partners-field";
 import { PalettePicker, TemplateList, recommendedPalette } from "@/components/design/design-pickers";
 import { PreviewViews, type PreviewData, type PreviewView } from "@/components/design/template-preview";
 import { NichePicker, PiecePicker, type NicheChip, type PieceChip } from "@/components/import/confirm-pickers";
@@ -18,6 +19,8 @@ import {
 import type { DraftPreview, ImportResult } from "@/lib/import/events";
 import { resolvePalette } from "@/lib/palette/palettes";
 import { DEFAULT_DESIGN, TEMPLATE_INFO, type PaletteId, type TemplateId } from "@/lib/portfolio/design";
+import { partnersPayload, type BrandPartnerDraft } from "@/lib/portfolio/media-kit-drafts";
+import { detectBrandMentions, mergeMentions } from "@/lib/portfolio/mentions";
 import { nicheFromLabel } from "@/lib/portfolio/niches";
 import { SUPPORT_FORM_URL } from "@/lib/site";
 import { Avatar } from "./avatar";
@@ -31,6 +34,8 @@ import { errorText, pillButton, primaryButton, textLink } from "./brand-ui";
  *      previa en la pantalla: un botón flotante "Preview" abre un modal con la vista previa (Contenido y Media kit).
  *   2. Servicios (11.12 · ronda 6 13.6): llegan las sugerencias de la IA (de sus captions y las marcas que menciona);
  *      la creadora las usa, edita o quita, y no se sigue con sugerencias sin revisar. Solo se envía lo confirmado.
+ *      Debajo, Brand Partners (13.19, opcional): las @marcas detectadas en sus contenidos y en los links agregados
+ *      llegan como candidatas SIN marcar; solo viajan las que ella agrega (y las que carga a mano).
  *   3. Plantilla: lista compacta + vista previa grande y fiel, con sus datos reales (r2, C1).
  *   4. Paleta: la de su foto (recomendada) o una de las curadas, con la misma vista previa (C4).
  * Arriba, la fila de métricas (7.2): Seguidores, Interacciones promedio y ER, con su base.
@@ -107,6 +112,11 @@ export function ImportReview({ draft, owner, onGenerated, onStartOver, onUnautho
   // IA, por revisar; si no hay (la IA falló o es un borrador anterior), con una vacía.
   const [services, setServices] = useState<ServiceCard[]>(() => initialServiceCards(draft.suggestedServices ?? []));
   const [serviceError, setServiceError] = useState<string | null>(null);
+  // Ronda 6 · 13.19: Brand partners confirmados (arranca vacío: ninguna mención se agrega sola).
+  const [partners, setPartners] = useState<BrandPartnerDraft[]>([]);
+  const [partnerError, setPartnerError] = useState<string | null>(null);
+  // Subidas de logo en curso: no se genera a medias.
+  const [uploads, setUploads] = useState(0);
   // Spec 11.5: piezas agregadas por link en esta sesión (la más nueva primero).
   const [linkPieces, setLinkPieces] = useState<DraftPiece[]>([]);
   const [pieceError, setPieceError] = useState<string | null>(null);
@@ -159,6 +169,11 @@ export function ImportReview({ draft, owner, onGenerated, onStartOver, onUnautho
   // 13.4: lo agregado por link va primero en la grilla, así se ve al instante (no queda escondido tras "Ver más").
   const pool = useMemo(() => [...linkPieces, ...draft.pieces, ...draft.profilePosts], [linkPieces, draft.pieces, draft.profilePosts]);
   const colors = resolvePalette(palette, draft.photo);
+  // 13.19 (a): marcas candidatas = las de sus últimos 12 contenidos (servidor) + las de los links agregados aquí.
+  const detectedBrands = useMemo(
+    () => mergeMentions(draft.brandMentions ?? [], detectBrandMentions(linkPieces.map((piece) => piece.title), [draft.username])),
+    [draft.brandMentions, draft.username, linkPieces],
+  );
 
   // Datos reales de la creadora para las vistas previas. Estable entre renders (están memoizadas).
   const nicheLabels = niches.map((niche) => niche.label).join("\n");
@@ -189,6 +204,11 @@ export function ImportReview({ draft, owner, onGenerated, onStartOver, onUnautho
 
   function chooseTemplate(next: TemplateId) {
     startTransition(() => setTemplate(next));
+  }
+
+  function updatePartners(action: SetStateAction<BrandPartnerDraft[]>) {
+    setPartners(action);
+    setPartnerError(null);
   }
 
   /** Revisa nichos y piezas antes de seguir. Devuelve true si están bien. */
@@ -258,6 +278,8 @@ export function ImportReview({ draft, owner, onGenerated, onStartOver, onUnautho
       services: services
         .filter((card) => !card.suggested && card.title.trim())
         .map((card) => ({ title: card.title.trim(), description: card.description.trim() })),
+      // 13.19: solo las marcas que ella agregó (las menciones sin tocar no viajan).
+      ...(partners.length > 0 ? { brandPartners: partnersPayload(partners) } : {}),
       // 13.15: el onboarding (correo = cuenta, y el género para los textos de WhatsApp).
       ...(owner ? { owner } : {}),
       ...(retry ? { retry: true } : {}),
@@ -319,6 +341,9 @@ export function ImportReview({ draft, owner, onGenerated, onStartOver, onUnautho
           goTo(0);
         } else if (path.startsWith("services")) {
           setServiceError(issue.message);
+          goTo(1);
+        } else if (path.startsWith("brandPartners")) {
+          setPartnerError(issue.message);
           goTo(1);
         } else {
           if (response.status === 404 || response.status === 410) setExpired(true);
@@ -444,6 +469,23 @@ export function ImportReview({ draft, owner, onGenerated, onStartOver, onUnautho
               error={serviceError}
               brands={draft.brandMentions ?? []}
             />
+            {/* 13.19: Brand partners (opcional). Solo lo confirmado aparece en su Media kit. */}
+            <section aria-labelledby={`${uid}-marcas`} className="mt-12" data-review-brands>
+              <h3 id={`${uid}-marcas`} className="title-3">
+                Brand Partners
+              </h3>
+              <p className="mt-2 mb-5 text-sm text-muted">
+                Opcional. Las marcas con las que trabajó de verdad: aparecen en su Media kit.
+              </p>
+              <BrandPartnersField
+                partners={partners}
+                setPartners={updatePartners}
+                detected={detectedBrands}
+                newKey={newKey}
+                onPending={(delta) => setUploads((count) => Math.max(0, count + delta))}
+                error={partnerError}
+              />
+            </section>
           </section>
         )}
 
@@ -538,8 +580,13 @@ export function ImportReview({ draft, owner, onGenerated, onStartOver, onUnautho
             {step === 0 ? "Agregar servicios" : step === 1 ? "Elegir plantilla" : "Elegir paleta"}
           </button>
         ) : (
-          <button type="button" onClick={generate} disabled={generating} className={`${primaryButton} flex-1 sm:flex-none sm:px-8`}>
-            {generating ? "Generando…" : "Generar portafolio"}
+          <button
+            type="button"
+            onClick={generate}
+            disabled={generating || uploads > 0}
+            className={`${primaryButton} flex-1 sm:flex-none sm:px-8`}
+          >
+            {generating ? "Generando…" : uploads > 0 ? "Esperando los logos…" : "Generar portafolio"}
           </button>
         )}
         <button type="button" onClick={onStartOver} className="min-h-tap px-2 text-sm text-muted underline-offset-4 hover:text-ink hover:underline">
