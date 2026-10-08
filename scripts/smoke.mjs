@@ -1248,9 +1248,9 @@ try {
       kitMetrics,
     );
     check(
-      /data-media-kit/.test(bioViews.kit) && bioViews.kit.includes("Plataformas") && bioViews.kit.includes("Piezas destacadas") &&
-        bioViews.kit.includes("Sobre mí") && /data-mk-contact[^>]*>Trabaja conmigo|Trabaja conmigo/.test(bioViews.kit),
-      "Media Kit: cabecera, plataformas, piezas destacadas, Sobre mí y «Trabaja conmigo»",
+      /data-media-kit/.test(bioViews.kit) && !bioViews.kit.includes("Piezas destacadas") &&
+        !bioViews.kit.includes("Sobre mí") && /Trabaja conmigo/.test(bioViews.kit),
+      "Media Kit (13.18): sin galería repetida ni «Sobre mí»; con «Trabaja conmigo» (detalle en smoke-media-kit)",
     );
     const autoBg = bioPage.html.match(/--pf-bg:(#[0-9a-f]{6})/)?.[1];
     check(
@@ -1485,7 +1485,7 @@ try {
   const draftSrc = await source("lib", "import", "draft.ts");
   check(
     /suggested\?: boolean/.test(servicesSrc) && /Usar todas/.test(servicesSrc) && /card\.suggested/.test(servicesSrc) &&
-      /SERVICES_MAX = 4;/.test(servicesSrc) && /suggestedServices:/.test(draftSrc) && /captionMentions\(/.test(draftSrc) &&
+      /SERVICES_MAX = 4;/.test(servicesSrc) && /suggestedServices:/.test(draftSrc) && /detectBrandMentions\(/.test(draftSrc) &&
       /marcas_mencionadas/.test(groqSrc) && /pendingSuggestions\(services\)/.test(reviewSrc) && /!card\.suggested && card\.title\.trim\(\)/.test(reviewSrc),
     "13.6: Servicios llega con sugerencias de la IA (captions + marcas mencionadas), editables y eliminables; solo se envía lo que la creadora confirma",
   );
