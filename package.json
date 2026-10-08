@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "smoke": "node --env-file=.env.local scripts/smoke.mjs",
+    "smoke": "node --env-file=.env.local scripts/smoke.mjs && node --env-file=.env.local scripts/smoke-media-kit.mjs",
+    "smoke:mediakit": "node --env-file=.env.local scripts/smoke-media-kit.mjs",
     "test:sheet": "node --env-file-if-exists=.env.local scripts/test-sheet.mjs"
   },
   "dependencies": {

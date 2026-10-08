@@ -10,6 +10,8 @@ import { PortfolioStatus } from "@/components/editor/portfolio-status";
 import { StudioHeader } from "@/components/studio-header";
 import { readActivity } from "@/lib/portfolio/activity";
 import { getPortfolioAccess } from "@/lib/auth";
+import { importedPosts } from "@/lib/portfolio/case-studies";
+import { detectBrandMentions } from "@/lib/portfolio/mentions";
 import { getPortfolio } from "@/lib/portfolio/repository";
 import { resolvePortfolio } from "@/lib/portfolio/resolve";
 import { publicPath } from "@/lib/portfolio/slug";
@@ -26,6 +28,8 @@ export const metadata: Metadata = {
  * Edita cualquier portafolio (también los importados). Lo cambiado queda como dato manual.
  * Arriba, los links de la versión general y de cada nicho del portafolio, cada uno con
  * "Copiar" y "Abrir". Un nicho sin piezas conserva su link (abre mostrando todo).
+ * Ronda 6 · 13.19 / 13.20: el editor recibe sus publicaciones importadas (para marcar case studies) y las @menciones
+ * de sus contenidos (candidatas a Brand partners).
  */
 export default async function EditPortfolioPage({ params, searchParams }: PageProps<"/editar/[slug]">) {
   const { slug } = await params;
@@ -70,6 +74,13 @@ export default async function EditPortfolioPage({ params, searchParams }: PagePr
     form: formFromPortfolio(resolved),
     manual: doc.manual,
     extras: extrasFromPortfolio(resolved),
+    // 13.20: sus últimos contenidos importados, con sus cifras reales.
+    imported: importedPosts(doc.instagram),
+    // 13.19 (a): las @menciones de sus captions y de sus piezas (incluidas las agregadas por link), sin la propia.
+    mentions: detectBrandMentions(
+      [...(doc.instagram?.posts.map((post) => post.caption) ?? []), ...doc.pieces.map((piece) => piece.title)],
+      [doc.instagram?.username ?? "", resolved.contact.instagram ?? ""].filter(Boolean),
+    ),
   };
 
   return (

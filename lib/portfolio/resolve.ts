@@ -1,9 +1,20 @@
+import { resolveCaseStudies, type ResolvedCaseStudy } from "./case-studies";
 import { DEFAULT_DESIGN, type Design } from "./design";
 import { computeEngagementRate } from "./engagement";
 import type { Gender } from "./gender";
 import { creatorMetrics, type CreatorMetric } from "./metrics";
 import { resolveNiches, type NicheDef } from "./niches";
-import type { Contact, EngagementRate, InstagramPost, Piece, Portfolio, Service, StoredImage, VideoLink } from "./schema";
+import type {
+  BrandPartner,
+  Contact,
+  EngagementRate,
+  InstagramPost,
+  Piece,
+  Portfolio,
+  Service,
+  StoredImage,
+  VideoLink,
+} from "./schema";
 import { pieceMetrics, profileStats, type PieceMetrics, type ProfileStat } from "./stats";
 
 /** A dónde lleva una pieza: su video original o el post de Instagram del que salió. */
@@ -48,6 +59,13 @@ export type ResolvedPortfolio = {
    * para no romper vistas previas que armen este objeto a mano.
    */
   gender?: Gender | null;
+  /**
+   * Ronda 6 · 13.19: las marcas que la creadora confirmó (solo esas). Opcional en el tipo por la misma razón que
+   * `gender`; ausente = ninguna.
+   */
+  brandPartners?: BrandPartner[];
+  /** Ronda 6 · 13.20: sus case studies, con su publicación. Ausente = ninguno. */
+  caseStudies?: ResolvedCaseStudy[];
   pieces: ResolvedPiece[];
 };
 
@@ -99,6 +117,10 @@ export function resolvePortfolio(doc: Portfolio): ResolvedPortfolio {
     metrics: creatorMetrics(ig, engagementRate),
     design: doc.design ?? DEFAULT_DESIGN,
     gender: manual.gender ?? null,
+    // 13.19: solo lo confirmado (es dato manual: la IA nunca lo propone por su cuenta).
+    brandPartners: manual.brandPartners ?? [],
+    // 13.20: cada caso con su publicación; uno cuya publicación ya no está, no se muestra.
+    caseStudies: resolveCaseStudies(manual.caseStudies ?? [], ig),
     pieces,
   };
 }
