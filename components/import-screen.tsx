@@ -13,7 +13,9 @@ import {
 } from "@/lib/import/events";
 import { readNdjson } from "@/lib/import/ndjson";
 import { parseInstagramUsername } from "@/lib/instagram/username";
+import { GENDER_LABEL } from "@/lib/portfolio/gender";
 import { ImportReview } from "./import-review";
+import { OnboardingStep, useOnboarding } from "./import/onboarding-step";
 import { PrefillSummary } from "./prefill-summary";
 import { ReadyDialog } from "./ready-dialog";
 import { errorText, fieldLabel, pillButton, primaryButton, textInput } from "./brand-ui";
@@ -28,6 +30,8 @@ import { errorText, fieldLabel, pillButton, primaryButton, textInput } from "./b
  * abrir, editar y crear otro. Al cerrarlo queda una línea para volver a abrirlo.
  * v2 · M2: nada se genera a ciegas. Al terminar la importación se confirma lo que sugirió la IA
  * (nichos) y se eligen plantilla y paleta (import-review.tsx); recién ahí se genera.
+ * Ronda 6 · 13.15 / 13.23 · 1: lo PRIMERO es el onboarding mínimo (correo + género, components/import/onboarding-step.tsx).
+ * Se pide una vez por sesión, se muestra arriba del formulario ("Tu cuenta: … · Cambiar") y viaja al generar.
  */
 
 type ManualEvent = Extract<ImportEvent, { type: "manual" }>;
@@ -93,9 +97,11 @@ export function ImportScreen() {
   const [input, setInput] = useState("");
   const [fieldError, setFieldError] = useState<string | null>(null);
   const [state, setState] = useState<State>({ phase: "idle" });
+  const { onboarding, saveOnboarding, clearOnboarding } = useOnboarding();
   const inputRef = useRef<HTMLInputElement>(null);
   const outcomeRef = useRef<HTMLDivElement>(null);
   const focusInputOnIdle = useRef(false);
+  const focusAfterOnboarding = useRef(false);
   const running = state.phase === "running";
 
   // Si no se pudo armar solo, el foco (y la vista) van al aviso; al volver a empezar, al campo.
@@ -107,6 +113,13 @@ export function ImportScreen() {
       inputRef.current?.focus();
     }
   }, [state.phase]);
+
+  // 13.15: terminado el onboarding, el foco va al campo de Instagram.
+  useEffect(() => {
+    if (!onboarding || !focusAfterOnboarding.current) return;
+    focusAfterOnboarding.current = false;
+    inputRef.current?.focus();
+  }, [onboarding]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -168,6 +181,7 @@ export function ImportScreen() {
       {state.phase === "review" ? (
         <ImportReview
           draft={state.draft}
+          owner={onboarding}
           onGenerated={(result) => setState({ phase: "done", result, dialogOpen: true })}
           onStartOver={startOver}
           onUnauthorized={() => router.replace("/acceso")}
@@ -176,6 +190,14 @@ export function ImportScreen() {
         <div ref={outcomeRef} tabIndex={-1} className="outline-none">
           <ManualNotice result={state.result} onContinue={() => continueManually(state.result)} onStartOver={startOver} />
         </div>
+      ) : !onboarding ? (
+        // 13.15 / 13.23 · 1: el correo y el género se piden al inicio, antes de importar.
+        <OnboardingStep
+          onDone={(value) => {
+            focusAfterOnboarding.current = true;
+            saveOnboarding(value);
+          }}
+        />
       ) : (
         <>
           {state.phase === "done" && (
@@ -195,6 +217,20 @@ export function ImportScreen() {
               </button>
             </div>
           )}
+
+          <p className="mb-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted" data-onboarding-summary>
+            <span className="min-w-0 [overflow-wrap:anywhere]">
+              Tu cuenta: <span className="font-semibold text-ink">{onboarding.email}</span> · {GENDER_LABEL[onboarding.gender]}
+            </span>
+            <button
+              type="button"
+              onClick={clearOnboarding}
+              disabled={running}
+              className="min-h-tap px-1 font-semibold text-ink underline decoration-accent underline-offset-4 disabled:opacity-50"
+            >
+              Cambiar
+            </button>
+          </p>
 
           <form onSubmit={submit} noValidate className="panel p-5 sm:p-6">
             <label htmlFor="instagram" className={fieldLabel}>

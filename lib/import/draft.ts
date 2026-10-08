@@ -4,6 +4,7 @@ import { z } from "zod";
 import { ConflictError, GenerationFailedError, InvalidInputError, NotFoundError } from "@/lib/errors";
 import { titleFromCaption } from "@/lib/instagram/snapshot";
 import { computeEngagementRate } from "@/lib/portfolio/engagement";
+import type { Gender } from "@/lib/portfolio/gender";
 import { captionMentions } from "@/lib/portfolio/mentions";
 import { creatorMetrics } from "@/lib/portfolio/metrics";
 import { nicheFromLabel, type NicheDef } from "@/lib/portfolio/niches";
@@ -47,6 +48,7 @@ import type { DraftPiece, DraftPreview } from "./events";
  * Ronda 6 · 13.6: la vista previa del borrador trae las formas de colaborar que sugirió la IA y las @marcas que la
  * creadora menciona en sus captions. Solo son sugerencias: al generar, el servidor guarda únicamente los servicios
  * que manda el cliente (los que ella confirmó), nunca los de la IA.
+ * Ronda 6 · 13.11 / 13.15: el género que eligió en el onboarding queda en el portafolio (manual.gender).
  */
 
 const DRAFT_TTL_MS = 24 * 60 * 60 * 1000;
@@ -336,7 +338,11 @@ function selectedPieces(draft: StoredDraft, input: ConfirmImportInput, slugs: Se
   });
 }
 
-export async function confirmDraft(input: ConfirmImportInput): Promise<ConfirmOutcome> {
+/**
+ * Genera el portafolio del borrador. `options.gender` (13.11 / 13.15): el género que eligió en el onboarding; queda
+ * en manual.gender (solo adapta los textos de WhatsApp, 13.8).
+ */
+export async function confirmDraft(input: ConfirmImportInput, options: { gender?: Gender } = {}): Promise<ConfirmOutcome> {
   const storage = getStorage();
   const stored = await storage.readJson(draftPath(input.draftId));
   if (!stored) throw new NotFoundError("Esta importación ya no existe. Vuelve a importar el perfil.");
@@ -431,7 +437,12 @@ export async function confirmDraft(input: ConfirmImportInput): Promise<ConfirmOu
         instagram: draft.snapshot,
         generated: draft.generated,
         // Los nichos confirmados son la fuente de verdad (mandan sobre los de la IA, que quedan en `generated`).
-        manual: { niches, ...(services.length > 0 ? { services } : {}) },
+        // 13.11: el género del onboarding, si vino.
+        manual: {
+          niches,
+          ...(services.length > 0 ? { services } : {}),
+          ...(options.gender ? { gender: options.gender } : {}),
+        },
         pieces,
         design: input.design,
         insights: { engagementRate: computeEngagementRate(draft.snapshot), computedAt: new Date().toISOString() },

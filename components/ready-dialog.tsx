@@ -133,7 +133,7 @@ export function ReadyDialog({
 
         <DesignSection result={result} onResultChange={onResultChange} />
 
-        <MagicLinkSection slug={result.slug} />
+        <AccountSection slug={result.slug} owner={result.owner ?? null} />
 
         <ShareSection
           url={url}
@@ -161,22 +161,22 @@ export function ReadyDialog({
 }
 
 /**
- * Spec 11.8: el correo del creador para recibir un magic link (volver a su link o editar), sin usuario ni contraseña.
- * El link vale 30 días y solo para este portafolio. Sin SMTP configurado (desarrollo o Preview), queda en los logs.
+ * La cuenta (11.8 · 12.1 · ronda 6 13.15 / 13.23 · 1). El correo se pidió AL INICIO (onboarding): aquí ya no se pide.
+ * Se dice a qué correo se mandaron los links (este portafolio + "Mis portafolios") y se puede reenviar. Sin
+ * onboarding (cliente anterior), queda el formulario de antes como respaldo. Sin SMTP: modo mock (logs).
  */
-function MagicLinkSection({ slug }: { slug: string }) {
+function AccountSection({ slug, owner }: { slug: string; owner: NonNullable<ImportResult["owner"]> | null }) {
   const uid = useId();
   const [email, setEmail] = useState("");
   const [state, setState] = useState<{ kind: "idle" | "sending" | "sent" | "mock" | "error"; message?: string }>({ kind: "idle" });
 
-  async function send(event: React.FormEvent) {
-    event.preventDefault();
+  async function send(target: string) {
     setState({ kind: "sending" });
     try {
       const response = await fetch(`/api/portfolios/${slug}/magic-link`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim() }),
+        body: JSON.stringify({ email: target.trim() }),
       });
       const data = await response.json().catch(() => null);
       if (!response.ok) {
@@ -189,8 +189,56 @@ function MagicLinkSection({ slug }: { slug: string }) {
     }
   }
 
+  const status = (
+    <p aria-live="polite" className="mt-2 text-sm">
+      {state.kind === "sent" && <span className="text-success">Listo: revisa tu correo (los links valen 30 días).</span>}
+      {state.kind === "mock" && (
+        <span className="text-muted">Modo de prueba: el correo aún no está configurado y los links quedaron en los registros del servidor.</span>
+      )}
+      {state.kind === "error" && <span className={errorText}>{state.message}</span>}
+    </p>
+  );
+
+  if (owner) {
+    return (
+      <div className="mt-7 border-t border-line pt-5" data-testid="ready-magic-link" data-owner-email>
+        <p className={fieldLabel}>Tu cuenta</p>
+        <p className="mt-1 text-sm text-muted">
+          {owner.mail === "failed" ? (
+            <>
+              No pudimos mandarte el correo a <span className="font-semibold text-ink [overflow-wrap:anywhere]">{owner.email}</span>.
+              Reenvíalo con el botón.
+            </>
+          ) : (
+            <>
+              Te mandamos a <span className="font-semibold text-ink [overflow-wrap:anywhere]">{owner.email}</span> el link para
+              editar este portafolio y entrar a «Mis portafolios». Sin contraseña.
+            </>
+          )}
+        </p>
+        {owner.mail === "mock" && state.kind === "idle" && (
+          <p className="mt-1 text-sm text-muted">
+            Modo de prueba: el correo aún no está configurado y los links quedaron en los registros del servidor.
+          </p>
+        )}
+        <button type="button" onClick={() => send(owner.email)} disabled={state.kind === "sending"} className={`${pillButton} mt-3`}>
+          {state.kind === "sending" ? "Reenviando…" : "Reenviar el correo"}
+        </button>
+        {status}
+      </div>
+    );
+  }
+
   return (
-    <form onSubmit={send} className="mt-7 border-t border-line pt-5" data-testid="ready-magic-link" noValidate>
+    <form
+      onSubmit={(event) => {
+        event.preventDefault();
+        void send(email);
+      }}
+      className="mt-7 border-t border-line pt-5"
+      data-testid="ready-magic-link"
+      noValidate
+    >
       <label htmlFor={`${uid}-email`} className={fieldLabel}>
         Guarda tu portafolio con tu correo
       </label>
@@ -215,13 +263,7 @@ function MagicLinkSection({ slug }: { slug: string }) {
           {state.kind === "sending" ? "Enviando…" : "Enviarme el link"}
         </button>
       </div>
-      <p aria-live="polite" className="mt-2 text-sm">
-        {state.kind === "sent" && <span className="text-success">Listo: revisa tu correo (vale 30 días).</span>}
-        {state.kind === "mock" && (
-          <span className="text-muted">Modo de prueba: el correo aún no está configurado y el link quedó en los registros del servidor.</span>
-        )}
-        {state.kind === "error" && <span className={errorText}>{state.message}</span>}
-      </p>
+      {status}
     </form>
   );
 }

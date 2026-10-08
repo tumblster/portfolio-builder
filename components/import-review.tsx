@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { PalettePicker, TemplateList, recommendedPalette } from "@/components/design/design-pickers";
 import { PreviewViews, type PreviewData, type PreviewView } from "@/components/design/template-preview";
 import { NichePicker, PiecePicker, type NicheChip, type PieceChip } from "@/components/import/confirm-pickers";
+import type { Onboarding } from "@/components/import/onboarding-step";
 import { ServicesStep, initialServiceCards, pendingSuggestions, type ServiceCard } from "@/components/import/services-step";
 import type { DraftPiece } from "@/lib/import/events";
 import "@/components/import/review.css";
@@ -33,7 +34,9 @@ import { errorText, pillButton, primaryButton, textLink } from "./brand-ui";
  *   3. Plantilla: lista compacta + vista previa grande y fiel, con sus datos reales (r2, C1).
  *   4. Paleta: la de su foto (recomendada) o una de las curadas, con la misma vista previa (C4).
  * Arriba, la fila de métricas (7.2): Seguidores, Interacciones promedio y ER, con su base.
- * Generar llama a /api/import/confirm con esas decisiones; mientras tanto, Chispa acompaña (C5).
+ * Generar llama a /api/import/confirm con esas decisiones y, desde la ronda 6 (13.15), con el onboarding (correo +
+ * género): la cuenta queda guardada, el género en el portafolio y le llega el correo con sus links.
+ * Mientras tanto, Chispa acompaña (C5).
  *
  * Generar nunca se queda en "Reintentando…" para siempre (7.4 a, lib/import/confirm-retry.ts): los 409 se
  * reintentan con tope y plazo global, cada petición se corta si se cuelga, y el servidor marca el borrador como
@@ -76,12 +79,14 @@ function EyeIcon() {
 
 type Props = {
   draft: DraftPreview;
+  /** 13.15: el onboarding (correo + género); viaja al generar. null solo en clientes que no lo pidieron. */
+  owner: Onboarding | null;
   onGenerated: (result: ImportResult) => void;
   onStartOver: () => void;
   onUnauthorized: () => void;
 };
 
-export function ImportReview({ draft, onGenerated, onStartOver, onUnauthorized }: Props) {
+export function ImportReview({ draft, owner, onGenerated, onStartOver, onUnauthorized }: Props) {
   const uid = useId();
   const counter = useRef(0);
   const newKey = () => `n-${(counter.current += 1)}`;
@@ -253,6 +258,8 @@ export function ImportReview({ draft, onGenerated, onStartOver, onUnauthorized }
       services: services
         .filter((card) => !card.suggested && card.title.trim())
         .map((card) => ({ title: card.title.trim(), description: card.description.trim() })),
+      // 13.15: el onboarding (correo = cuenta, y el género para los textos de WhatsApp).
+      ...(owner ? { owner } : {}),
       ...(retry ? { retry: true } : {}),
     });
     // Error terminal (7.4 a): claro, con salida al soporte, y el próximo "Generar" pide otro intento.
