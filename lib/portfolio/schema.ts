@@ -31,6 +31,9 @@ import { slugSchema } from "./slug";
  * servicios ("formas de colaborar"). Ambos siguen la misma regla manual → IA. Los JSON de la
  * v1 (schemaVersion 1) se leen igual y se guardan como v2 en su siguiente edición.
  *
+ * Ronda 6 · 13.19 / 13.20: `manual` suma los Brand partners y los case studies del Media kit. Solo existen como dato
+ * manual: los confirma o los escribe la creadora; la IA nunca los propone por su cuenta.
+ *
  * Este archivo no depende del servidor: el formulario también lo puede usar.
  */
 
@@ -47,6 +50,12 @@ export const LIMITS = {
   serviceTitle: 40,
   serviceDescription: 120,
   maxServices: 4,
+  /** Ronda 6 · 13.19: Brand partners. */
+  brandName: 60,
+  maxBrandPartners: 12,
+  /** Ronda 6 · 13.20: case studies. */
+  campaignName: 80,
+  maxCaseStudies: 6,
 } as const;
 
 const utcDate = z.iso.datetime(); // ISO 8601 en UTC, p. ej. 2026-09-28T15:04:05.000Z
@@ -329,6 +338,79 @@ export const generatedContentSchema = z.object({
 });
 export type GeneratedContent = z.infer<typeof generatedContentSchema>;
 
+// ── Brand partners y case studies del Media kit (ronda 6 · 13.19 / 13.20) ──
+/*
+ * Brand partners: solo las marcas que la creadora confirmó. Una @mención en sus captions es una pista, no una prueba
+ * de colaboración: `source` recuerda si salió de ahí ("detected") o la escribió ella ("manual"). El logo es una copia
+ * en NUESTRO almacenamiento (foto de perfil de la marca vía Apify, o la que subió); sin logo se muestra la inicial.
+ *
+ * Case studies: apuntan a una publicación importada de su Instagram (`postId`) y arrancan con sus cifras reales. Si
+ * esa publicación ya no está en la captura, el caso simplemente no se muestra (resolve.ts): nunca invalida el
+ * portafolio guardado.
+ */
+export const BRAND_SOURCES = ["detected", "manual"] as const;
+
+/** Usuario de Instagram de la marca: acepta "@Marca" o "marca" y guarda "marca". */
+export const brandHandleSchema = z
+  .string({ error: "Pega el link del Instagram de la marca." })
+  .trim()
+  .transform((value) => value.replace(/^@/, "").toLowerCase())
+  .refine((value) => /^[a-z0-9._]{1,30}$/.test(value), { error: "Ese usuario de Instagram no es válido." });
+
+export const brandPartnerSchema = z.object({
+  name: z
+    .string({ error: "Escribe el nombre de la marca." })
+    .trim()
+    .min(1, { error: "Escribe el nombre de la marca." })
+    .max(LIMITS.brandName, { error: `El nombre admite hasta ${LIMITS.brandName} caracteres.` }),
+  instagram: brandHandleSchema,
+  logo: storedImageSchema.nullable().default(null),
+  source: z.enum(BRAND_SOURCES).default("manual"),
+});
+export type BrandPartner = z.output<typeof brandPartnerSchema>;
+
+export const brandPartnersSchema = z
+  .array(brandPartnerSchema)
+  .max(LIMITS.maxBrandPartners, { error: `Puedes mostrar hasta ${LIMITS.maxBrandPartners} marcas.` })
+  .refine((partners) => new Set(partners.map((partner) => partner.instagram)).size === partners.length, {
+    error: "Esa marca ya está en la lista.",
+  });
+
+/** Una cifra de un case study: null = no mostrarla. */
+const caseMetric = z
+  .number({ error: "Escribe solo números." })
+  .int({ error: "Escribe un número entero." })
+  .nonnegative({ error: "No puede ser negativo." })
+  .max(100_000_000_000)
+  .nullable()
+  .default(null);
+
+export const caseStudySchema = z.object({
+  /** La publicación importada (id del post de Instagram). */
+  postId: z.string().min(1).max(64),
+  brand: z
+    .string({ error: "Escribe la marca." })
+    .trim()
+    .min(1, { error: "Escribe la marca." })
+    .max(LIMITS.brandName, { error: `La marca admite hasta ${LIMITS.brandName} caracteres.` }),
+  campaign: z
+    .string()
+    .trim()
+    .max(LIMITS.campaignName, { error: `La campaña admite hasta ${LIMITS.campaignName} caracteres.` })
+    .default(""),
+  /** Miniatura propia; null = la de la publicación. */
+  image: storedImageSchema.nullable().default(null),
+  metrics: z.object({ views: caseMetric, likes: caseMetric, comments: caseMetric }),
+});
+export type CaseStudy = z.output<typeof caseStudySchema>;
+
+export const caseStudiesSchema = z
+  .array(caseStudySchema)
+  .max(LIMITS.maxCaseStudies, { error: `Puedes mostrar hasta ${LIMITS.maxCaseStudies} casos de estudio.` })
+  .refine((cases) => new Set(cases.map((item) => item.postId)).size === cases.length, {
+    error: "Esa publicación ya es un caso de estudio.",
+  });
+
 // ── Datos escritos a mano (siempre ganan) ───────────────────────────
 export const manualDataSchema = z.object({
   name: z
@@ -362,6 +444,10 @@ export const manualDataSchema = z.object({
   gender: z
     .enum(GENDERS, { error: "Elige una de las opciones: Hombre, Mujer, Otro o Prefiero no decirlo." })
     .optional(),
+  /** Ronda 6 · 13.19: Brand partners confirmados por la creadora. Ausente o [] = sin la sección en el Media kit. */
+  brandPartners: brandPartnersSchema.optional(),
+  /** Ronda 6 · 13.20: case studies sobre sus publicaciones importadas. Ausente o [] = sin la sección. */
+  caseStudies: caseStudiesSchema.optional(),
 });
 export type ManualData = z.infer<typeof manualDataSchema>;
 
@@ -512,6 +598,8 @@ export const confirmImportInputSchema = z.object({
   retry: z.boolean().optional(),
   /** Spec 11.12: las tarjetas de servicio del creador (obligatorias desde esta ronda: mínimo 1). */
   services: servicesSchema.optional(),
+  /** Ronda 6 · 13.19: los Brand partners que la creadora confirmó en la revisión (opcional). */
+  brandPartners: brandPartnersSchema.optional(),
   design: designSchema,
 });
 export type ConfirmImportInput = z.output<typeof confirmImportInputSchema>;

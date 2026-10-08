@@ -1,27 +1,48 @@
 import Image from "next/image";
-import type { ResolvedPortfolio } from "@/lib/portfolio/resolve";
-import { Avatar, ContactPill, PieceLink, pieceMeta, portfolioView } from "./template-kit";
+import { brandInitial, brandProfileUrl } from "@/lib/portfolio/brands";
+import { caseMetricLabels, type ResolvedCaseStudy } from "@/lib/portfolio/case-studies";
+import type { ResolvedPiece, ResolvedPortfolio } from "@/lib/portfolio/resolve";
+import { publicPath } from "@/lib/portfolio/slug";
+import { NO_METRICS } from "@/lib/portfolio/stats";
+import { ShareWhatsApp } from "./share-whatsapp";
+import { Avatar, HireLink, PieceLink, portfolioView } from "./template-kit";
 import "./media-kit.css";
 
 /*
- * Vista MEDIA KIT del portafolio público (ronda 30/09 · 7.3; benchmark: el media kit de Beacons).
- * Cabecera (avatar, nombre, tag de nicho) → las 3 métricas (Seguidores, Interacciones promedio, ER, cada una con su
- * base) → plataformas → piezas destacadas → párrafo "Sobre mí" → "Trabaja conmigo". El ER vive aquí, no en
- * "Sobre mí". Mismo diseño para las 4 plantillas, con los colores de su paleta (--pf-*). Componente de servidor.
- * Fuera de alcance (a propósito): demografía de audiencia, tarifas y conexión con Meta.
+ * Vista MEDIA KIT del portafolio público (ronda 30/09 · 7.3; ronda 6 · 13.18 Media Kit v1).
+ * Orden: cabecera (avatar, nombre, nichos) → Métricas + Engagement Rate (cada una con su base) → Brand Partners
+ * (13.19: solo las marcas que la creadora confirmó) → Case studies (13.20: publicaciones reales con marca, campaña y
+ * cifras) → "Trabaja conmigo" (13.8 / 13.9: WhatsApp con el mensaje según su género) → compartir por WhatsApp (12.4).
+ *
+ * El Media kit NO repite el grid de contenido (13.18): no hay "piezas destacadas"; los case studies son tarjetas con
+ * contexto, no una galería. Sin demografía de audiencia (edad, género, países): necesita OAuth de Instagram y el App
+ * Review de Meta, queda para otra fase. Mismo diseño en las 4 plantillas, con su paleta (--pf-*). Componente de
+ * servidor (solo el botón de compartir y el overlay de video llegan al navegador).
  */
 
-const FEATURED = 6;
-const SOCIAL = new Set(["instagram", "tiktok", "youtube"]);
+/** Un case study como pieza, para abrirlo en el overlay igual que el contenido (13.2 / 13.3). */
+function casePiece(item: ResolvedCaseStudy): ResolvedPiece {
+  return {
+    id: `caso-${item.postId}`,
+    origin: "instagram",
+    title: item.campaign || item.brand,
+    niche: null,
+    image: item.image,
+    video: item.kind === "video" ? item.link : null,
+    sourcePostId: item.postId,
+    link: item.link,
+    metrics: NO_METRICS,
+    kind: item.kind,
+  };
+}
 
 export function MediaKit({ portfolio }: { portfolio: ResolvedPortfolio }) {
   const view = portfolioView(portfolio, "page");
-  const { links, email, handle } = view;
-  const about = portfolio.valueProp || portfolio.bio;
-  const followers = portfolio.metrics.find((metric) => metric.kind === "followers");
-  const platforms = links.filter((link) => SOCIAL.has(link.kind));
-  const contact = email ?? links[0] ?? null;
-  const featured = portfolio.pieces.slice(0, FEATURED);
+  const { handle } = view;
+  const partners = portfolio.brandPartners ?? [];
+  const cases = portfolio.caseStudies ?? [];
+  // "Trabaja conmigo": WhatsApp (o su correo). Un ancla a la sección de contacto no sirve aquí: vive en Contenido.
+  const canHire = view.hire !== null && !view.hire.href.startsWith("#");
 
   return (
     <div className="mk" data-media-kit>
@@ -55,49 +76,72 @@ export function MediaKit({ portfolio }: { portfolio: ResolvedPortfolio }) {
         </section>
       )}
 
-      {platforms.length > 0 && (
-        <section aria-labelledby="mk-plataformas" className="mk-section">
-          <h2 id="mk-plataformas" className="mk-h2">
-            Plataformas
+      {partners.length > 0 && (
+        <section aria-labelledby="mk-marcas" className="mk-section">
+          <h2 id="mk-marcas" className="mk-h2">
+            Brand Partners
           </h2>
-          <ul className="mk-platforms">
-            {platforms.map((link) => (
-              <li key={link.kind}>
-                <ContactPill link={link} className="mk-platform" />
-                {link.kind === "instagram" && followers && (
-                  <span className="mk-platform__meta">{followers.display} seguidores</span>
-                )}
+          <ul className="mk-brands" data-mk-brands>
+            {partners.map((partner) => (
+              <li key={partner.instagram}>
+                <a
+                  className="mk-brand"
+                  href={brandProfileUrl(partner.instagram)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  data-mk-brand={partner.instagram}
+                >
+                  <span className="mk-brand__logo" aria-hidden="true">
+                    {partner.logo ? (
+                      <Image src={partner.logo.url} alt="" width={64} height={64} sizes="64px" className="mk-brand__img" />
+                    ) : (
+                      brandInitial(partner.name)
+                    )}
+                  </span>
+                  <span className="mk-brand__name">{partner.name}</span>
+                  <span className="sr-only"> en Instagram (se abre en otra pestaña)</span>
+                </a>
               </li>
             ))}
           </ul>
         </section>
       )}
 
-      {featured.length > 0 && (
-        <section aria-labelledby="mk-piezas" className="mk-section">
-          <h2 id="mk-piezas" className="mk-h2">
-            Piezas destacadas
+      {cases.length > 0 && (
+        <section aria-labelledby="mk-casos" className="mk-section">
+          <h2 id="mk-casos" className="mk-h2">
+            Case studies
           </h2>
-          <ul className="mk-pieces">
-            {featured.map((piece) => {
-              const { platform } = pieceMeta(piece);
+          <ul className="mk-cases" data-mk-cases>
+            {cases.map((item) => {
+              const labels = caseMetricLabels(item.metrics);
               return (
-                <li key={piece.id}>
-                  <PieceLink piece={piece} className="mk-piece">
-                    <span className="mk-piece__media" data-reel-media>
-                      {piece.image && (
+                <li key={item.postId} className="mk-case" data-mk-case={item.postId}>
+                  <PieceLink piece={casePiece(item)} className="mk-case__media-link">
+                    <span className="mk-case__media" data-reel-media>
+                      {item.image && (
                         <Image
-                          src={piece.image.url}
+                          src={item.image.url}
                           alt=""
                           fill
-                          sizes="(min-width: 640px) 220px, 45vw"
-                          className="mk-piece__img"
+                          sizes="(min-width: 640px) 160px, 112px"
+                          className="mk-case__img"
                         />
                       )}
                     </span>
-                    <span className="mk-piece__title">{piece.title}</span>
-                    {platform && <span className="mk-piece__meta">{platform}</span>}
+                    <span className="sr-only">Ver {item.campaign || `el trabajo con ${item.brand}`}</span>
                   </PieceLink>
+                  <div className="mk-case__body">
+                    <h3 className="mk-case__brand">{item.brand}</h3>
+                    {item.campaign && <p className="mk-case__campaign">{item.campaign}</p>}
+                    {labels.length > 0 && (
+                      <ul className="mk-case__metrics" aria-label="Resultados" data-mk-case-metrics>
+                        {labels.map((label) => (
+                          <li key={label}>{label}</li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
                 </li>
               );
             })}
@@ -105,28 +149,17 @@ export function MediaKit({ portfolio }: { portfolio: ResolvedPortfolio }) {
         </section>
       )}
 
-      {about && (
-        <section aria-labelledby="mk-sobre" className="mk-section">
-          <h2 id="mk-sobre" className="mk-h2">
-            Sobre mí
-          </h2>
-          <p className="mk-about">{about}</p>
-        </section>
-      )}
-
-      {contact && (
-        <p className="mk-cta-wrap">
-          <a
-            className="mk-cta"
-            href={contact.href}
-            {...(contact.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
-            data-mk-contact
-          >
-            Trabaja conmigo
-            {contact.external && <span className="sr-only"> (se abre en otra pestaña)</span>}
-          </a>
+      {canHire && (
+        <p className="mk-cta-wrap" data-mk-hire>
+          <HireLink view={view} className="mk-cta" />
         </p>
       )}
+
+      <p className="mk-share" data-mk-share>
+        <ShareWhatsApp basePath={publicPath(portfolio.slug)} gender={portfolio.gender ?? null} hash="#media-kit" className="mk-share__link">
+          Compartir por WhatsApp
+        </ShareWhatsApp>
+      </p>
     </div>
   );
 }

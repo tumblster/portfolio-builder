@@ -1,7 +1,8 @@
 /*
- * Toggle SOBRE MÍ / MEDIA KIT y la vista Media Kit (ronda 30/09 · 7.3). Colores de la paleta del portafolio
- * (--pf-*, que llegan en el style de .pf-views): los mismos pares que ya cumplen ≥ 7:1 en las plantillas
- * (tinta y texto secundario sobre el fondo; blanco sobre la tinta). El acento solo decora.
+ * Toggle SOBRE MÍ / MEDIA KIT y la vista Media Kit (ronda 30/09 · 7.3; ronda 6 · 13.18). Colores de la paleta del
+ * portafolio (--pf-*, que llegan en el style de .pf-views): los mismos pares que ya cumplen ≥ 7:1 en las plantillas
+ * (tinta y texto secundario sobre el fondo o sobre blanco; blanco sobre la tinta; --pf-display sobre --pf-beige). El
+ * acento solo decora.
  */
 .pf-views {
   --pf-switch-h: 3.5rem;
@@ -221,6 +222,10 @@
   padding: 1.5rem 1rem 2.5rem;
   background: var(--pf-bg);
 }
+/* 13.18: en Media kit, el compartir es su propia sección (abre directo en el Media kit): sin duplicarlo abajo. */
+.pf-views[data-view="kit"] > .pf-share {
+  display: none;
+}
 .pf-share__whatsapp {
   display: inline-flex;
   align-items: center;
@@ -299,6 +304,8 @@
   letter-spacing: 0.14em;
   text-transform: uppercase;
 }
+
+/* Métricas + ER */
 .mk-metrics {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
@@ -341,84 +348,134 @@
   line-height: 1.4;
   overflow-wrap: anywhere;
 }
-.mk-platforms {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.mk-platforms li {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.25rem 0.75rem;
-}
-.mk-platform {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  min-height: 2.75rem;
-  padding: 0 1rem;
-  border: 1px solid color-mix(in srgb, var(--pf-ink) 18%, transparent);
-  border-radius: 999px;
-  background: #ffffff;
-  color: var(--pf-ink);
-  font-weight: 600;
-  overflow-wrap: anywhere;
-}
-.mk-platform__meta {
-  color: var(--pf-muted);
-  font-size: 0.875rem;
-}
-.mk-pieces {
+
+/* 13.19 · Brand Partners: logos en círculo con el nombre debajo (o la inicial). */
+.mk-brands {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(6rem, 1fr));
   gap: 0.75rem;
   margin: 0;
   padding: 0;
   list-style: none;
 }
-@media (width >= 40rem) {
-  .mk-pieces {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
-.mk-piece {
+.mk-brand {
   display: flex;
   flex-direction: column;
-  gap: 0.375rem;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.75rem;
+  padding: 0.875rem 0.5rem;
+  border: 1px solid color-mix(in srgb, var(--pf-ink) 14%, transparent);
+  border-radius: 1.25rem;
+  background: #ffffff;
   color: var(--pf-ink);
+  text-align: center;
   text-decoration: none;
 }
-.mk-piece__media {
+.mk-brand__logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 4rem;
+  height: 4rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--pf-beige);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--pf-ink) 12%, transparent);
+  color: var(--pf-display);
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+.mk-brand__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.mk-brand__name {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+/* 13.20 · Case studies: tarjetas horizontales con contexto (no una galería). */
+.mk-cases {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.mk-case {
+  display: grid;
+  grid-template-columns: 7rem minmax(0, 1fr);
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--pf-ink) 14%, transparent);
+  border-radius: 1.25rem;
+  background: #ffffff;
+}
+@media (width >= 40rem) {
+  .mk-case {
+    grid-template-columns: 10rem minmax(0, 1fr);
+    gap: 1.25rem;
+  }
+}
+.mk-case__media-link {
+  display: block;
+  border-radius: 0.875rem;
+  color: inherit;
+}
+.mk-case__media {
   position: relative;
   display: block;
   aspect-ratio: 4 / 5;
   overflow: hidden;
-  border-radius: 1rem;
+  border-radius: 0.875rem;
   background: var(--pf-beige);
 }
-.mk-piece__img {
+.mk-case__img {
   object-fit: cover;
 }
-.mk-piece__title {
-  font-size: 0.875rem;
-  font-weight: 600;
-  line-height: 1.3;
+.mk-case__body {
+  min-width: 0;
+}
+.mk-case__brand {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
   overflow-wrap: anywhere;
 }
-.mk-piece__meta {
+.mk-case__campaign {
+  margin: 0.25rem 0 0;
   color: var(--pf-muted);
-  font-size: 0.75rem;
+  font-size: 0.9375rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
 }
-.mk-about {
-  margin: 0;
-  font-size: 1.0625rem;
-  line-height: 1.65;
-  white-space: pre-line;
+.mk-case__metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  list-style: none;
 }
+.mk-case__metrics li {
+  padding: 0.25rem 0.625rem;
+  border-radius: 999px;
+  background: var(--pf-bg);
+  color: var(--pf-ink);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* Trabaja conmigo + compartir */
 .mk-cta-wrap {
   margin: 2.75rem 0 0;
   text-align: center;
@@ -436,9 +493,27 @@
   text-decoration: none;
   box-shadow: 0 4px 0 var(--pf-accent);
 }
+.mk-share {
+  display: flex;
+  justify-content: center;
+  margin: 1.5rem 0 0;
+}
+.mk-share__link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+  padding: 0 1.25rem;
+  border: 1px solid color-mix(in srgb, var(--pf-ink) 22%, transparent);
+  border-radius: 999px;
+  background: #ffffff;
+  color: var(--pf-ink);
+  font-weight: 700;
+  text-decoration: none;
+}
 .mk-cta:focus-visible,
-.mk-piece:focus-visible,
-.mk-platform:focus-visible {
+.mk-brand:focus-visible,
+.mk-case__media-link:focus-visible,
+.mk-share__link:focus-visible {
   outline: 3px solid var(--pf-accent);
   outline-offset: 3px;
 }

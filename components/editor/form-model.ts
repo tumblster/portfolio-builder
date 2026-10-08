@@ -1,7 +1,16 @@
 import type { CreatorMetric } from "@/lib/portfolio/metrics";
 import type { ManualPrefill } from "@/lib/import/events";
 import { recommendedPalette } from "@/components/design/design-pickers";
+import type { ImportedPost } from "@/lib/portfolio/case-studies";
 import { DEFAULT_DESIGN, type Design } from "@/lib/portfolio/design";
+import {
+  caseDraftsFrom,
+  caseStudiesPayload,
+  partnerDraftsFrom,
+  partnersPayload,
+  type BrandPartnerDraft,
+  type CaseStudyDraft,
+} from "@/lib/portfolio/media-kit-drafts";
 import { LEGACY_NICHES, type NicheDef } from "@/lib/portfolio/niches";
 import type { PieceLink, ResolvedPortfolio } from "@/lib/portfolio/resolve";
 import {
@@ -28,6 +37,8 @@ import { NO_METRICS, type PieceMetrics, type ProfileStat } from "@/lib/portfolio
  * los creados a mano y en los de la v1). En M1 no se editan: el formulario los usa para el
  * selector de cada pieza y los conserva tal cual al guardar. Los servicios sí se editan.
  * Ronda 6 · 13.11: el género (del onboarding) tampoco se edita aquí: se conserva tal cual al guardar.
+ * Ronda 6 · 13.19 / 13.20: Brand partners y case studies del Media kit se editan aquí (solo existen como dato manual,
+ * así que se envían siempre que haya alguno o ya estuvieran guardados: guardar nunca los borra sin querer).
  */
 
 export const CONTACT_KEYS = ["email", "whatsapp", "instagram", "tiktok", "youtube", "website"] as const;
@@ -66,6 +77,10 @@ export type FormState = {
   pieces: PieceDraft[];
   /** Plantilla y paleta (v2 · M2): se cambian sin tocar ningún otro dato. */
   design: Design;
+  /** Ronda 6 · 13.19: Brand partners confirmados. */
+  brandPartners: BrandPartnerDraft[];
+  /** Ronda 6 · 13.20: case studies sobre sus publicaciones importadas. */
+  caseStudies: CaseStudyDraft[];
 };
 
 /**
@@ -82,7 +97,17 @@ export type PreviewExtras = {
 export const NO_EXTRAS: PreviewExtras = { stats: [], metrics: {}, engagementRate: null, creatorMetrics: [] };
 
 /** Lo que estaba guardado al abrir (o al último guardado): para saber qué cambió. */
-export type Baseline = { slug: string; revision: number; form: FormState; manual: ManualData; extras: PreviewExtras };
+export type Baseline = {
+  slug: string;
+  revision: number;
+  form: FormState;
+  manual: ManualData;
+  extras: PreviewExtras;
+  /** Ronda 6 · 13.20: sus publicaciones importadas, para marcar case studies. Ausente = ninguna. */
+  imported?: ImportedPost[];
+  /** Ronda 6 · 13.19 (a): @menciones de sus contenidos, candidatas a Brand partners. */
+  mentions?: string[];
+};
 
 /** Errores por campo: "name", "contact.email", "pieces.2.title", "pieces"… */
 export type FieldErrors = Record<string, string>;
@@ -113,6 +138,8 @@ export function emptyForm(): FormState {
     services: [],
     pieces: Array.from({ length: LIMITS.minPieces }, () => emptyPiece()),
     design: DEFAULT_DESIGN,
+    brandPartners: [],
+    caseStudies: [],
   };
 }
 
@@ -137,6 +164,8 @@ export function formFromPrefill(prefill: ManualPrefill): FormState {
     services: [],
     pieces,
     design: { template: DEFAULT_DESIGN.template, palette: recommendedPalette(prefill.photo) },
+    brandPartners: [],
+    caseStudies: [],
   };
 }
 
@@ -164,6 +193,8 @@ export function formFromPortfolio(resolved: ResolvedPortfolio): FormState {
       postLink: !piece.video && piece.link ? piece.link : null,
     })),
     design: resolved.design,
+    brandPartners: partnerDraftsFrom(resolved.brandPartners ?? []),
+    caseStudies: caseDraftsFrom(resolved.caseStudies ?? []),
   };
 }
 
@@ -246,6 +277,13 @@ export function toUpdatePayload(form: FormState, baseline: Baseline) {
     ...(services !== undefined ? { services } : {}),
     // Ronda 6 · 13.11: el género del onboarding no se edita aquí: se conserva (si no, guardar lo borraba).
     ...(baseline.manual.gender !== undefined ? { gender: baseline.manual.gender } : {}),
+    // Ronda 6 · 13.19 / 13.20: lo que muestra el formulario es lo guardado; se envía siempre que exista.
+    ...(form.brandPartners.length > 0 || baseline.manual.brandPartners !== undefined
+      ? { brandPartners: partnersPayload(form.brandPartners) }
+      : {}),
+    ...(form.caseStudies.length > 0 || baseline.manual.caseStudies !== undefined
+      ? { caseStudies: caseStudiesPayload(form.caseStudies) }
+      : {}),
   };
   const design = form.design;
   const designChanged =
