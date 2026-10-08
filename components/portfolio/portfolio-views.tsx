@@ -29,6 +29,9 @@ import { MadeWithBadge } from "./made-with-badge";
  *  - 13.8: los textos de WhatsApp ("Hablemos" y compartir) se adaptan al género que eligió (lib/portfolio/gender.ts);
  *    sin dato, Otro o Prefiero no decirlo, en neutro (13.23 · 2).
  *  - 13.9: el CTA "Ver media kit" de las plantillas (data-pf-to-kit) cambia de vista igual que el switch.
+ *  - 13.13: con un link de nicho (/p/<slug>/<nicho>, el formato del M1), la página llega con ese nicho ya elegido y
+ *    SIN la fila de chips: quien lo recibe ve solo ese nicho (el header queda en "foto | Contenido · Media kit |
+ *    Hablemos").
  *  - 13.17 / 13.23 · 6: el badge flotante "Hecho con Supercreador", en todos los portafolios.
  */
 
@@ -141,7 +144,8 @@ export function PortfolioViews({ about, kit, style, nav }: { about: ReactNode; k
     : nav.contactId
       ? `#${nav.contactId}`
       : null;
-  const hasNiches = nav.niches.length > 0;
+  // 13.13: con un link de nicho, sin los chips (la página ya viene con ese nicho elegido).
+  const hasNiches = nav.niches.length > 0 && activeNiche === null;
 
   return (
     <div
@@ -149,6 +153,7 @@ export function PortfolioViews({ about, kit, style, nav }: { about: ReactNode; k
       style={style}
       data-view={kitActive ? "kit" : "about"}
       data-has-niches={hasNiches ? "" : undefined}
+      data-niche-link={activeNiche ?? undefined}
       onClick={onViewsClick}
     >
       <header className="pf-bar" data-pf-bar>
@@ -216,21 +221,13 @@ export function PortfolioViews({ about, kit, style, nav }: { about: ReactNode; k
               <div ref={scroller} className="pf-bar__chips">
                 <nav aria-label={`Nichos de ${nav.name}`}>
                   <ul>
-                    {nav.niches.map((niche) => {
-                      const on = activeNiche === niche.slug;
-                      return (
-                        <li key={niche.slug}>
-                          <a
-                            className="pf-chip"
-                            href={on ? nav.basePath : `${nav.basePath}/${niche.slug}`}
-                            aria-current={on ? "page" : undefined}
-                            data-pf-chip={niche.slug}
-                          >
-                            {niche.label}
-                          </a>
-                        </li>
-                      );
-                    })}
+                    {nav.niches.map((niche) => (
+                      <li key={niche.slug}>
+                        <a className="pf-chip" href={`${nav.basePath}/${niche.slug}`} data-pf-chip={niche.slug}>
+                          {niche.label}
+                        </a>
+                      </li>
+                    ))}
                   </ul>
                 </nav>
               </div>

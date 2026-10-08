@@ -103,4 +103,10 @@ export type ImportResult = {
   revision: number;
   resolved: ResolvedPortfolio;
   warnings: string[];
+  /**
+   * Ronda 6 · 13.15: la cuenta del onboarding (el correo) y qué pasó con el correo de sus links: "smtp" (salió),
+   * "mock" (sin SMTP: quedó en los registros), "failed" (no salió: se puede reenviar) o null (no se mandó en esta
+   * petición, p. ej. un reintento que devolvió el mismo portafolio). Ausente o null en clientes sin onboarding.
+   */
+  owner?: { email: string; mail: "smtp" | "mock" | "failed" | null } | null;
 };

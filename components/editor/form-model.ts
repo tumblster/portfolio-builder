@@ -27,6 +27,7 @@ import { NO_METRICS, type PieceMetrics, type ProfileStat } from "@/lib/portfolio
  * v2: los nichos son propios de cada portafolio (los de la IA, o Belleza/Lifestyle/Viajes en
  * los creados a mano y en los de la v1). En M1 no se editan: el formulario los usa para el
  * selector de cada pieza y los conserva tal cual al guardar. Los servicios sí se editan.
+ * Ronda 6 · 13.11: el género (del onboarding) tampoco se edita aquí: se conserva tal cual al guardar.
  */
 
 export const CONTACT_KEYS = ["email", "whatsapp", "instagram", "tiktok", "youtube", "website"] as const;
@@ -243,6 +244,8 @@ export function toUpdatePayload(form: FormState, baseline: Baseline) {
     // Los nichos no se editan en M1: se conservan tal como estaban guardados.
     ...(baseline.manual.niches !== undefined ? { niches: baseline.manual.niches } : {}),
     ...(services !== undefined ? { services } : {}),
+    // Ronda 6 · 13.11: el género del onboarding no se edita aquí: se conserva (si no, guardar lo borraba).
+    ...(baseline.manual.gender !== undefined ? { gender: baseline.manual.gender } : {}),
   };
   const design = form.design;
   const designChanged =

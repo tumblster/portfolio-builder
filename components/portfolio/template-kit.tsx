@@ -8,7 +8,6 @@ import { contactMessage, whatsappUrl } from "@/lib/portfolio/gender";
 import { nichesWithPieces, type NicheDef } from "@/lib/portfolio/niches";
 import type { ResolvedPiece, ResolvedPortfolio } from "@/lib/portfolio/resolve";
 import type { StoredImage } from "@/lib/portfolio/schema";
-import { publicPath } from "@/lib/portfolio/slug";
 import type { ProfileStatKind } from "@/lib/portfolio/stats";
 import { ContactIcon, PLATFORM_LABEL } from "./icons";
 import { NicheScope } from "./niche-filter";
@@ -24,8 +23,8 @@ import "./portfolio-ctas.css";
  * Ronda 6 · 13.9: los dos CTAs de toda plantilla salen de aquí (HireLink y KitLink), con el mismo destino en las 4:
  *  - "Trabaja conmigo": WhatsApp con el mensaje pre-llenado según su género (13.8); sin WhatsApp, su correo o su
  *    sección de contacto; sin ningún contacto, no se muestra.
- *  - "Ver media kit": en la página, la vista Media kit (el mismo switch del header); en el editor, la página pública
- *    en esa vista, en otra pestaña.
+ *  - "Ver media kit": en la página, la vista Media kit (el mismo switch del header). En la vista previa (editor y
+ *    /crear/manual) se muestra igual pero sin link: ahí no hay una página a la que ir.
  */
 
 export type NicheFilter =
@@ -99,11 +98,8 @@ export function portfolioView(portfolio: ResolvedPortfolio, variant: TemplatePro
     id,
     /** 13.9: "Trabaja conmigo" (null si no hay forma de contactarla). */
     hire: hireLink(portfolio, firstName, email, hasContact ? id("contacto") : null),
-    /** 13.9: "Ver media kit". */
-    kit:
-      variant === "page"
-        ? ({ href: "#media-kit", external: false, whatsapp: false } satisfies CtaLink)
-        : ({ href: `${publicPath(portfolio.slug)}#media-kit`, external: true, whatsapp: false } satisfies CtaLink),
+    /** 13.9: "Ver media kit" (en la página). En la vista previa, null: se muestra sin link. */
+    kit: variant === "page" ? ({ href: "#media-kit", external: false, whatsapp: false } satisfies CtaLink) : null,
     headings:
       variant === "page"
         ? ({ Root: "main", H1: "h1", H2: "h2", H3: "h3" } as const)
@@ -245,21 +241,23 @@ export function HireLink({ view, className, children }: { view: PortfolioView; c
 
 /**
  * 13.9 · CTA secundario "Ver media kit". En la página, data-pf-to-kit: el header (portfolio-views.tsx) lo intercepta y
- * cambia de vista como el switch (sin JavaScript, el #media-kit hace lo mismo al cargar).
+ * cambia de vista como el switch (sin JavaScript, el #media-kit hace lo mismo al cargar). En la vista previa se ve
+ * igual pero no navega (no hay página a la que ir).
  */
 export function KitLink({ view, className, children }: { view: PortfolioView; className: string; children?: ReactNode }) {
   const { kit } = view;
+  if (!kit) {
+    return (
+      <span className={className} data-pf-cta="kit" aria-disabled="true">
+        Ver media kit
+        {children}
+      </span>
+    );
+  }
   return (
-    <a
-      className={className}
-      href={kit.href}
-      {...(kit.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
-      data-pf-cta="kit"
-      data-pf-to-kit={view.isPage ? "" : undefined}
-    >
+    <a className={className} href={kit.href} data-pf-cta="kit" data-pf-to-kit="">
       Ver media kit
       {children}
-      {kit.external && <span className="sr-only"> (se abre en otra pestaña)</span>}
     </a>
   );
 }
