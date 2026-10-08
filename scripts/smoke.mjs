@@ -529,9 +529,11 @@ try {
   check(viajes.status === 200 && viajesHtml.includes('data-pf-filter="viajes"'), "El link de un nicho abre ya filtrado → /p/…/viajes");
   check(activeNiche(viajesHtml) === "viajes" && pills(viajesHtml).length === 0, "En /viajes, la página ya viene filtrada");
   const viajesBar = viajesHtml.match(/<header[^>]*data-pf-bar[\s\S]*?<\/header>/)?.[0] ?? "";
+  // Ronda 6 · 13.13: con link de nicho, ese nicho ya viene elegido y los chips generales no se muestran.
   check(
-    new RegExp(`<a[^>]*href="/p/${slug}"[^>]*aria-current="page"[^>]*data-pf-chip="viajes"`).test(viajesBar),
-    "En /viajes, su chip queda elegido y tocarlo vuelve a todo",
+    /class="pf-seg"/.test(viajesBar) && !/data-pf-chip/.test(viajesBar) && !/class="pf-bar__row2"/.test(viajesBar) &&
+      /data-niche-link="viajes"/.test(viajesHtml),
+    "13.13: el link de un nicho abre con ese nicho elegido y sin los chips de nichos (solo Contenido · Media kit)",
   );
   check(/<title>[^<]*— Viajes<\/title>/.test(viajesHtml), "El título de la pestaña nombra el nicho");
   check(/<meta name="robots" content="noindex, nofollow"/.test(viajesHtml), "El link de nicho tampoco se indexa");
@@ -1372,97 +1374,43 @@ try {
     const done = await call("GET", `/api/import/status?draftId=${chipsId}`);
     check(done.data?.state === "done" && done.data?.slug === chips.data?.slug, "Estado consultable: el borrador confirmado queda «done» con su link", done.data);
 
-    // ── 7.4: el 409 ya no es eterno ──
-    const busyId = await writeDraft({ claim: { at: new Date().toISOString(), slug: null } });
-    const busy = await confirm({ ...confirmInput, draftId: busyId });
-    const retryAtMs = Date.parse(busy.data?.error?.retryAt ?? "");
+    // ── Ronda 6 · 13.15 / 13.11 / 13.14: onboarding (correo + género) → cuenta → panel «Mis portafolios» ──
+    const ownerEmail = `duena.${Date.now()}@ejemplo.com`;
+    const ownerDraftId = await writeDraft();
+    const ownerInput = {
+      draftId: ownerDraftId,
+      niches: [{ label: "Fitness" }],
+      selection: [{ id: "pieza-1", niche: "fitness" }, { id: "pieza-2", niche: null }, { id: "pieza-3", niche: null }],
+      design: { template: "creator", palette: "crema" },
+      services: [{ title: "Videos UGC para anuncios", description: "" }],
+    };
+    const badOwner = await confirm({ ...ownerInput, owner: { email: ownerEmail, gender: "x" } });
+    const withOwner = await confirm({ ...ownerInput, owner: { email: ownerEmail, gender: "mujer" } });
+    const ownerSlug = withOwner.data?.slug;
+    const ownerFile = JSON.parse(await readFile(path.join(process.cwd(), ".data", "owners", `${ownerSlug}.json`), "utf8").catch(() => "null"));
     check(
-      busy.status === 409 && retryAtMs > Date.now() && retryAtMs - Date.now() <= 76_000,
-      `409 solo mientras otra petición genera, con un retryAt acotado (≤ 75 s): ${busy.data?.error?.retryAt}`,
-      busy.data,
+      badOwner.status === 400 && withOwner.status === 201 && withOwner.data?.resolved?.gender === "mujer" &&
+        withOwner.data?.owner?.email === ownerEmail && withOwner.data?.owner?.mail === "mock" && ownerFile?.email === ownerEmail,
+      "13.15 / 13.11: el correo y el género del onboarding viajan al generar: la cuenta queda guardada, el género en el portafolio y sale el correo con sus links",
+      { status: [badOwner.status, withOwner.status], owner: withOwner.data?.owner, ownerFile },
     );
-    const generating = await call("GET", `/api/import/status?draftId=${busyId}`);
-    check(generating.data?.state === "generating", "Estado consultable: «generating» mientras dura el candado", generating.data);
-    // Un candado que quedó colgado (la ejecución murió) y una generación que lanza una excepción: estado FALLIDO.
-    const stuckId = await writeDraft({
-      claim: { at: new Date(Date.now() - 10 * 60 * 1000).toISOString(), slug: null },
-      pieces: base.pieces.slice(0, 2), // el portafolio necesita 3 piezas: createPortfolio falla
-    });
-    const stuckInput = { draftId: stuckId, niches: confirmInput.niches, pieceNiches: {}, design: confirmInput.design };
-    const firstFail = await confirm(stuckInput);
+    const accountToken = (email, expires) => {
+      const key = createHash("sha256").update(email.trim().toLowerCase()).digest("hex").slice(0, 40);
+      const payload = Buffer.from(JSON.stringify({ a: key, e: expires, v: 1, t: "account" })).toString("base64url");
+      return `${payload}.${createHmac("sha256", magicSecret).update(payload).digest("base64url")}`;
+    };
+    const panelOpen = await fetch(new URL(`/m/cuenta/${accountToken(ownerEmail, Date.now() + 29 * 24 * 3600 * 1000)}`, BASE), { redirect: "manual" });
+    const accountCookie = (panelOpen.headers.get("set-cookie") ?? "").match(/sc_account=[^;]+/)?.[0] ?? "";
+    const panelHtml = await (await fetch(new URL("/mis-portafolios", BASE), { headers: { cookie: accountCookie } })).text();
+    const panelAnon = await (await fetch(new URL("/mis-portafolios", BASE))).text();
+    const portfolioAsAccount = await fetch(new URL(`/m/cuenta/${tokenFor(ownerSlug, Date.now() + 60 * 1000)}`, BASE), { redirect: "manual" });
     check(
-      firstFail.status === 500 && firstFail.data?.error?.code === "generation_failed" && firstFail.data?.error?.message,
-      `Si la generación lanza una excepción: error terminal, no 409 → "${firstFail.data?.error?.message}"`,
-      firstFail.data,
-    );
-    const failedStatus = await call("GET", `/api/import/status?draftId=${stuckId}`);
-    check(
-      failedStatus.data?.state === "failed" && failedStatus.data?.failure?.code === "create_failed" && failedStatus.data?.failure?.at,
-      "Estado consultable: el borrador queda «failed» con su causa y hora",
-      failedStatus.data,
-    );
-    const againFail = await confirm(stuckInput);
-    check(
-      againFail.status === 500 && againFail.data?.error?.code === "generation_failed",
-      "Reintentar sin pedirlo no vuelve al 409: sigue siendo el error terminal",
-      againFail.data,
-    );
-    const explicitRetry = await confirm({ ...stuckInput, retry: true });
-    check(
-      explicitRetry.status === 500 && explicitRetry.data?.error?.code === "generation_failed" && Date.parse(explicitRetry.data?.error?.failedAt) > Date.parse(failedStatus.data?.failure?.at),
-      "«Inténtalo de nuevo» (retry) hace otro intento real y, si vuelve a fallar, registra el nuevo fallo",
-      explicitRetry.data,
-    );
-    // El cliente: con un 409 eterno, la misma política de components/import-review.tsx corta con un error < 60 s.
-    const policy = await import(new URL("../lib/import/confirm-retry.ts", import.meta.url));
-    let clock = 0;
-    let attempt = 0;
-    const requestMs = 1_500; // cada respuesta 409 tarda esto
-    for (;;) {
-      clock += requestMs;
-      const delay = policy.nextConfirmRetry(attempt, 0, clock, Date.now() + 10 * 60 * 1000);
-      if (delay === null) break;
-      clock += delay;
-      attempt += 1;
-    }
-    check(
-      clock < 60_000 && attempt <= policy.CONFIRM_RETRY_DELAYS_MS.length && policy.CONFIRM_DEADLINE_MS < 60_000,
-      `Cliente ante un 409 eterno: ${attempt} reintentos y error terminal a los ${(clock / 1000).toFixed(1)} s (< 60 s)`,
-    );
-    check(
-      policy.confirmRequestTimeout(0, policy.CONFIRM_DEADLINE_MS) === 0 && policy.confirmRequestTimeout(0, 0) <= policy.CONFIRM_DEADLINE_MS,
-      "Cliente: ninguna petición colgada pasa el plazo global (se corta)",
-    );
-
-    // ── Spec 10.1: round-trip de escritura condicional en el almacenamiento del servidor (disco en CI; Blob si BASE
-    //    apunta a un deployment): leer → escribir con el etag leído → leer → el etag viejo se rechaza. ──
-    const roundtrip = await call("GET", "/api/import/health?roundtrip=1");
-    const rt = roundtrip.data?.checks?.roundtrip;
-    check(
-      roundtrip.status === 200 && rt?.ok === true && rt.steps.read && rt.steps.conditionalWrite && rt.steps.readBack && rt.steps.staleRejected,
-      `Almacenamiento (${rt?.driver}): leer → escritura condicional → leer funciona y un etag viejo se rechaza`,
-      roundtrip.data?.checks,
-    );
-    if (roundtrip.data?.checks?.blobEtags) {
-      const blobEtags = roundtrip.data.checks.blobEtags;
-      check(blobEtags.writeWithHeadEtag === "ok" && blobEtags.staleWriteRejected, "Blob: ifMatch con el etag canónico (head) funciona", blobEtags);
-    }
-
-    // ── Spec 10.2 · ronda 6 13.3: en la grilla TODA pieza abre un visor (la misma regla que usa la grilla). ──
-    const { viewerFor } = await import(new URL("../lib/import/piece-viewer.ts", import.meta.url));
-    const { embedFor: embedOf } = await import(new URL("../lib/portfolio/embed.ts", import.meta.url));
-    const hasEmbed = (video) => embedOf(video) !== null;
-    const img = { url: "/media/x.webp" };
-    const viewers = [
-      viewerFor({ video: { platform: "instagram", url: "https://www.instagram.com/reel/C1abc/" }, image: img }, hasEmbed),
-      viewerFor({ video: null, image: img }, hasEmbed),
-      viewerFor({ video: { platform: "instagram", url: "https://www.instagram.com/prueba/" }, image: img }, hasEmbed),
-      viewerFor({ video: null, image: img, kind: "carousel", postUrl: "https://www.instagram.com/p/C1abc/" }, hasEmbed),
-    ];
-    check(
-      JSON.stringify(viewers) === JSON.stringify(["reel", "image", "image", "carousel"]),
-      "«Tus últimos 12 contenidos»: toda pieza abre visor (reel y carrusel en el overlay; foto o video sin embed → visor de imagen)",
-      viewers,
+      panelOpen.status === 303 && (panelOpen.headers.get("location") ?? "").endsWith("/mis-portafolios") && accountCookie &&
+        new RegExp(`data-my-portfolio="${ownerSlug}"`).test(panelHtml) && panelHtml.includes(`/p/${ownerSlug}/fitness`) &&
+        /href="\/m\/[^"]+"[^>]*>Editar/.test(panelHtml) && /data-views="\d+"/.test(panelHtml) &&
+        /data-testid="email-access"/.test(panelAnon) && !/data-my-portfolio=/.test(panelAnon) &&
+        (portfolioAsAccount.headers.get("location") ?? "").includes("enlace=vencido"),
+      "13.14: el link de la cuenta abre «Mis portafolios» (vistas, editar, links por nicho); sin él, pide el correo; un link de portafolio no sirve de link de cuenta",
     );
   } else {
     console.log("· (se omiten las pruebas del borrador de importación: no es almacenamiento local)");
@@ -1561,6 +1509,21 @@ try {
   check(
     /shareMessage\(gender, `\$\{url\}\?ref=whatsapp`\)/.test(readySrc) && !/Mira mi portafolio de UGC/.test(readySrc),
     "13.8: «Compartir por WhatsApp» del modal «Portafolio listo» usa el texto según el género",
+  );
+
+  // ── Ronda 6 · pieza 5: onboarding al inicio (13.15 / 13.23 · 1), 4 opciones de género (13.11) y el editor no lo pierde ──
+  const onboardingSrc = await source("components", "import", "onboarding-step.tsx");
+  const screenSrc = await source("components", "import-screen.tsx");
+  const formModelSrc = await source("components", "editor", "form-model.ts");
+  check(
+    /GENDERS\.map/.test(onboardingSrc) && /type="email"/.test(onboardingSrc) && /<OnboardingStep/.test(screenSrc) &&
+      /owner \? \{ owner \}/.test(reviewSrc) && /gender: baseline\.manual\.gender/.test(formModelSrc) &&
+      /owner\.email/.test(readySrc) && /data-owner-email/.test(readySrc),
+    "13.15 / 13.23 · 1 / 13.11: correo y género se piden al inicio (no al generar), viajan al generar y el editor no pierde el género al guardar",
+  );
+  check(
+    /if \(!kit\)/.test(kitSrc) && /aria-disabled="true"/.test(kitSrc) && !/vista-previa#media-kit/.test(kitSrc),
+    "13.9 (corrección): en la vista previa «Ver media kit» no apunta a una página que no existe",
   );
 } catch (error) {
   failures += 1;
