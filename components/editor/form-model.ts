@@ -65,6 +65,8 @@ export type ServiceDraft = { key: string; title: string; description: string };
 
 export type FormState = {
   name: string;
+  /** E2 del dueño: lo que sigue al separador del nombre de IG; va bajo el nombre en el hero. */
+  tagline: string;
   bio: string;
   valueProp: string;
   photo: StoredImage | null;
@@ -129,6 +131,7 @@ export function serviceDraft(service: Partial<Service> = {}, key: string = newPi
 export function emptyForm(): FormState {
   return {
     name: "",
+    tagline: "",
     bio: "",
     valueProp: "",
     photo: null,
@@ -155,6 +158,7 @@ export function formFromPrefill(prefill: ManualPrefill): FormState {
   while (pieces.length < LIMITS.minPieces) pieces.push(emptyPiece());
   return {
     name: prefill.name,
+    tagline: prefill.tagline,
     bio: prefill.bio,
     valueProp: "",
     photo: prefill.photo,
@@ -173,6 +177,7 @@ export function formFromPrefill(prefill: ManualPrefill): FormState {
 export function formFromPortfolio(resolved: ResolvedPortfolio): FormState {
   return {
     name: resolved.name,
+    tagline: resolved.tagline,
     bio: resolved.bio,
     valueProp: resolved.valueProp,
     photo: resolved.photo,
@@ -230,6 +235,7 @@ const serviceInput = (service: ServiceDraft): Service => ({ title: service.title
 export function toCreatePayload(form: FormState) {
   return {
     name: form.name,
+    tagline: form.tagline,
     bio: form.bio,
     photo: form.photo,
     valueProp: form.valueProp,
@@ -246,7 +252,7 @@ const servicesKey = (services: ServiceDraft[]) =>
   JSON.stringify(services.map((service) => [service.title.trim(), service.description.trim()]));
 
 export function toUpdatePayload(form: FormState, baseline: Baseline) {
-  const text = (key: "name" | "bio" | "valueProp") =>
+  const text = (key: "name" | "tagline" | "bio" | "valueProp") =>
     form[key].trim() !== baseline.form[key].trim() ? form[key] : baseline.manual[key];
 
   const contact: Partial<ContactDraft> = {};
@@ -263,6 +269,7 @@ export function toUpdatePayload(form: FormState, baseline: Baseline) {
 
   const manual: ManualData = {
     name: text("name"),
+    tagline: text("tagline"),
     bio: text("bio"),
     valueProp: text("valueProp"),
     photo: sameImage(form.photo, baseline.form.photo) ? baseline.manual.photo : form.photo,
@@ -337,6 +344,7 @@ export function toPreview(form: FormState, extras: PreviewExtras = NO_EXTRAS): R
   return {
     slug: "vista-previa",
     name: form.name.trim() || "Nombre de tu clienta",
+    tagline: form.tagline.trim(),
     bio: form.bio.trim(),
     photo: form.photo,
     cover: form.cover,

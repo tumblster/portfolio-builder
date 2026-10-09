@@ -31,7 +31,7 @@ import {
  */
 
 export function CreatorTemplate({ portfolio, variant, filter, coverEdit }: TemplateProps) {
-  const { name, bio, valueProp, stats, services, pieces } = portfolio;
+  const { name, tagline, bio, valueProp, stats, services, pieces } = portfolio;
   const view = portfolioView(portfolio, variant);
   const { filterable, filterableSlugs, email, channels, hasContact, cover, handle, firstName, er, isPage, id } = view;
   const { Root, H1, H2, H3 } = view.headings;
@@ -94,6 +94,7 @@ export function CreatorTemplate({ portfolio, variant, filter, coverEdit }: Templ
                 <H1 id={id("nombre")} className="pf-h1">
                   Hola, soy {name}.
                 </H1>
+                {tagline && <p className="pf-tagline">{tagline}</p>}
                 {valueProp && <p className="pf-lead">{valueProp}</p>}
                 {bio && <p className="pf-bio">{bio}</p>}
                 {/* 13.9: principal "Trabaja conmigo" y secundario "Ver media kit". */}

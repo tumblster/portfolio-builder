@@ -291,6 +291,13 @@
   letter-spacing: -0.03em;
   overflow-wrap: anywhere;
 }
+/* E2 del dueño: lo que sigue al separador del nombre de IG; va bajo el nombre. */
+.mk-tagline {
+  margin: 0.25rem 0 0;
+  color: var(--pf-muted);
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
 .mk-tags {
   display: flex;
   flex-wrap: wrap;

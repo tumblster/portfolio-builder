@@ -41,6 +41,8 @@ export const SCHEMA_VERSION = 2;
 
 export const LIMITS = {
   name: 80,
+  /** Lo que va después del separador en el nombre de IG ("Daniela Gadea | Marca Personal para profesionales"). */
+  tagline: 60,
   bio: 220,
   valueProp: 160,
   pieceTitle: 80,
@@ -425,6 +427,8 @@ export const manualDataSchema = z.object({
     .max(LIMITS.bio, { error: `La bio admite hasta ${LIMITS.bio} caracteres.` })
     .optional(),
   photo: storedImageSchema.nullable().optional(), // null = sin foto
+  /** Lo que sigue al separador del nombre de IG; va bajo el nombre en el hero (E2 del dueño). */
+  tagline: z.string().trim().max(LIMITS.tagline).optional(),
   /** Foto del banner del hero (ajuste 7). Ausente o null = el banner usa la foto de perfil o la primera pieza. */
   cover: storedImageSchema.nullable().optional(),
   valueProp: z
@@ -537,6 +541,8 @@ export const createPortfolioInputSchema = z.object({
     .max(LIMITS.bio, { error: `La bio admite hasta ${LIMITS.bio} caracteres.` })
     .default(""),
   photo: storedImageSchema.nullable().default(null),
+  /** E2 del dueño: lo que sigue al separador del nombre de IG; va bajo el nombre en el hero. */
+  tagline: z.string().trim().max(LIMITS.tagline).default(""),
   valueProp: z
     .string()
     .trim()
@@ -600,6 +606,8 @@ export const confirmImportInputSchema = z.object({
   services: servicesSchema.optional(),
   /** Ronda 6 · 13.19: los Brand partners que la creadora confirmó en la revisión (opcional). */
   brandPartners: brandPartnersSchema.optional(),
+  /** E2 del dueño: true = agrega al portafolio el sitio web pineado en su IG (opt-in con checkbox). */
+  website: z.boolean().optional(),
   design: designSchema,
 });
 export type ConfirmImportInput = z.output<typeof confirmImportInputSchema>;

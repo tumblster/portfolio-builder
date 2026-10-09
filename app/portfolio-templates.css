@@ -61,6 +61,14 @@
     font-size: 40px;
     font-weight: 700;
   }
+  /* E2 del dueño: lo que sigue al separador del nombre de IG; va bajo el nombre, como tag. */
+  .pf-tagline {
+    margin: 6px 0 0;
+    color: var(--pf-muted);
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+  }
   .bio-handle {
     margin: 0;
     color: var(--pf-muted);
@@ -717,6 +725,10 @@
     line-height: 0.86;
     text-transform: uppercase;
     overflow-wrap: break-word;
+  }
+  /* En la editorial (fondo oscuro) el tagline va en blanco suave, no en muted. */
+  .pf[data-template="editorial"] .pf-tagline {
+    color: rgb(255 255 255 / 0.72);
   }
   .ed-hero__row {
     display: grid;
