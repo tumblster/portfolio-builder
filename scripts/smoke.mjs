@@ -430,18 +430,20 @@ try {
     filterNiches(html),
   );
   const views = panelsOf(html);
-  // Spec 11.6: header ÚNICO en 2 filas: [foto] | «Contenido | Media kit» | Hablemos; abajo, chips de nichos (sin «Todo»).
+  // Spec 11.6 (E2: los nichos salen del navbar fijo): header ÚNICO en 1 fila: [foto] | «Contenido | Media kit» |
+  // Hablemos; los chips de nichos van estáticos en el cuerpo (sin «Todo»).
   const bar = html.match(/<header[^>]*data-pf-bar[\s\S]*?<\/header>/)?.[0] ?? "";
-  const barChips = [...bar.matchAll(/data-pf-chip="([a-z0-9-]+)"/g)].map((m) => m[1]);
+  const barChips = [...html.matchAll(/data-pf-chip="([a-z0-9-]+)"/g)].map((m) => m[1]);
   check(
     /class="pf-bar__avatar"/.test(bar) &&
       /role="tablist"[^>]*class="pf-seg"/.test(bar) && />Contenido<\/button>/.test(bar) && />Media kit<\/button>/.test(bar) &&
       barChips.length > 0 && barChips.every((chip) => filterNiches(html).includes(chip)) &&
-      !barChips.includes("media-kit") && !barChips.includes("todo") && !/>Todo</.test(bar) &&
+      !barChips.includes("media-kit") && !barChips.includes("todo") && !/>Todo</.test(html) &&
+      !/pf-bar__row2/.test(bar) &&
       /class="pf-bar__cta"[^>]*href="(#pf-page-contacto|https:\/\/wa\.me\/\d+\?text=[^"]+)"[^>]*>Hablemos/.test(bar) &&
       !bar.replace(/<[^>]+>/g, " ").includes(name) &&
       (html.match(/data-pf-bar/g) ?? []).length === 1,
-    `Header único: foto | Contenido · Media kit | Hablemos; chips: ${barChips.join(" · ")} (sin nombre ni «Todo»)`,
+    `Header único: foto | Contenido · Media kit | Hablemos; chips fuera del navbar: ${barChips.join(" · ")} (sin nombre ni «Todo»)`,
     bar.slice(0, 300),
   );
   // Ronda 6 · 13.10: la fila 1 en ese orden, y «Media kit» es texto del control (nunca un chip).
@@ -460,17 +462,18 @@ try {
   const publicCss = await cssOf(html);
   check(
     /\.pf-chip\[aria-current=("?)page\1\]\s*\{[^}]*background:\s*(transparent|0 0|none)[;}]/.test(publicCss) &&
-      /\.pf-views\[data-view=("?)kit\1\] \.pf-bar__row2\s*\{[^}]*grid-template-rows:\s*0fr/.test(publicCss) &&
+      !/\.pf-bar__row2/.test(publicCss) && /\.pf-niches__scroller/.test(publicCss) &&
       /\.pf-views \.pf-nav,\s*\.pf-views \.ed-top\s*\{\s*display:\s*none/.test(publicCss) &&
-      /\.pf-bar__chips\[data-scrolled\]\s*\{[^}]*mask-image:\s*linear-gradient\(90deg,\s*(transparent|#0000)/.test(publicCss),
-    "Header: el chip elegido va solo trazado; en Media kit la fila de chips se colapsa; fundido a la izquierda",
+      /\.pf-niches__scroller\[data-scrolled\]\s*\{[^}]*mask-image:\s*linear-gradient\(90deg,\s*(transparent|#0000)/.test(publicCss) &&
+      /<div[^>]*class="pf-niches"/.test(html),
+    "E2: los nichos salen del navbar fijo (estaticos en el cuerpo, como botones); el elegido va solo trazado; fundido a la izquierda",
   );
   const shareMenuSrc = await readFile(path.join(process.cwd(), "components", "portfolio", "share-menu.tsx"), "utf8");
   check(
-    /<button[^>]*aria-label="Compartir portafolio"[^>]*data-pf-share/.test(html) && !/Compartir por WhatsApp</.test(html) &&
+    /data-pf-made-with[\s\S]*?<button[^>]*aria-label="Compartir portafolio"[^>]*data-pf-share/.test(html) && !/Compartir por WhatsApp</.test(html) &&
       /whatsappUrl\(null, message\)/.test(shareMenuSrc) && /twitter\.com\/intent\/tweet/.test(shareMenuSrc) &&
-      /Instagram[\s\S]*TikTok[\s\S]*Copiar link/.test(shareMenuSrc),
-    "12.4: compartir sutil en el portafolio publicado (icono + capsula: WhatsApp, X, Instagram, TikTok, copiar)",
+      /Instagram[\s\S]*TikTok[\s\S]*Copiar link/.test(shareMenuSrc) && /share-menu__trigger--sm/.test(shareMenuSrc),
+    "12.4: compartir flotante junto al badge (mismo tamaño; capsula: WhatsApp, X, Instagram, TikTok, copiar)",
     { hasTrigger: /data-pf-share/.test(html) },
   );
   // Ronda 6 · 13.9: los dos CTAs de la plantilla (Creator, con WhatsApp).
@@ -1493,8 +1496,9 @@ try {
   check(
     /suggested\?: boolean/.test(servicesSrc) && /Usar todas/.test(servicesSrc) && /card\.suggested/.test(servicesSrc) &&
       /SERVICES_MAX = 4;/.test(servicesSrc) && /suggestedServices:/.test(draftSrc) && /detectBrandMentions\(/.test(draftSrc) &&
-      /marcas_mencionadas/.test(groqSrc) && /pendingSuggestions\(services\)/.test(reviewSrc) && /!card\.suggested && card\.title\.trim\(\)/.test(reviewSrc),
-    "13.6: Servicios llega con sugerencias de la IA (captions + marcas mencionadas), editables y eliminables; solo se envía lo que la creadora confirma",
+      /marcas_mencionadas/.test(groqSrc) && /SUGGESTED_SERVICES_MAX = 2;/.test(servicesSrc) &&
+      /data-service-suggestion/.test(servicesSrc) && /!card\.suggested && card\.title\.trim\(\)/.test(reviewSrc),
+    "13.6: Servicios llega con maximo 2 sugerencias de la IA (captions + marcas) como chips; solo se envía lo que la creadora confirma",
   );
   const qrLib = await import(new URL("../lib/share/qr.ts", import.meta.url));
   check(
@@ -1549,12 +1553,13 @@ try {
     "E2 #3: el botón de cada pieza es toggle (agregar/quitar); al tope avisa con toast en vez de botón muerto",
   );
   check(
-    /Se descartar/.test(reviewSrc) && /showToast/.test(reviewSrc) && !/Te queda 1 sugerencia por revisar/.test(reviewSrc),
-    "E2 #6/#7: las sugerencias de servicios sin revisar se descartan al generar (con toast), ya no bloquean",
+    /los servicios son opcionales/.test(reviewSrc) && !/Te queda 1 sugerencia por revisar/.test(reviewSrc) &&
+      !/Agrega al menos un servicio/.test(reviewSrc),
+    "E2 #6/#7: los servicios son opcionales; las sugerencias sin tocar se descartan en silencio, sin bloqueos ni avisos",
   );
   check(
-    /window\.scrollTo\(\{ top: 0 \}\)/.test(reviewSrc),
-    "E2 #5: autoscroll arriba al cambiar de paso en la revisión",
+    /window\.scrollTo\(\{ top: 0, behavior: "smooth" \}\)/.test(reviewSrc),
+    "E2 #5: autoscroll suave arriba al cambiar de paso en la revisión",
   );
 } catch (error) {
   failures += 1;
