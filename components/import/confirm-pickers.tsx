@@ -413,7 +413,7 @@ export function PiecePicker(props: {
                       Elegir nicho…
                     </option>
                   )}
-                  <option value="">Solo en «Todo»</option>
+                  <option value="">Sin nicho</option>
                   {props.niches.map((niche) => (
                     <option key={niche.key} value={niche.key}>
                       {niche.label}

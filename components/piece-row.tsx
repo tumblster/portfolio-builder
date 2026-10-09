@@ -6,7 +6,7 @@ type PieceRowProps = {
   title: string;
   image: StoredImage | null;
   isVideo: boolean;
-  /** Nombre del nicho de la pieza ("Belleza", "Cocina saludable"); sin nicho, solo va en "Todo". */
+  /** Nombre del nicho de la pieza ("Belleza", "Cocina saludable"); sin nicho, solo se ve en la vista general. */
   nicheLabel?: string | null;
 };
 
