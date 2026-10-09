@@ -48,6 +48,8 @@ export type ImportErrorCode =
 export type ManualPrefill = {
   username: string;
   name: string;
+  /** Lo que sigue al separador del nombre de IG; va bajo el nombre en el hero (E2 del dueño). */
+  tagline: string;
   bio: string;
   photo: StoredImage | null;
   contact: { instagram: string; website?: string };
@@ -71,6 +73,10 @@ export type DraftPreview = {
   draftId: string;
   username: string;
   name: string;
+  /** Lo que sigue al separador del nombre de IG; va bajo el nombre en el hero (E2 del dueño). */
+  tagline: string;
+  /** El sitio web pineado en su IG (si tiene): se pregunta con checkbox antes de generar (E2 del dueño). */
+  website: string | null;
   photo: StoredImage | null;
   /** Nichos que sugirió la IA, cada uno con al menos una pieza: los chips pre-marcados. */
   suggestedNiches: NicheDef[];

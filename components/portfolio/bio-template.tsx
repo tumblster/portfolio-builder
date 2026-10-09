@@ -27,7 +27,7 @@ import {
  * contacto van después, todos iguales (el sólido es el CTA principal).
  */
 export function BioTemplate({ portfolio, variant, filter, coverEdit }: TemplateProps) {
-  const { name, bio, valueProp, stats, services, pieces, photo } = portfolio;
+  const { name, tagline, bio, valueProp, stats, services, pieces, photo } = portfolio;
   const view = portfolioView(portfolio, variant);
   const { filterable, filterableSlugs, links, hasContact, handle, er, id } = view;
   const { Root, H1, H2, H3 } = view.headings;
@@ -49,6 +49,7 @@ export function BioTemplate({ portfolio, variant, filter, coverEdit }: TemplateP
           <header className="bio-head">
             <Avatar photo={photo} name={name} size={112} className="bio-avatar" />
             <H1 className="bio-name">{name}</H1>
+            {tagline && <p className="pf-tagline">{tagline}</p>}
             {handle && <p className="bio-handle">{handle}</p>}
             {er && (
               <p className="bio-er" data-pf-stat="engagementRate">

@@ -21,6 +21,7 @@ export async function POST(request: NextRequest) {
         generated: null,
         manual: {
           name: input.name,
+          tagline: input.tagline || undefined,
           bio: input.bio,
           photo: input.photo,
           valueProp: input.valueProp,

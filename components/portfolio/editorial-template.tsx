@@ -25,7 +25,7 @@ import {
  * Ronda 6 · 13.9: bajo el hero, "Trabaja conmigo" (sólido en blanco) y "Ver media kit" (contorno).
  */
 export function EditorialTemplate({ portfolio, variant, filter, coverEdit }: TemplateProps) {
-  const { name, bio, valueProp, stats, services, pieces } = portfolio;
+  const { name, tagline, bio, valueProp, stats, services, pieces } = portfolio;
   const view = portfolioView(portfolio, variant);
   const { filterable, filterableSlugs, email, channels, hasContact, cover, er, id } = view;
   const { Root, H1, H2, H3 } = view.headings;
@@ -56,6 +56,7 @@ export function EditorialTemplate({ portfolio, variant, filter, coverEdit }: Tem
             <H1 id={id("nombre")} className="ed-display">
               {name}
             </H1>
+            {tagline && <p className="pf-tagline">{tagline}</p>}
             <div className="ed-hero__row">
               <div className="ed-hero__copy">
                 {valueProp && <p className="ed-lead">{valueProp}</p>}

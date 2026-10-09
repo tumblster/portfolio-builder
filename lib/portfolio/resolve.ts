@@ -34,6 +34,8 @@ export type ResolvedPiece = Piece & {
 export type ResolvedPortfolio = {
   slug: string;
   name: string;
+  /** E2 del dueño: lo que sigue al separador del nombre de IG; va bajo el nombre en el hero. */
+  tagline: string;
   bio: string;
   photo: StoredImage | null;
   /** Foto propia del banner del hero (ajuste 7), o null. */
@@ -103,6 +105,8 @@ export function resolvePortfolio(doc: Portfolio): ResolvedPortfolio {
   return {
     slug: doc.slug,
     name: manual.name ?? (ig?.fullName || ig?.username || ""),
+    /** E2 del dueño: lo que sigue al separador del nombre de IG; va bajo el nombre en el hero. */
+    tagline: manual.tagline ?? "",
     bio: manual.bio ?? ig?.biography ?? "",
     photo: manual.photo !== undefined ? manual.photo : (ig?.profilePhoto ?? null),
     cover: manual.cover ?? null,

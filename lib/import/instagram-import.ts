@@ -5,6 +5,7 @@ import { ConfigError } from "@/lib/errors";
 import { assertApifyConfigured, scrapeInstagramProfile, type ApifyProfile } from "@/lib/instagram/apify";
 import { copyInstagramImage, mapWithConcurrency } from "@/lib/instagram/images";
 import { httpUrlOrNull, pickTopPosts, titleFromCaption, toInstagramPost, toSnapshot } from "@/lib/instagram/snapshot";
+import { splitNameTagline } from "@/lib/portfolio/name-tagline";
 import {
   LIMITS,
   type GeneratedContent,
@@ -156,9 +157,11 @@ function toPieces(selected: InstagramPost[], generated: GeneratedContent | null)
 function toPrefill(profile: ApifyProfile, photo: StoredImage | null, posts: InstagramPost[]): ManualPrefill {
   const handle = profile.username.toLowerCase();
   const website = httpUrlOrNull(profile.externalUrl);
+  const { name, tagline } = splitNameTagline(profile.fullName?.trim() || "");
   return {
     username: handle,
-    name: profile.fullName?.trim().slice(0, LIMITS.name) || handle,
+    name: name || handle,
+    tagline,
     bio: (profile.biography ?? "").trim().slice(0, LIMITS.bio),
     photo,
     contact: { instagram: handle, ...(website ? { website } : {}) },

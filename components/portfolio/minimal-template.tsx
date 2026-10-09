@@ -27,7 +27,7 @@ import {
  * Ronda 6 · 13.9: "Trabaja conmigo" (sólido, con flecha) y "Ver media kit" (contorno).
  */
 export function MinimalTemplate({ portfolio, variant, filter }: TemplateProps) {
-  const { name, bio, valueProp, stats, services, pieces, photo } = portfolio;
+  const { name, tagline, bio, valueProp, stats, services, pieces, photo } = portfolio;
   const view = portfolioView(portfolio, variant);
   const { filterable, filterableSlugs, email, channels, hasContact, er, id } = view;
   const { Root, H1, H2, H3 } = view.headings;
@@ -40,6 +40,7 @@ export function MinimalTemplate({ portfolio, variant, filter }: TemplateProps) {
           <aside className="min-side" aria-label={`Sobre ${name}`}>
             <Avatar photo={photo} name={name} size={56} className="min-avatar" />
             <H1 className="min-name">{name}</H1>
+            {tagline && <p className="pf-tagline">{tagline}</p>}
             {intro && <p className="min-intro">{intro}</p>}
             {valueProp && bio && <p className="min-bio">{bio}</p>}
             <p className="min-status">

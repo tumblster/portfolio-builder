@@ -48,6 +48,7 @@ export function MediaKit({ portfolio }: { portfolio: ResolvedPortfolio }) {
       <header className="mk-head">
         <Avatar photo={portfolio.photo} name={portfolio.name} size={96} className="mk-avatar" />
         <h1 className="mk-name">{portfolio.name}</h1>
+        {portfolio.tagline && <p className="mk-tagline">{portfolio.tagline}</p>}
         {portfolio.niches.length > 0 && (
           <ul className="mk-tags" aria-label="Nichos">
             {portfolio.niches.map((niche) => (
