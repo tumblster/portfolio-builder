@@ -444,8 +444,10 @@ export async function confirmDraft(input: ConfirmImportInput, options: { gender?
   const startedAt = Date.now();
   logConfirm("info", "create.start", draft.id);
   try {
-    // E2 del dueño: el tagline (lo que sigue al separador del nombre de IG) queda en manual: es editable.
-    const { tagline } = splitNameTagline(draft.snapshot.fullName || "");
+    // E2 del dueño: el nombre de IG se parte en nombre + tagline; ambos quedan en manual (el nombre corto manda
+    // sobre el `fullName` de Instagram y el tagline va bajo el nombre, no en el título). Sin separador, `name`
+    // es el nombre tal cual y no cambia nada.
+    const { name, tagline } = splitNameTagline(draft.snapshot.fullName || "");
     portfolio = await createPortfolio(
       {
         source: "instagram",
@@ -455,6 +457,7 @@ export async function confirmDraft(input: ConfirmImportInput, options: { gender?
         // 13.11: el género del onboarding, si vino. 13.19: las marcas confirmadas, si hay.
         manual: {
           niches,
+          ...(name ? { name } : {}),
           ...(tagline ? { tagline } : {}),
           // E2 del dueño: el sitio web pineado en su IG solo va si lo marcó con el checkbox; si no, "" lo oculta
           // aunque Instagram tenga el dato (así lo define el esquema de contacto).
