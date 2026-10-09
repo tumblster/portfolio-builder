@@ -1227,6 +1227,20 @@ try {
       "El documento guarda los nichos confirmados, conserva la sugerencia de la IA y el ER como dato",
       doc && { manual: doc.manual.niches, generated: doc.generated?.niches, insights: doc.insights },
     );
+    // E2 del dueño (bug r3): al confirmar una importación, el nombre corto también queda en manual.name (no solo
+    // el tagline); si no, el portafolio final resolvía el título desde el fullName largo de Instagram.
+    const sepId = await writeDraft({
+      snapshot: { ...base.instagram, fullName: "Valentina Fixture | Marca Personal para profesionales" },
+    });
+    const sepConfirmed = await confirm({ draftId: sepId, niches: [{ label: "Lifestyle" }], design: { template: "bio", palette: "auto" } });
+    const sepResolved = sepConfirmed.data?.resolved;
+    check(
+      sepConfirmed.status === 201 &&
+        sepResolved?.name === "Valentina Fixture" &&
+        sepResolved?.tagline === "Marca Personal para profesionales",
+      "Importado: «Valentina Fixture | Marca Personal…» → título «Valentina Fixture» + tagline debajo",
+      sepResolved && { name: sepResolved.name, tagline: sepResolved.tagline },
+    );
 
     const again = await confirm(confirmInput);
     check(again.status === 200 && again.data?.slug === draftSlug, "Confirmar dos veces devuelve el mismo portafolio (no duplica)", again.data);
