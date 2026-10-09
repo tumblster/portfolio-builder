@@ -14,25 +14,26 @@ export const landingContainer = "mx-auto w-full max-w-[75rem] px-5 sm:px-8";
 export const landingPrimary =
   "landing-btn-3d inline-flex h-12 items-center justify-center rounded-full bg-ink px-6 text-[0.9375rem] font-medium text-cream transition-colors hover:bg-[#2a2e24]";
 
-/** Lockup: la sonrisa (30 px de alto) + el wordmark, separados por más de un diente (15 px a esta escala). */
+/** Lockup: la sonrisa (30 px de alto) + el wordmark, separados por más de un diente (15 px a esta escala).
+ *  En móvil (compact) va solo la sonrisa: el wordmark no aporta a 360 px y compite con el CTA. */
 export function LandingLogo({ mascotTarget = false, compact = false }: { mascotTarget?: boolean; compact?: boolean }) {
   return (
     <Link href="/" className="flex min-h-11 shrink-0 items-center gap-4 text-[1.0625rem] font-semibold tracking-[-0.02em]">
       <SupercreadorMark className="h-[30px] w-auto text-ink" mascotTarget={mascotTarget} />
-      {/* Header en pantallas de menos de 400 px (compact): solo la sonrisa, para que quepan "Acceso" y el CTA; el
+      {/* Header en móvil (compact): solo la sonrisa, para que quepan "Acceso" y el CTA; el
           nombre sigue ahí para lectores de pantalla. */}
-      <span className={compact ? "max-[399px]:sr-only" : undefined}>Supercreador</span>
+      <span className={compact ? "max-md:sr-only" : undefined}>Supercreador</span>
     </Link>
   );
 }
 
 /** Lockup del producto (13.16): "Payfolio" + byline "by Supercreador". Sin el mark de Supercreador: la landing es
- *  la del producto, con navegación propia mínima. */
+ *  la del producto, con navegación propia mínima. En móvil, solo "Payfolio" (E2: sin la palabra Supercreador). */
 export function PayfolioLockup() {
   return (
     <Link href="/" className="flex min-h-11 shrink-0 items-center gap-2 text-[1.0625rem] font-semibold tracking-[-0.02em]">
       Payfolio
-      <span className="text-sm font-medium text-muted">by Supercreador</span>
+      <span className="hidden text-sm font-medium text-muted md:inline">by Supercreador</span>
     </Link>
   );
 }

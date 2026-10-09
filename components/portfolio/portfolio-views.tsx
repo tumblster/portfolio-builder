@@ -11,8 +11,9 @@ import {
   type MouseEvent,
   type ReactNode,
 } from "react";
-import { contactMessage, shareMessage, whatsappUrl, type Gender } from "@/lib/portfolio/gender";
+import { contactMessage, whatsappUrl, type Gender } from "@/lib/portfolio/gender";
 import { MadeWithBadge } from "./made-with-badge";
+import { ShareMenu } from "./share-menu";
 
 /*
  * Header ÚNICO del portafolio publicado (spec 11.6; ronda 6 · 13.10), en 2 filas contextuales:
@@ -22,8 +23,9 @@ import { MadeWithBadge } from "./made-with-badge";
  *    se filtra por nicho. Sin nombre en texto, sin chip "Todo"; "Media kit" es texto del control, nunca un chip. El
  *    chip elegido va solo trazado (outline). Tocar el elegido lo suelta (vuelve a todo).
  * Además: "Hablemos" abre WhatsApp con un mensaje pre-llenado si el creador puso su número (12.6; si no, lleva a su
- * contacto); el ojito con las vistas (12.7: 1 por persona por día, lo cuenta el servidor); y "Compartir por WhatsApp"
- * al final (12.4). Al abrir, avisa la visita con su ?ref= y la página (11.9 / 12.9): sin cookies.
+ * contacto); el ojito con las vistas (12.7: 1 por persona por día, lo cuenta el servidor); y compartir al final
+ * (12.4; E2 #9: icono sutil + cápsula con WhatsApp, X, Instagram, TikTok y copiar link). Al abrir, avisa la visita
+ * con su ?ref= y la página (11.9 / 12.9): sin cookies.
  *
  * Ronda 6:
  *  - 13.8: los textos de WhatsApp ("Hablemos" y compartir) se adaptan al género que eligió (lib/portfolio/gender.ts);
@@ -241,24 +243,10 @@ export function PortfolioViews({ about, kit, style, nav }: { about: ReactNode; k
       <div role="tabpanel" id="pf-panel-kit" aria-labelledby="pf-tab-kit" hidden={!kitActive} className="pf-views__panel pf-views__kit">
         {kit}
       </div>
-      <p className="pf-share">
-        <a
-          className="pf-share__whatsapp"
-          href={whatsappUrl(null, shareMessage(nav.gender, ""))}
-          onClick={(event) => {
-            // El link completo (con el dominio de este deployment) se arma al tocar.
-            event.currentTarget.href = whatsappUrl(
-              null,
-              shareMessage(nav.gender, `${window.location.origin}${nav.basePath}?ref=whatsapp`),
-            );
-          }}
-          target="_blank"
-          rel="noopener noreferrer"
-          data-pf-share
-        >
-          Compartir por WhatsApp<span className="sr-only"> (se abre en otra pestaña)</span>
-        </a>
-      </p>
+      {/* E2 #9: compartir sutil: icono + cápsula (WhatsApp, X, Instagram, TikTok, copiar). */}
+      <div className="pf-share">
+        <ShareMenu basePath={nav.basePath} gender={nav.gender} tag="whatsapp" />
+      </div>
       {/* 13.17 / 13.23 · 6: en todos los portafolios (aún no hay plan pago). */}
       <MadeWithBadge />
     </div>

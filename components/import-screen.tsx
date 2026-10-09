@@ -13,7 +13,6 @@ import {
 } from "@/lib/import/events";
 import { readNdjson } from "@/lib/import/ndjson";
 import { parseInstagramUsername } from "@/lib/instagram/username";
-import { GENDER_LABEL } from "@/lib/portfolio/gender";
 import { ImportReview } from "./import-review";
 import { OnboardingStep, useOnboarding } from "./import/onboarding-step";
 import { PrefillSummary } from "./prefill-summary";
@@ -31,7 +30,7 @@ import { errorText, fieldLabel, pillButton, primaryButton, textInput } from "./b
  * v2 · M2: nada se genera a ciegas. Al terminar la importación se confirma lo que sugirió la IA
  * (nichos) y se eligen plantilla y paleta (import-review.tsx); recién ahí se genera.
  * Ronda 6 · 13.15 / 13.23 · 1: lo PRIMERO es el onboarding mínimo (correo + género, components/import/onboarding-step.tsx).
- * Se pide una vez por sesión, se muestra arriba del formulario ("Tu cuenta: … · Cambiar") y viaja al generar.
+ * Se pide una vez por sesión, se muestra arriba del formulario ("<correo> · Cambiar") y viaja al generar.
  */
 
 type ManualEvent = Extract<ImportEvent, { type: "manual" }>;
@@ -220,7 +219,7 @@ export function ImportScreen() {
 
           <p className="mb-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted" data-onboarding-summary>
             <span className="min-w-0 [overflow-wrap:anywhere]">
-              Tu cuenta: <span className="font-semibold text-ink">{onboarding.email}</span> · {GENDER_LABEL[onboarding.gender]}
+              <span className="font-semibold text-ink">{onboarding.email}</span>
             </span>
             <button
               type="button"

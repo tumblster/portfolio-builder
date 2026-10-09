@@ -17,6 +17,7 @@ import {
 import { MAX_NICHES, nicheFromLabel } from "@/lib/portfolio/niches";
 import { NICHE_TAXONOMY, foldText } from "@/lib/portfolio/niche-taxonomy";
 import { InlineReel } from "@/components/reel/inline-reel";
+import { showToast } from "@/components/ui/toast";
 import { ImageLightbox } from "@/components/viewer/image-lightbox";
 import { viewerFor } from "@/lib/import/piece-viewer";
 import { embedFor } from "@/lib/portfolio/embed";
@@ -348,6 +349,23 @@ export function PiecePicker(props: {
     onChange([...pieces, { id, nicheKey, pending: nicheKey === null }]);
   }
 
+  /**
+   * E2 del dueño: el botón de cada pieza es un toggle. Tocar una agregada la quita ("✓ Agregada" → "+ Agregar");
+   * tocar una nueva con el cupo lleno avisa con toast ("Quita una pieza…") en vez de un botón muerto.
+   */
+  function togglePiece(id: string) {
+    if (chosen.has(id)) {
+      onError(null);
+      onChange(pieces.filter((piece) => piece.id !== id));
+      return;
+    }
+    if (full) {
+      showToast(`Ya tienes ${limits.max} piezas: quita una para agregar otra.`);
+      return;
+    }
+    add(id);
+  }
+
   const options: ComboOption[] = props.pool
     .filter((piece) => !chosen.has(piece.id))
     .map((piece) => ({ id: piece.id, label: piece.title, thumb: <Thumb piece={piece} size={36} /> }));
@@ -528,10 +546,14 @@ export function PiecePicker(props: {
               <span className="line-clamp-2 min-h-[2.5em] text-xs leading-snug break-words">{piece.title}</span>
               <button
                 type="button"
-                onClick={() => add(piece.id)}
-                disabled={added || full}
-                aria-label={added ? `«${piece.title}» ya está en tus piezas` : `Agregar «${piece.title}»`}
-                className="inline-flex min-h-tap items-center justify-center gap-1.5 rounded-full border border-ink/60 bg-paper px-3 text-sm font-semibold text-ink transition-colors hover:border-ink disabled:cursor-not-allowed disabled:border-line disabled:text-muted"
+                onClick={() => togglePiece(piece.id)}
+                aria-pressed={added}
+                aria-label={added ? `Quitar «${piece.title}» de tus piezas` : `Agregar «${piece.title}»`}
+                className={`inline-flex min-h-tap items-center justify-center gap-1.5 rounded-full border px-3 text-sm font-semibold transition-colors hover:border-ink ${
+                  added
+                    ? "border-ink bg-ink text-cream"
+                    : "border-ink/60 bg-paper text-ink"
+                }`}
               >
                 <span aria-hidden="true">{added ? "✓" : "+"}</span>
                 {added ? "Agregada" : "Agregar"}

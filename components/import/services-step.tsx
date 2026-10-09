@@ -9,9 +9,9 @@ import { useId } from "react";
  *
  * Ronda 6 · 13.6: el paso llega con SUGERENCIAS de la IA, sacadas de sus captions y de las marcas que menciona
  * (lib/ai/groq.ts). Cada sugerencia se ve como tal (borde punteado, "Sugerencia") y la creadora decide: «Usar»,
- * editarla (al tocar su texto queda confirmada) o «Quitar»; «Usar todas» confirma las que quedan. No se puede seguir
- * con sugerencias sin revisar (components/import-review.tsx) y al generar solo viajan las tarjetas confirmadas: nunca
- * se publica un servicio que ella no confirmó.
+ * editarla (al tocar su texto queda confirmada) o «Quitar»; «Usar todas» confirma las que quedan. E2 del dueño:
+ * las sugerencias sin revisar no bloquean: se descartan al generar (con toast) y solo viajan las tarjetas
+ * confirmadas: nunca se publica un servicio que ella no confirmó.
  */
 
 export type ServiceCard = {
