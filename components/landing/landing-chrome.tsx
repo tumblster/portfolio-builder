@@ -26,15 +26,27 @@ export function LandingLogo({ mascotTarget = false, compact = false }: { mascotT
   );
 }
 
+/** Lockup del producto (13.16): "Payfolio" + byline "by Supercreador". Sin el mark de Supercreador: la landing es
+ *  la del producto, con navegación propia mínima. */
+export function PayfolioLockup() {
+  return (
+    <Link href="/" className="flex min-h-11 shrink-0 items-center gap-2 text-[1.0625rem] font-semibold tracking-[-0.02em]">
+      Payfolio
+      <span className="text-sm font-medium text-muted">by Supercreador</span>
+    </Link>
+  );
+}
+
 /**
  * `nav`: reemplaza la navegación de la landing (anclas + CTA del piloto) por otra, p. ej. en /crear, donde quien
  * entra ya es del piloto y solo necesita "Salir".
+ * `brand`: "payfolio" en la landing del producto (13.16); "supercreador" en el resto (default, sin cambios).
  */
-export function LandingHeader({ base = "", nav, below }: { base?: "" | "/"; nav?: ReactNode; below?: ReactNode }) {
+export function LandingHeader({ base = "", nav, below, brand = "supercreador" }: { base?: "" | "/"; nav?: ReactNode; below?: ReactNode; brand?: "supercreador" | "payfolio" }) {
   return (
     <header className="landing-glass fixed inset-x-0 top-0 z-40">
       <div className={`${landingContainer} flex h-16 items-center justify-between gap-2 sm:gap-4`}>
-        <LandingLogo compact />
+        {brand === "payfolio" ? <PayfolioLockup /> : <LandingLogo compact />}
         {nav !== undefined ? (
           nav
         ) : (
@@ -68,8 +80,39 @@ export function LandingHeader({ base = "", nav, below }: { base?: "" | "/"; nav?
   );
 }
 
-/** `mascotTarget`: el mark del footer es donde aterriza la carita viajera (solo en la landing). */
-export function LandingFooter({ mascotTarget = false }: { mascotTarget?: boolean }) {
+/** `mascotTarget`: el mark del footer es donde aterriza la carita viajera (solo en la landing).
+ *  `brand`: "payfolio" usa el footer del producto (13.16): "Hecho por Supercreador" + link; conserva el mark para
+ *  que la viajera tenga dónde aterrizar. */
+export function LandingFooter({ mascotTarget = false, brand = "supercreador" }: { mascotTarget?: boolean; brand?: "supercreador" | "payfolio" }) {
+  if (brand === "payfolio") {
+    return (
+      <footer>
+        <div className={`${landingContainer} flex flex-col gap-4 py-10 sm:flex-row sm:items-center sm:justify-between`}>
+          <p className="flex items-center gap-3 text-sm text-muted">
+            <SupercreadorMark className="h-[26px] w-auto text-ink" mascotTarget={mascotTarget} />
+            <span>
+              Hecho por{" "}
+              <a
+                href="https://supercreador.tech"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium text-ink underline decoration-accent decoration-2 underline-offset-4 hover:text-accent-ink"
+              >
+                Supercreador
+              </a>{" "}
+              — el hub para creadores de contenido
+            </span>
+          </p>
+          <Link
+            href="/acceso"
+            className="flex min-h-11 items-center text-sm font-medium hover:underline hover:decoration-accent hover:decoration-2 hover:underline-offset-4"
+          >
+            Entrar
+          </Link>
+        </div>
+      </footer>
+    );
+  }
   return (
     <footer>
       <div className={`${landingContainer} flex flex-col gap-4 py-10 sm:flex-row sm:items-center sm:justify-between`}>

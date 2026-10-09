@@ -13,16 +13,16 @@ import { interTight } from "@/lib/fonts/inter-tight";
 import { fontTmj } from "@/lib/fonts/tmj";
 
 /*
- * Landing pública "/" (v2 · M4-rev r2). Tres bloques: hero → roadmap de producto ("For you page") → cierre con la
- * captura de correo del programa piloto. Chispa es la protagonista: en el hero se ríe (carcajada) y, al bajar,
- * viaja con quien lee cambiando de expresión en cada tramo (data-mascot-zone) hasta que el logo del footer la
- * absorbe. Estática y `noindex`.
+ * Landing del producto "/" (v2 · M4-rev r2; 13.16: branding Payfolio). Cuatro bloques: hero → roadmap de producto
+ * ("For you page") → "Esto es parte de Supercreador" → cierre con la captura de correo del programa piloto.
+ * Chispa es la protagonista: en el hero se ríe (carcajada) y, al bajar, viaja con quien lee cambiando de expresión
+ * en cada tramo (data-mascot-zone) hasta que el logo del footer la absorbe. Estática y `noindex`.
  */
 
 export const metadata: Metadata = {
-  title: "Supercreador · El hub para creadores de contenido",
+  title: "Payfolio by Supercreador — Tu portafolio web para conseguir marcas",
   description:
-    "Convierte tu Instagram en un portafolio con link propio, uno por nicho y tu Engagement Rate a la vista.",
+    "Payfolio convierte tu Instagram en un portafolio web profesional: métricas, brand partners y case studies, listo para enviar a las marcas.",
   robots: { index: false, follow: false },
 };
 
@@ -36,7 +36,7 @@ type RoadmapItem = {
 
 const ROADMAP: RoadmapItem[] = [
   {
-    name: "Portfolio Builder",
+    name: "Payfolio",
     status: "Disponible ahora",
     text: (
       <>
@@ -88,7 +88,7 @@ function Chevron() {
 export default function LandingPage() {
   return (
     <>
-      <LandingHeader />
+      <LandingHeader brand="payfolio" />
 
       <main className="overflow-x-clip">
         {/* 1 · Hero: copy, Chispa protagonista y la mini-mock */}
@@ -96,6 +96,8 @@ export default function LandingPage() {
         <section className={`${container} landing-hero pt-18 pb-11 md:pt-28 md:pb-18 lg:pb-22`} data-hero>
           {/* En el celular el stack de texto va centrado bajo la cara; desde tablet, a la izquierda. */}
           <div className="landing-hero__copy text-center md:text-left">
+            {/* 13.16: byline del producto */}
+            <p className={`${eyebrow} mb-5 md:mb-6`}>Payfolio by Supercreador</p>
             <h1
               className={`${interTight.variable} ${fontTmj.variable} landing-h1 text-[2.375rem] leading-[1.06] font-semibold tracking-[-0.03em] sm:text-5xl lg:text-[3.75rem]`}
             >
@@ -175,7 +177,34 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* 3 · Cierre: captura de correo del programa piloto */}
+        {/* 3 · Esto es parte de Supercreador (13.16): misión del hub + carta del fundador */}
+        <section aria-labelledby="supercreador-titulo" className="pb-24 md:pb-32 lg:pb-40">
+          <div className={container}>
+            <div className={column}>
+              <p className={eyebrow}>Esto es parte de Supercreador</p>
+              <h2
+                id="supercreador-titulo"
+                className="mt-5 text-[2rem] leading-[1.1] font-medium tracking-[-0.025em] sm:text-[2.75rem]"
+              >
+                Un producto del hub para creadores de contenido
+              </h2>
+              <p className="mt-6 max-w-2xl leading-relaxed text-muted">
+                Payfolio nace en Supercreador: el hub donde las creadoras convierten su contenido en oportunidades.
+                Empieza con el portafolio; sigue con el tablero de oportunidades y las tarifas.
+              </p>
+              {/* TODO-DUEÑO: carta breve del fundador. Reemplazar este bloque con el texto final. */}
+              <div className="mt-8 rounded-[1.75rem] border border-dashed border-line p-7 sm:p-9" data-todo-dueno>
+                <p className="text-xs font-semibold tracking-[0.16em] text-muted uppercase">TODO-DUEÑO</p>
+                <p className="mt-3 max-w-2xl leading-relaxed text-muted">
+                  Aquí va la carta breve del fundador: por qué existe Supercreador y qué viene después para las
+                  creadoras.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* 4 · Cierre: captura de correo del programa piloto */}
         <section id="piloto" aria-labelledby="piloto-titulo" className="pb-28 md:pb-32 lg:pb-40">
           <div className={container}>
             <div
@@ -208,7 +237,7 @@ export default function LandingPage() {
         </MascotTraveler>
       </main>
 
-      <LandingFooter mascotTarget />
+      <LandingFooter brand="payfolio" mascotTarget />
     </>
   );
 }

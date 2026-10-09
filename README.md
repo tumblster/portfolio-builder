@@ -119,6 +119,28 @@ DM Sans como única familia, crema + tinta + azul acero, contraste de texto ≥ 
   refresca solo cada 60 s como red de seguridad.
 - Un link que no existe muestra un 404 en español. Las páginas y las imágenes no aparecen en buscadores.
 
+## Media kit (v2 · ronda 6 · 13.18)
+
+Segunda vista del portafolio público ("Contenido | Media kit", `components/portfolio/media-kit.tsx`): no repite el
+grid de contenido ni trae demografía de audiencia (edad/género/países: requiere OAuth de Instagram, queda para otra
+fase). Orden: **métricas + ER → Brand partners → Case studies → "Trabaja conmigo" → compartir**.
+
+- **Métricas + ER** con su base etiquetada (las mismas del hero de Contenido, sin duplicar el grid).
+- **Brand partners (13.19):** solo las marcas que la creadora confirmó. En la revisión antes de generar y en el
+  editor, las @menciones de sus últimos 12 contenidos llegan como candidatas (`detected`); solo se guardan las que
+  ella agrega, o las que carga a mano (`manual`: nombre + Instagram + logo opcional). `components/brand-partners-field.tsx`.
+- **Logo de la marca** (`POST /api/brand-logo`, `lib/brand-logo.ts`): la foto de perfil de su Instagram, leída con el
+  mismo actor de Apify del import y copiada a nuestro almacenamiento (caché `brand-logos/<usuario>.json`: 30 días si
+  se encontró, 1 día si no). Sin crédito, cuenta privada o timeout → logo subido o inicial de la marca
+  (`lib/portfolio/brands.ts`). Nunca Google ni Wikipedia. Costo: ~US$0,003 por marca nueva.
+- **Case studies (13.20):** publicaciones importadas de su Instagram que la creadora marca en el editor
+  (`components/editor/case-studies-field.tsx`, solo ahí, no en la revisión): marca, campaña, miniatura y métricas
+  (vistas, me gusta, comentarios). Las cifras arrancan con los datos reales del post y son editables, con botón para
+  volver al dato real. Un caso cuya publicación ya no está en la captura no se muestra (nunca invalida el portafolio).
+- **"Trabaja conmigo":** WhatsApp con el mensaje según su género (o su correo). **Compartir:** abre directo en
+  `#media-kit` con `?ref=whatsapp`; en esta vista el compartir global se oculta por CSS para no duplicarlo.
+- El overlay de video (13.2/13.3) también abre los casos. Prueba de humo: `npm run smoke:mediakit` (22 checks).
+
 ## Marca (v2 · M4-rev)
 
 La marca de Supercreador es **la sonrisa de Chispa, nada más**: la boca de la expresión "carcajada" (la del hero),
@@ -160,15 +182,20 @@ con la clase `studio` del layout, así nunca alcanza a la página pública.
   queda oculto).
 - La landing `/` ya no usa este sistema: desde el M4-rev tiene el suyo (siguiente sección).
 
-## Landing (v2 · M4-rev, referencia superhuman.com)
+## Landing (v2 · M4-rev, referencia superhuman.com; 13.16: branding Payfolio)
 
 `app/(landing)/`: mismo `/`, con su propio layout, su propia fuente (solo Inter) y su propio CSS, así el interior
-del studio no cambia y la landing no descarga lo que no usa.
+del studio no cambia y la landing no descarga lo que no usa. **El producto se llama Payfolio** (13.16): la landing
+es la del producto, con navegación propia mínima (sin la navbar de Supercreador).
 
-- **Tres bloques:** hero → cómo funciona en 3 cards (importa tu Instagram → confirma tus nichos y elige el
-  diseño → comparte tu link) → cierre con la **captura de correo del programa piloto**. Navegación fija (Cómo
-  funciona, Piloto y el CTA) y footer mínimo con "Entrar". Todos los "Únete al programa piloto" llevan a la
-  captura.
+- **Cuatro bloques:** hero (con byline "Payfolio by Supercreador") → roadmap "For you page" → **"Esto es parte
+  de Supercreador"** (misión del hub + carta del fundador; el texto de la carta lo provee el dueño: placeholder
+  marcado `TODO-DUEÑO`) → cierre con la **captura de correo del programa piloto**. Navegación fija mínima
+  (Roadmap, Piloto, Acceso y el CTA) y footer del producto.
+- **Header del producto** (`PayfolioLockup` en `landing-chrome.tsx`): wordmark "Payfolio" + byline "by Supercreador".
+  `/acceso` y `/crear` siguen usando el header/footer de Supercreador (prop `brand`, default `"supercreador"`).
+- **Footer del producto:** "Hecho por [Supercreador](https://supercreador.tech) — el hub para creadores de contenido"
+  + link "Entrar". Conserva el mark de la sonrisa para que la carita viajera tenga dónde aterrizar.
 - **Minimalismo premium:** Inter en pesos medios y capitalización de frase (H1 60 px en escritorio, 38 px en el
   celular), eyebrows en mayúsculas chicas, contenedor de 1200 px, botones píldora de 48 px, un solo botón sólido
   por bloque y el secundario como link de texto ("Ver cómo funciona ›").
@@ -349,9 +376,10 @@ npm run smoke
 ```
 
 Prueba la API, la sesión, el editor, la página pública y sus links por nicho (incluido el caché) y las
-validaciones de importación y portadas **sin gastar saldo** (nunca llama a Apify ni a Groq). En v2 · M4-rev
-son **128 checks**. Lo nuevo del M4-rev (la landing): exactamente 3 bloques (hero, cómo funciona en cards y cierre) y ninguna de las
-secciones quitadas; navegación fija; el copy aprobado del hero; las chispitas en "superpoderes" y "profesional" sin
+validaciones de importación y portadas **sin gastar saldo** (nunca llama a Apify ni a Groq). Incluye la
+pieza 6 (Media kit, Brand partners, Case studies) vía `npm run smoke:mediakit` (22 checks; corre dentro de
+`npm run smoke`). Lo nuevo del M4-rev (la landing): byline "Payfolio by Supercreador", cuatro bloques (hero,
+roadmap, "Esto es parte de Supercreador", cierre) y ninguna de las secciones quitadas; navegación fija; el copy aprobado del hero; las chispitas en "superpoderes" y "profesional" sin
 efectos; la carcajada en el hero y la acompañante con sus 5 expresiones en orden por tramo; Chispa por debajo de 10 KB en
 la página; con "reducir movimiento" todo quieto; la captura de correo y su API (correo inválido 400, alta 201, repetido 200,
 trampa para bots, archivo en `pilot-signups/`); el encuadre de las 6 expresiones (lienzo común, centradas, ≥ 10 % de aire,
