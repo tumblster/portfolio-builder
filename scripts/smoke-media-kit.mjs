@@ -123,9 +123,9 @@ if (process.env.STORAGE_DRIVER === "blob") {
   check("sin demografía de audiencia", !/demograf/i.test(kit));
   check("«Trabaja conmigo» abre WhatsApp con su número", kit.includes("data-mk-hire") && kit.includes("wa.me/51987654321"));
   check("el mensaje de «Trabaja conmigo» va según su género", kit.includes("supercreadora"));
-  check("compartir por WhatsApp en el Media kit", kit.includes("data-mk-share"));
-  const order = ["data-mk-metrics", "data-mk-brands", "data-mk-cases", "data-mk-share"].map((marker) => kit.indexOf(marker));
-  check("orden: métricas → Brand partners → Case studies → compartir", order.every((at, index) => at >= 0 && (index === 0 || at > order[index - 1])), order.join(","));
+  check("compartir flotante junto al badge (E2)", kit.includes("data-pf-made-with") && kit.includes("data-pf-share"));
+  const order = ["data-mk-metrics", "data-mk-brands", "data-mk-cases"].map((marker) => kit.indexOf(marker));
+  check("orden: métricas → Brand partners → Case studies (el compartir es flotante)", order.every((at, index) => at >= 0 && (index === 0 || at > order[index - 1])), order.join(","));
 
   // ── API ──
   const read = await api("GET", `/api/portfolios/${SLUG}`);

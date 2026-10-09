@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { SupercreadorMark } from "@/components/brand/supercreador-mark";
 import "./made-with-badge.css";
 
@@ -10,8 +10,9 @@ import "./made-with-badge.css";
  * compite con los CTAs. Al tocarla se abre una tarjetita con un CTA al producto ("Crea tu portafolio", con ?ref=badge
  * para saber cuántos llegan por aquí). Se cierra con otro toque, tocando fuera o con Escape (el foco vuelve a la
  * píldora). Solo en la página pública: el editor no lo muestra.
+ * E2 del dueño: `aside` va AL LADO de la píldora, del mismo tamaño (el botón de compartir).
  */
-export function MadeWithBadge({ href = "/?ref=badge" }: { href?: string }) {
+export function MadeWithBadge({ href = "/?ref=badge", aside }: { href?: string; aside?: ReactNode }) {
   const uid = useId();
   const panelId = `${uid}-panel`;
   const [open, setOpen] = useState(false);
@@ -55,6 +56,7 @@ export function MadeWithBadge({ href = "/?ref=badge" }: { href?: string }) {
         <SupercreadorMark className="pf-made__mark" />
         Hecho con Supercreador
       </button>
+      {aside}
     </div>
   );
 }

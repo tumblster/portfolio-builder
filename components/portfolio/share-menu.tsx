@@ -62,9 +62,11 @@ type Props = {
   gender: Gender | null;
   hash?: string;
   tag?: string;
+  /** "sm": 36 px para ir al lado del flotante "Hecho con Supercreador" (E2 del dueño). */
+  size?: "md" | "sm";
 };
 
-export function ShareMenu({ basePath, gender, hash = "", tag = "share" }: Props) {
+export function ShareMenu({ basePath, gender, hash = "", tag = "share", size = "md" }: Props) {
   const [open, setOpen] = useState(false);
   const [url, setUrl] = useState("");
   const rootRef = useRef<HTMLDivElement>(null);
@@ -125,10 +127,10 @@ export function ShareMenu({ basePath, gender, hash = "", tag = "share" }: Props)
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label="Compartir portafolio"
-        className="share-menu__trigger"
+        className={`share-menu__trigger${size === "sm" ? " share-menu__trigger--sm" : ""}`}
         data-pf-share
       >
-        <ShareIcon size={20} />
+        <ShareIcon size={size === "sm" ? 18 : 20} />
       </button>
       {open && (
         <div role="menu" aria-label="Compartir portafolio" className="share-menu__pop">

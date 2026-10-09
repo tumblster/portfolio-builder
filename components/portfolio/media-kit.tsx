@@ -2,9 +2,7 @@ import Image from "next/image";
 import { brandInitial, brandProfileUrl } from "@/lib/portfolio/brands";
 import { caseMetricLabels, type ResolvedCaseStudy } from "@/lib/portfolio/case-studies";
 import type { ResolvedPiece, ResolvedPortfolio } from "@/lib/portfolio/resolve";
-import { publicPath } from "@/lib/portfolio/slug";
 import { NO_METRICS } from "@/lib/portfolio/stats";
-import { ShareMenu } from "./share-menu";
 import { Avatar, HireLink, PieceLink, portfolioView } from "./template-kit";
 import "./media-kit.css";
 
@@ -12,8 +10,8 @@ import "./media-kit.css";
  * Vista MEDIA KIT del portafolio público (ronda 30/09 · 7.3; ronda 6 · 13.18 Media Kit v1).
  * Orden: cabecera (avatar, nombre, nichos) → Métricas + Engagement Rate (cada una con su base) → Brand Partners
  * (13.19: solo las marcas que la creadora confirmó) → Case studies (13.20: publicaciones reales con marca, campaña y
- * cifras) → "Trabaja conmigo" (13.8 / 13.9: WhatsApp con el mensaje según su género) → compartir (12.4; E2 #9: icono
- * sutil + cápsula).
+ * cifras) → "Trabaja conmigo" (13.8 / 13.9: WhatsApp con el mensaje según su género). El compartir es flotante,
+ * al lado del badge "Hecho con Supercreador" (E2 del dueño).
  *
  * El Media kit NO repite el grid de contenido (13.18): no hay "piezas destacadas"; los case studies son tarjetas con
  * contexto, no una galería. Sin demografía de audiencia (edad, género, países): necesita OAuth de Instagram y el App
@@ -156,10 +154,6 @@ export function MediaKit({ portfolio }: { portfolio: ResolvedPortfolio }) {
         </p>
       )}
 
-      {/* E2 #9: compartir sutil: icono + cápsula (WhatsApp, X, Instagram, TikTok, copiar). */}
-      <div className="mk-share" data-mk-share>
-        <ShareMenu basePath={publicPath(portfolio.slug)} gender={portfolio.gender ?? null} hash="#media-kit" tag="whatsapp" />
-      </div>
     </div>
   );
 }

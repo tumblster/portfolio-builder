@@ -12,8 +12,8 @@
   bottom: calc(12px + env(safe-area-inset-bottom, 0px));
   left: 12px;
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
+  flex-direction: row;
+  align-items: center;
   gap: 8px;
   max-width: calc(100vw - 24px);
 }
@@ -49,6 +49,9 @@
   height: 12px;
 }
 .pf-made__panel {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
   width: min(280px, calc(100vw - 24px));
   padding: 14px 16px;
   border: 1px solid rgb(14 17 11 / 0.12);
