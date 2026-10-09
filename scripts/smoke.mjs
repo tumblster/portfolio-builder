@@ -704,8 +704,9 @@ try {
   check(/<meta name="robots" content="noindex, nofollow"/.test(landingHtml), "La landing sigue fuera de los buscadores (noindex)");
   const sections = [...visible.matchAll(/<section[^>]*>/g)].map((m) => m[0]);
   check(
-    sections.length === 3 && /data-hero/.test(sections[0]) && /id="como-funciona"/.test(sections[1]) && /id="piloto"/.test(sections[2]),
-    "La landing queda en 3 bloques: hero, roadmap (#como-funciona) y el cierre del piloto",
+    sections.length === 4 && /data-hero/.test(sections[0]) && /id="como-funciona"/.test(sections[1]) &&
+      /aria-labelledby="supercreador-titulo"/.test(sections[2]) && /id="piloto"/.test(sections[3]),
+    "La landing queda en 4 bloques: hero, roadmap, \u00abEsto es parte de Supercreador\u00bb y el cierre del piloto",
     sections,
   );
   check(
@@ -722,8 +723,8 @@ try {
   check(
     h1 === "Dale superpoderes a tu marca personal" && (landingHtml.match(/<h1/g) ?? []).length === 1 &&
       heroSub === "Convierte tu Instagram en un portafolio web profesional, listo para enviar a las marcas" &&
-      heroCopy?.[2] === "<h1" && !visible.includes("Empieza por aquí"),
-    `Hero con el copy aprobado, sin eyebrow ("${h1}")`,
+      heroCopy?.[2] === "<p" && /Payfolio by Supercreador/.test(visible) && !visible.includes("Empieza por aquí"),
+    `Hero con el copy aprobado + byline "Payfolio by Supercreador" ("${h1}")`,
     { h1, heroSub, first: heroCopy?.[2] },
   );
   const h1Html = visible.match(/<h1[^>]*>[\s\S]*?<\/h1>/)?.[0] ?? "";
@@ -855,14 +856,14 @@ try {
     /For you page/i.test(roadmap) &&
       textOf(roadmap.match(/<h2[^>]*>([\s\S]*?)<\/h2>/)?.[1] ?? "") === "Estamos construyendo herramientas para ti" &&
       [
-        ["Portfolio Builder", "Disponible ahora"],
+        ["Payfolio", "Disponible ahora"],
         ["Tablero de oportunidades", "En construcción"],
         ["Tarifar sin fricción", "Próximo"],
       ].every(([name, status]) => roadmap.includes(name) && roadmap.includes(`data-roadmap-status="${status}"`)) &&
       (roadmap.match(/<li[^>]*data-mascot-zone/g) ?? []).length === 3 &&
       /<a[^>]*href="\/crear"[^>]*>Probarlo<\/a>/.test(roadmap) &&
       (roadmap.match(/<button[^>]*disabled=""[^>]*>Próximamente<\/button>/g) ?? []).length === 2,
-    "Roadmap: 3 herramientas con su estado; solo Portfolio Builder se puede probar (/crear)",
+    "Roadmap: 3 herramientas con su estado; solo Payfolio se puede probar (/crear)",
   );
   check(
     /<a[^>]*href="#piloto"[^>]*data-pilot-float[^>]*>Únete al programa piloto<\/a>/.test(visible) && /\.pilot-float\s*\{[^}]*z-index:\s*20/.test(landingCss),
@@ -981,19 +982,17 @@ try {
   const smileOuter = (smile.match(/M[^M]*/g) ?? []).sort((a, b) => b.length - a.length)[0] ?? "";
   const marks = [...visible.matchAll(/<svg[^>]*data-brand-mark[^>]*>([\s\S]*?)<\/svg>/g)];
   check(
-    marks.length === 2 && marks.every((m) => m[1] === `<path d="${smile}"></path>` && /fill="currentColor"/.test(m[0]) && /text-ink/.test(m[0])) &&
+    marks.length === 1 && marks.every((m) => m[1] === `<path d="${smile}"></path>` && /fill="currentColor"/.test(m[0]) && /text-ink/.test(m[0])) &&
       !/<circle cx="12" cy="13" r="9"/.test(visible),
-    "La marca (header y footer) es la sonrisa de la carcajada con el mismo path, en tinta; se fue el símbolo circular",
+    "La marca en la landing del producto: la sonrisa solo en el footer (13.16); se fue el símbolo circular",
     marks.map((m) => m[0].slice(0, 80)),
   );
   // El nombre va en un span: bajo 400 px el header lo oculta a la vista (sigue para lectores de pantalla), el footer no.
-  const lockups = [...visible.matchAll(/<a[^>]*href="\/"[^>]*>(<svg[^>]*data-brand-mark[\s\S]*?<\/svg>)<span( class="([^"]*)")?>Supercreador<\/span><\/a>/g)];
+  const payfolioLockup = visible.match(/<a[^>]*href="\/"[^>]*>Payfolio<span[^>]*>by Supercreador<\/span><\/a>/);
   check(
-    lockups.length === 2 &&
-      lockups.every((m) => /h-\[30px\]/.test(m[1])) &&
-      /max-\[399px\]:sr-only/.test(lockups[0][3] ?? "") &&
-      !lockups[1][2],
-    "Lockup: marca de 30 px + wordmark \"Supercreador\" (en el header, solo la sonrisa bajo 400 px; el footer siempre completo)",
+    payfolioLockup && /Hecho por[\s\S]*?href="https:\/\/supercreador\.tech"/.test(visible),
+    "Lockup del producto (13.16): \"Payfolio\" + byline \"by Supercreador\" en el header; footer \u00abHecho por Supercreador\u00bb con link",
+    payfolioLockup?.[0]?.slice(0, 120),
   );
   const iconLink = landingHtml.match(/<link rel="icon" href="([^"]+)"[^>]*type="image\/svg\+xml"/);
   const iconRes = iconLink ? await fetch(new URL(iconLink[1], BASE)) : null;
