@@ -465,7 +465,14 @@ try {
       /\.pf-bar__chips\[data-scrolled\]\s*\{[^}]*mask-image:\s*linear-gradient\(90deg,\s*(transparent|#0000)/.test(publicCss),
     "Header: el chip elegido va solo trazado; en Media kit la fila de chips se colapsa; fundido a la izquierda",
   );
-  check(/<a[^>]*href="https:\/\/wa\.me\/\?text=[^"]+"[^>]*data-pf-share/.test(html), "12.4: «Compartir por WhatsApp» en el portafolio publicado");
+  const shareMenuSrc = await readFile(path.join(process.cwd(), "components", "portfolio", "share-menu.tsx"), "utf8");
+  check(
+    /<button[^>]*aria-label="Compartir portafolio"[^>]*data-pf-share/.test(html) && !/Compartir por WhatsApp</.test(html) &&
+      /whatsappUrl\(null, message\)/.test(shareMenuSrc) && /twitter\.com\/intent\/tweet/.test(shareMenuSrc) &&
+      /Instagram[\s\S]*TikTok[\s\S]*Copiar link/.test(shareMenuSrc),
+    "12.4: compartir sutil en el portafolio publicado (icono + capsula: WhatsApp, X, Instagram, TikTok, copiar)",
+    { hasTrigger: /data-pf-share/.test(html) },
+  );
   // Ronda 6 · 13.9: los dos CTAs de la plantilla (Creator, con WhatsApp).
   check(
     /<a[^>]*href="https:\/\/wa\.me\/\d+\?text=[^"]+"[^>]*data-pf-cta="hire"[^>]*>Trabaja conmigo/.test(html) &&
@@ -513,14 +520,15 @@ try {
   const genderBar = genderHtml.match(/<header[^>]*data-pf-bar[\s\S]*?<\/header>/)?.[0] ?? "";
   const hrefOf = (pattern, source) => decodeURIComponent(source.match(pattern)?.[1] ?? "");
   const hablemosHref = hrefOf(/class="pf-bar__cta"[^>]*href="([^"]+)"/, genderBar);
-  const shareHref = hrefOf(/<a[^>]*href="(https:\/\/wa\.me\/\?text=[^"]+)"[^>]*data-pf-share/, genderHtml);
+
   const hireHref = hrefOf(/<a[^>]*href="(https:\/\/wa\.me\/\d+\?text=[^"]+)"[^>]*data-pf-cta="hire"/, genderHtml);
   check(
     badGender.status === 400 && withGender.status === 200 && withGender.data?.resolved?.gender === "mujer" &&
-      /como supercreadora.*conversar contigo/.test(hablemosHref) && /Conoce mi trabajo como supercreadora 😀/.test(shareHref) &&
-      /como supercreadora.*trabajar contigo/.test(hireHref),
-    "13.8: con «Mujer», «Hablemos», «Trabaja conmigo» y «Compartir por WhatsApp» dicen «supercreadora»",
-    { status: [badGender.status, withGender.status], hablemosHref, shareHref, hireHref },
+      /como supercreadora.*conversar contigo/.test(hablemosHref) &&
+      /como supercreadora.*trabajar contigo/.test(hireHref) &&
+      /shareMessage\(gender, url\)/.test(shareMenuSrc),
+    "13.8: con «Mujer», «Hablemos» y «Trabaja conmigo» dicen «supercreadora»; el menu de compartir usa el texto segun el genero",
+    { status: [badGender.status, withGender.status], hablemosHref, hireHref },
   );
 
   // ── Links por nicho ──
@@ -1523,6 +1531,30 @@ try {
   check(
     /if \(!kit\)/.test(kitSrc) && /aria-disabled="true"/.test(kitSrc) && !/vista-previa#media-kit/.test(kitSrc),
     "13.9 (corrección): en la vista previa «Ver media kit» no apunta a una página que no existe",
+  );
+
+  // ── E2 del dueño (08/10, móvil): correcciones de UX ──
+  const readSrc = (...parts) => readFile(path.join(process.cwd(), ...parts), "utf8");
+  const toastSrc = await readSrc("components", "ui", "toast.tsx");
+  check(
+    /data-toast-bar/.test(toastSrc) && /role="status"/.test(toastSrc) && /setTimeout\(kill/.test(toastSrc),
+    "E2: toast con barrita de tiempo y autodestrucción (un solo aviso a la vez)",
+  );
+  check(
+    /max-md:sr-only/.test(await readSrc("components", "landing", "landing-chrome.tsx")),
+    "E2 #1: en móvil el navbar lleva solo el logo (sin la palabra «Supercreador»)",
+  );
+  check(
+    /togglePiece/.test(pickersSrc) && /showToast\(/.test(pickersSrc) && /aria-pressed=\{added\}/.test(pickersSrc),
+    "E2 #3: el botón de cada pieza es toggle (agregar/quitar); al tope avisa con toast en vez de botón muerto",
+  );
+  check(
+    /Se descartar/.test(reviewSrc) && /showToast/.test(reviewSrc) && !/Te queda 1 sugerencia por revisar/.test(reviewSrc),
+    "E2 #6/#7: las sugerencias de servicios sin revisar se descartan al generar (con toast), ya no bloquean",
+  );
+  check(
+    /window\.scrollTo\(\{ top: 0 \}\)/.test(reviewSrc),
+    "E2 #5: autoscroll arriba al cambiar de paso en la revisión",
   );
 } catch (error) {
   failures += 1;
