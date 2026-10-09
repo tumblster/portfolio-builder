@@ -241,7 +241,7 @@ export function paletteFromSwatch(swatch: string): Palette {
 
   return {
     id: "auto",
-    name: "De su foto",
+    name: "Automática",
     bg,
     ink,
     muted,
@@ -260,7 +260,7 @@ export function paletteFromSwatch(swatch: string): Palette {
 /** La paleta que se usa de verdad. "auto" sin color de foto (foto vieja o sin foto) → la de siempre. */
 export function resolvePalette(id: PaletteId, photo: StoredImage | null): Palette {
   if (id === "auto") {
-    return photo?.swatch && HEX_PATTERN.test(photo.swatch) ? paletteFromSwatch(photo.swatch) : { ...DEFAULT_PALETTE, id: "auto", name: "De su foto" };
+    return photo?.swatch && HEX_PATTERN.test(photo.swatch) ? paletteFromSwatch(photo.swatch) : { ...DEFAULT_PALETTE, id: "auto", name: "Automática" };
   }
   return CURATED_PALETTES.find((palette) => palette.id === id) ?? DEFAULT_PALETTE;
 }

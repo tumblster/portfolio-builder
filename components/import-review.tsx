@@ -7,11 +7,10 @@ import { PalettePicker, TemplateList, recommendedPalette } from "@/components/de
 import { PreviewViews, type PreviewData, type PreviewView } from "@/components/design/template-preview";
 import { NichePicker, PiecePicker, type NicheChip, type PieceChip } from "@/components/import/confirm-pickers";
 import type { Onboarding } from "@/components/import/onboarding-step";
-import { ServicesStep, initialServiceCards, pendingSuggestions, type ServiceCard } from "@/components/import/services-step";
+import { ServicesStep, initialServiceCards, type ServiceCard } from "@/components/import/services-step";
 import type { DraftPiece } from "@/lib/import/events";
 import "@/components/import/review.css";
 import { ChispaLoader } from "@/components/mascot/chispa-loader";
-import { showToast } from "@/components/ui/toast";
 import {
   CONFIRM_TIMEOUT_MESSAGE,
   confirmRequestTimeout,
@@ -33,8 +32,9 @@ import { errorText, pillButton, primaryButton, textLink } from "./brand-ui";
  *      que eligió la IA llega precargado; se quita, se agrega (también piezas de su perfil o por link) y se ordena.
  *      Esto manda sobre la IA: arma las píldoras, los links /p/<slug>/<nicho> y el orden de las piezas. Sin vista
  *      previa en la pantalla: un botón flotante "Preview" abre un modal con la vista previa (Contenido y Media kit).
- *   2. Servicios (11.12 · ronda 6 13.6): llegan las sugerencias de la IA (de sus captions y las marcas que menciona);
- *      la creadora las usa, edita o quita; las que queden sin revisar se descartan al generar (con aviso). Solo se envía lo confirmado.
+ *   2. Servicios (11.12 · ronda 6 13.6): llegan hasta 2 sugerencias de la IA (de sus captions y las marcas que menciona),
+ *      como chips; la creadora toca las que quiere sumar o escribe las suyas. Las que queden sin tocar se descartan
+ *      en silencio al generar. Solo se envía lo confirmado.
  *      Debajo, Brand Partners (13.19, opcional): las @marcas detectadas en sus contenidos y en los links agregados
  *      llegan como candidatas SIN marcar; solo viajan las que ella agrega (y las que carga a mano).
  *   3. Plantilla: lista compacta + vista previa grande y fiel, con sus datos reales (r2, C1).
@@ -191,17 +191,18 @@ export function ImportReview({ draft, owner, onGenerated, onStartOver, onUnautho
   }, [draft.name, draft.username, draft.metrics, nicheLabels, thumbKey, pool]);
 
   // El foco va al título del paso nuevo cuando ya está en pantalla (después del commit de la transición).
+  // Con preventScroll para no pelear con el desplazamiento suave del goTo.
   useEffect(() => {
     if (!focusHeading.current) return;
     focusHeading.current = false;
-    stepHeading.current?.focus();
+    stepHeading.current?.focus({ preventScroll: true });
   }, [step]);
 
   function goTo(next: number) {
     setFormError(null);
     focusHeading.current = true;
-    // E2 del dueño: cada paso es una "página"; al cambiar, se vuelve arriba del todo.
-    if (typeof window !== "undefined") window.scrollTo({ top: 0 });
+    // E2 del dueño: cada paso es una "página"; al cambiar, se vuelve arriba del todo, con desplazamiento suave.
+    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
     startTransition(() => setStep(next));
   }
 
@@ -234,13 +235,9 @@ export function ImportReview({ draft, owner, onGenerated, onStartOver, onUnautho
     return true;
   }
 
-  /** E2 del dueño: las sugerencias sin revisar NO bloquean: se descartan al generar (toast mediante).
-   *  Solo se exige al menos una tarjeta con título. */
+  /** E2 del dueño: los servicios son opcionales. Las sugerencias sin tocar se descartan en silencio al generar
+   *  (sin avisos); solo viajan las tarjetas confirmadas con título. */
   function validateServices(): boolean {
-    if (!services.some((card) => card.title.trim())) {
-      setServiceError("Agrega al menos un servicio: un título y, si quieres, un link o una descripción.");
-      return false;
-    }
     setServiceError(null);
     return true;
   }
@@ -250,16 +247,7 @@ export function ImportReview({ draft, owner, onGenerated, onStartOver, onUnautho
       goTo(0);
       return;
     }
-    if (!validateServices()) {
-      goTo(1);
-      return;
-    }
-    const discarded = pendingSuggestions(services);
-    if (discarded > 0) {
-      showToast(
-        discarded === 1 ? "Se descartó 1 sugerencia sin revisar." : `Se descartaron ${discarded} sugerencias sin revisar.`,
-      );
-    }
+    validateServices();
     const retry = retryNext.current;
     setGenerating(true);
     setRetrying(false);

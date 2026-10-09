@@ -17,11 +17,11 @@ import { ShareMenu } from "./share-menu";
 
 /*
  * Header ÚNICO del portafolio publicado (spec 11.6; ronda 6 · 13.10), en 2 filas contextuales:
- *  - Fila 1 (siempre): [foto en círculo + vistas] | control segmentado "Contenido | Media kit" | Hablemos.
- *  - Fila 2 (solo en Contenido): chips de nichos, con scroll horizontal y fundido a la izquierda si no caben.
- *    Al pasar a Media kit se colapsa con animación y el header se compacta: el Media kit es ER + métricas, ahí no
- *    se filtra por nicho. Sin nombre en texto, sin chip "Todo"; "Media kit" es texto del control, nunca un chip. El
- *    chip elegido va solo trazado (outline). Tocar el elegido lo suelta (vuelve a todo).
+ *  - Fila única (siempre): [foto en círculo + vistas] | control segmentado "Contenido | Media kit" | Hablemos.
+ * E2 del dueño: los chips de nichos salen del navbar fijo y van estáticos arriba del contenido (solo en Contenido),
+ * como botones, con scroll horizontal y fundido a la izquierda si no caben. Sin nombre en texto, sin chip "Todo";
+ * "Media kit" es texto del control, nunca un chip. El chip elegido va solo trazado (outline). Tocar el elegido lo
+ * suelta (vuelve a todo).
  * Además: "Hablemos" abre WhatsApp con un mensaje pre-llenado si el creador puso su número (12.6; si no, lleva a su
  * contacto); el ojito con las vistas (12.7: 1 por persona por día, lo cuenta el servidor); y compartir al final
  * (12.4; E2 #9: icono sutil + cápsula con WhatsApp, X, Instagram, TikTok y copiar link). Al abrir, avisa la visita
@@ -154,7 +154,6 @@ export function PortfolioViews({ about, kit, style, nav }: { about: ReactNode; k
       className="pf-views"
       style={style}
       data-view={kitActive ? "kit" : "about"}
-      data-has-niches={hasNiches ? "" : undefined}
       data-niche-link={activeNiche ?? undefined}
       onClick={onViewsClick}
     >
@@ -217,38 +216,34 @@ export function PortfolioViews({ about, kit, style, nav }: { about: ReactNode; k
             </a>
           )}
         </div>
+      </header>
+      <div role="tabpanel" id="pf-panel-about" aria-labelledby="pf-tab-content" hidden={kitActive} className="pf-views__panel">
+        {/* E2 del dueño: los nichos salen del navbar fijo; van estáticos arriba del contenido, como botones. */}
         {hasNiches && (
-          <div className="pf-bar__row2" aria-hidden={kitActive ? true : undefined} inert={kitActive ? true : undefined}>
-            <div className="pf-bar__row2-inner">
-              <div ref={scroller} className="pf-bar__chips">
-                <nav aria-label={`Nichos de ${nav.name}`}>
-                  <ul>
-                    {nav.niches.map((niche) => (
-                      <li key={niche.slug}>
-                        <a className="pf-chip" href={`${nav.basePath}/${niche.slug}`} data-pf-chip={niche.slug}>
-                          {niche.label}
-                        </a>
-                      </li>
-                    ))}
-                  </ul>
-                </nav>
-              </div>
+          <div className="pf-niches">
+            <div ref={scroller} className="pf-niches__scroller">
+              <nav aria-label={`Nichos de ${nav.name}`}>
+                <ul>
+                  {nav.niches.map((niche) => (
+                    <li key={niche.slug}>
+                      <a className="pf-chip" href={`${nav.basePath}/${niche.slug}`} data-pf-chip={niche.slug}>
+                        {niche.label}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </nav>
             </div>
           </div>
         )}
-      </header>
-      <div role="tabpanel" id="pf-panel-about" aria-labelledby="pf-tab-content" hidden={kitActive} className="pf-views__panel">
         {about}
       </div>
       <div role="tabpanel" id="pf-panel-kit" aria-labelledby="pf-tab-kit" hidden={!kitActive} className="pf-views__panel pf-views__kit">
         {kit}
       </div>
-      {/* E2 #9: compartir sutil: icono + cápsula (WhatsApp, X, Instagram, TikTok, copiar). */}
-      <div className="pf-share">
-        <ShareMenu basePath={nav.basePath} gender={nav.gender} tag="whatsapp" />
-      </div>
-      {/* 13.17 / 13.23 · 6: en todos los portafolios (aún no hay plan pago). */}
-      <MadeWithBadge />
+      {/* 13.17 / 13.23 · 6: en todos los portafolios (aún no hay plan pago). E2 del dueño: el compartir va flotante
+          al lado del badge, del mismo tamaño (icono sutil + cápsula). */}
+      <MadeWithBadge aside={<ShareMenu basePath={nav.basePath} gender={nav.gender} tag="whatsapp" size="sm" />} />
     </div>
   );
 }
