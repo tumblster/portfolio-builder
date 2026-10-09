@@ -321,7 +321,6 @@ export function PalettePicker({
               ))}
             </span>
             <span className="mt-2.5 leading-snug font-bold">{palette.name}</span>
-            {palette.id === "auto" && <span className="mt-0.5 text-sm leading-snug text-muted">Recomendada · sale de su foto</span>}
           </label>
         );
       })}

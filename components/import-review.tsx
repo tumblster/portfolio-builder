@@ -11,6 +11,7 @@ import { ServicesStep, initialServiceCards, pendingSuggestions, type ServiceCard
 import type { DraftPiece } from "@/lib/import/events";
 import "@/components/import/review.css";
 import { ChispaLoader } from "@/components/mascot/chispa-loader";
+import { showToast } from "@/components/ui/toast";
 import {
   CONFIRM_TIMEOUT_MESSAGE,
   confirmRequestTimeout,
@@ -33,7 +34,7 @@ import { errorText, pillButton, primaryButton, textLink } from "./brand-ui";
  *      Esto manda sobre la IA: arma las píldoras, los links /p/<slug>/<nicho> y el orden de las piezas. Sin vista
  *      previa en la pantalla: un botón flotante "Preview" abre un modal con la vista previa (Contenido y Media kit).
  *   2. Servicios (11.12 · ronda 6 13.6): llegan las sugerencias de la IA (de sus captions y las marcas que menciona);
- *      la creadora las usa, edita o quita, y no se sigue con sugerencias sin revisar. Solo se envía lo confirmado.
+ *      la creadora las usa, edita o quita; las que queden sin revisar se descartan al generar (con aviso). Solo se envía lo confirmado.
  *      Debajo, Brand Partners (13.19, opcional): las @marcas detectadas en sus contenidos y en los links agregados
  *      llegan como candidatas SIN marcar; solo viajan las que ella agrega (y las que carga a mano).
  *   3. Plantilla: lista compacta + vista previa grande y fiel, con sus datos reales (r2, C1).
@@ -199,6 +200,8 @@ export function ImportReview({ draft, owner, onGenerated, onStartOver, onUnautho
   function goTo(next: number) {
     setFormError(null);
     focusHeading.current = true;
+    // E2 del dueño: cada paso es una "página"; al cambiar, se vuelve arriba del todo.
+    if (typeof window !== "undefined") window.scrollTo({ top: 0 });
     startTransition(() => setStep(next));
   }
 
@@ -231,17 +234,9 @@ export function ImportReview({ draft, owner, onGenerated, onStartOver, onUnautho
     return true;
   }
 
-  /** Spec 11.12 · ronda 6 13.6: ninguna sugerencia sin revisar y al menos una tarjeta con título. */
+  /** E2 del dueño: las sugerencias sin revisar NO bloquean: se descartan al generar (toast mediante).
+   *  Solo se exige al menos una tarjeta con título. */
   function validateServices(): boolean {
-    const pending = pendingSuggestions(services);
-    if (pending > 0) {
-      setServiceError(
-        pending === 1
-          ? "Te queda 1 sugerencia por revisar: tócale «Usar» o «Quitar»."
-          : `Te quedan ${pending} sugerencias por revisar: tócales «Usar» o «Quitar» (o «Usar todas»).`,
-      );
-      return false;
-    }
     if (!services.some((card) => card.title.trim())) {
       setServiceError("Agrega al menos un servicio: un título y, si quieres, un link o una descripción.");
       return false;
@@ -258,6 +253,12 @@ export function ImportReview({ draft, owner, onGenerated, onStartOver, onUnautho
     if (!validateServices()) {
       goTo(1);
       return;
+    }
+    const discarded = pendingSuggestions(services);
+    if (discarded > 0) {
+      showToast(
+        discarded === 1 ? "Se descartó 1 sugerencia sin revisar." : `Se descartaron ${discarded} sugerencias sin revisar.`,
+      );
     }
     const retry = retryNext.current;
     setGenerating(true);

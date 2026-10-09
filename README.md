@@ -137,8 +137,9 @@ fase). Orden: **métricas + ER → Brand partners → Case studies → "Trabaja 
   (`components/editor/case-studies-field.tsx`, solo ahí, no en la revisión): marca, campaña, miniatura y métricas
   (vistas, me gusta, comentarios). Las cifras arrancan con los datos reales del post y son editables, con botón para
   volver al dato real. Un caso cuya publicación ya no está en la captura no se muestra (nunca invalida el portafolio).
-- **"Trabaja conmigo":** WhatsApp con el mensaje según su género (o su correo). **Compartir:** abre directo en
-  `#media-kit` con `?ref=whatsapp`; en esta vista el compartir global se oculta por CSS para no duplicarlo.
+- **"Trabaja conmigo":** WhatsApp con el mensaje según su género (o su correo). **Compartir:** icono sutil que abre
+  una cápsula con WhatsApp, X, Instagram, TikTok y copiar link (Instagram/TikTok copian el link, sin intent web);
+  abre directo en `#media-kit` con `?ref=whatsapp`; en esta vista el compartir global se oculta por CSS para no duplicarlo.
 - El overlay de video (13.2/13.3) también abre los casos. Prueba de humo: `npm run smoke:mediakit` (22 checks).
 
 ## Marca (v2 · M4-rev)
