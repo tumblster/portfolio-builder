@@ -132,7 +132,10 @@ function fixtureDoc({ slug, version, image, niches, pieceNiches }) {
       pieces: titles.map((title, n) => ({ sourcePostId: `post-${n + 1}`, title, niche: pieceNiches[n] })),
       ...(niches ? { niches, services: [{ title: "Reels y TikToks", description: "Guion, grabación y edición." }] } : {}),
     },
-    manual: {},
+    manual: {
+      // E2 del dueño: lo que sigue al separador del nombre de IG va bajo el nombre en el hero.
+      tagline: "Marca personal para profesionales",
+    },
     pieces: titles.map((title, n) => ({
       id: `pieza-${n + 1}`,
       origin: "instagram",
@@ -175,6 +178,8 @@ try {
   const chipsSlugForMagic = "lol-no-existe";
   const draft = {
     name,
+    // E2 del dueño: lo que sigue al separador del nombre de IG va bajo el nombre en el hero.
+    tagline: "Marca personal para profesionales",
     bio: "Creo contenido UGC de skincare y viajes.",
     photo: image,
     valueProp: "",
@@ -1560,6 +1565,21 @@ try {
   check(
     /window\.scrollTo\(\{ top: 0, behavior: "smooth" \}\)/.test(reviewSrc),
     "E2 #5: autoscroll suave arriba al cambiar de paso en la revisión",
+  );
+  // E2 del dueño: el nombre de IG se parte en nombre + tagline (el tagline va bajo el nombre, no en el título).
+  const { splitNameTagline } = await import(new URL("../lib/portfolio/name-tagline.ts", import.meta.url));
+  const split = splitNameTagline("Daniela Gadea | Marca Personal para profesionales");
+  const noSplit = splitNameTagline("María-José");
+  check(
+    split.name === "Daniela Gadea" && split.tagline === "Marca Personal para profesionales" &&
+      noSplit.name === "María-José" && noSplit.tagline === "" &&
+      /pf-tagline/.test(html) && html.includes("Marca personal para profesionales"),
+    "E2: «Daniela Gadea | Marca Personal…» → nombre + tagline bajo el título (sin romper «María-José»)",
+  );
+  check(
+    /data-website-checkbox/.test(reviewSrc) && /data-review-website/.test(reviewSrc) &&
+      /website: z\.boolean\(\)\.optional\(\)/.test(await readSrc("lib", "portfolio", "schema.ts")),
+    "E2: el sitio web pineado en su IG es opt-in (checkbox apagado por defecto antes de generar)",
   );
 } catch (error) {
   failures += 1;
