@@ -116,6 +116,8 @@ export function ImportReview({ draft, owner, onGenerated, onStartOver, onUnautho
   // Ronda 6 · 13.19: Brand partners confirmados (arranca vacío: ninguna mención se agrega sola).
   const [partners, setPartners] = useState<BrandPartnerDraft[]>([]);
   const [partnerError, setPartnerError] = useState<string | null>(null);
+  // E2 del dueño: el sitio web pineado en su IG solo va si lo marca (opt-in, apagado por defecto).
+  const [includeWebsite, setIncludeWebsite] = useState(false);
   // Subidas de logo en curso: no se genera a medias.
   const [uploads, setUploads] = useState(0);
   // Spec 11.5: piezas agregadas por link en esta sesión (la más nueva primero).
@@ -269,6 +271,8 @@ export function ImportReview({ draft, owner, onGenerated, onStartOver, onUnautho
         .map((card) => ({ title: card.title.trim(), description: card.description.trim() })),
       // 13.19: solo las marcas que ella agregó (las menciones sin tocar no viajan).
       ...(partners.length > 0 ? { brandPartners: partnersPayload(partners) } : {}),
+      // E2 del dueño: el sitio web pineado en su IG solo va si lo marcó con el checkbox.
+      ...(includeWebsite ? { website: true } : {}),
       // 13.15: el onboarding (correo = cuenta, y el género para los textos de WhatsApp).
       ...(owner ? { owner } : {}),
       ...(retry ? { retry: true } : {}),
@@ -475,6 +479,28 @@ export function ImportReview({ draft, owner, onGenerated, onStartOver, onUnautho
                 error={partnerError}
               />
             </section>
+            {/* E2 del dueño: el sitio web pineado en su IG es opt-in (checkbox, apagado por defecto). */}
+            {draft.website && (
+              <section aria-labelledby={`${uid}-web`} className="mt-12" data-review-website>
+                <h3 id={`${uid}-web`} className="title-3">
+                  Sitio web
+                </h3>
+                <p className="mt-2 mb-4 text-sm text-muted">Opcional. El link pineado en su Instagram.</p>
+                <label className="flex min-h-tap cursor-pointer items-start gap-3 rounded-card border border-line bg-paper p-4">
+                  <input
+                    type="checkbox"
+                    checked={includeWebsite}
+                    onChange={(event) => setIncludeWebsite(event.target.checked)}
+                    className="mt-1 size-5 shrink-0 accent-ink"
+                    data-website-checkbox
+                  />
+                  <span className="text-sm">
+                    <span className="font-semibold">Agregar su sitio web al portafolio</span>
+                    <span className="mt-0.5 block break-all text-muted">{draft.website}</span>
+                  </span>
+                </label>
+              </section>
+            )}
           </section>
         )}
 

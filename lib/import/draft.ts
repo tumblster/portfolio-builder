@@ -9,6 +9,7 @@ import { detectBrandMentions } from "@/lib/portfolio/mentions";
 import { creatorMetrics } from "@/lib/portfolio/metrics";
 import { nicheFromLabel, type NicheDef } from "@/lib/portfolio/niches";
 import { createPortfolio, getPortfolio } from "@/lib/portfolio/repository";
+import { splitNameTagline } from "@/lib/portfolio/name-tagline";
 import { slugCandidates, slugify } from "@/lib/portfolio/slug";
 import {
   LIMITS,
@@ -171,10 +172,16 @@ function toPreview(draft: StoredDraft): DraftPreview {
   const kindOf = (piece: Piece): "video" | "image" | "carousel" =>
     piece.video ? "video" : piece.sourcePostId && postType.get(piece.sourcePostId) === "carousel" ? "carousel" : "image";
   const engagementRate = computeEngagementRate(snapshot);
+  // E2 del dueño: el nombre de IG suele traer el "qué hace" pegado ("Daniela Gadea | Marca Personal para
+  // profesionales"): se separa en nombre + tagline; el tagline va bajo el nombre en el hero.
+  const { name, tagline } = splitNameTagline(snapshot.fullName || "");
   return {
     draftId: draft.id,
     username: draft.username,
-    name: snapshot.fullName || draft.username,
+    name: name || draft.username,
+    tagline,
+    /** El sitio web pineado en su IG (si tiene): se pregunta con checkbox antes de generar (E2 del dueño). */
+    website: snapshot.externalUrl ?? null,
     photo: snapshot.profilePhoto,
     // Lo que sugirió la IA (solo nichos con alguna pieza): el punto de partida de los chips.
     suggestedNiches: (generated?.niches ?? []).filter((niche) => used.has(niche.slug)),
@@ -437,6 +444,8 @@ export async function confirmDraft(input: ConfirmImportInput, options: { gender?
   const startedAt = Date.now();
   logConfirm("info", "create.start", draft.id);
   try {
+    // E2 del dueño: el tagline (lo que sigue al separador del nombre de IG) queda en manual: es editable.
+    const { tagline } = splitNameTagline(draft.snapshot.fullName || "");
     portfolio = await createPortfolio(
       {
         source: "instagram",
@@ -446,6 +455,10 @@ export async function confirmDraft(input: ConfirmImportInput, options: { gender?
         // 13.11: el género del onboarding, si vino. 13.19: las marcas confirmadas, si hay.
         manual: {
           niches,
+          ...(tagline ? { tagline } : {}),
+          // E2 del dueño: el sitio web pineado en su IG solo va si lo marcó con el checkbox; si no, "" lo oculta
+          // aunque Instagram tenga el dato (así lo define el esquema de contacto).
+          ...(input.website === true ? {} : { contact: { website: "" } }),
           ...(services.length > 0 ? { services } : {}),
           ...(brandPartners.length > 0 ? { brandPartners } : {}),
           ...(options.gender ? { gender: options.gender } : {}),

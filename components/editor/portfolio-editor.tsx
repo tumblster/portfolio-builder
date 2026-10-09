@@ -351,6 +351,22 @@ function EditorForm({ initial, initialBaseline }: { initial: FormState; initialB
               />
             </Field>
 
+            <Field id="campo-tagline" label="Tagline (opcional)">
+              <input
+                id="campo-tagline"
+                value={form.tagline}
+                onChange={(event) => edit({ tagline: event.target.value })}
+                maxLength={LIMITS.tagline}
+                autoComplete="off"
+                placeholder="Marca personal para profesionales"
+                aria-describedby="campo-tagline-hint"
+                className={textInput}
+              />
+              <p id="campo-tagline-hint" className="mt-2 text-sm text-muted">
+                Lo que va después del «|» en su Instagram. Va bajo su nombre en el portafolio.
+              </p>
+            </Field>
+
             <Field id="campo-bio" label="Bio (2 líneas)" error={errors.bio}>
               <textarea
                 id="campo-bio"
