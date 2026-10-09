@@ -1,0 +1,57 @@
+/* Toast con barrita de tiempo (correcciones E2 del dueño): un solo aviso a la vez, se autodestruye.
+ * Colores del sistema hardcodeados para que funcione en cualquier página (studio y portafolios públicos). */
+
+[data-toast] {
+  position: fixed;
+  left: 50%;
+  bottom: max(1.25rem, env(safe-area-inset-bottom));
+  transform: translate(-50%, 0.75rem);
+  opacity: 0;
+  z-index: 90;
+  max-width: min(92vw, 26rem);
+  background: #0e110b; /* ink */
+  color: #f5f5e7; /* cream */
+  border-radius: 1rem;
+  padding: 0.8rem 1.1rem 1rem;
+  font-size: 0.9375rem;
+  line-height: 1.45;
+  text-align: center;
+  text-wrap: balance;
+  box-shadow: 0 12px 32px rgb(0 0 0 / 0.28);
+  transition:
+    opacity 0.25s ease,
+    transform 0.25s ease;
+  overflow: hidden;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+[data-toast].is-visible {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+/* La barrita: arranca llena y se vacía en el tiempo del aviso. */
+[data-toast-bar] {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 3px;
+  width: 100%;
+  background: #fc3300; /* accent */
+  transform: scaleX(1);
+  transform-origin: left center;
+  transition-property: transform;
+  transition-timing-function: linear;
+}
+
+[data-toast-bar].is-done {
+  transform: scaleX(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-toast],
+  [data-toast-bar] {
+    transition: none;
+  }
+}

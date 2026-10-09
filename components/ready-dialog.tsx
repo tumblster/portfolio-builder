@@ -83,7 +83,7 @@ export function ReadyDialog({
             <p className="truncate text-sm text-muted">@{username}</p>
             {er && (
               <p className="text-sm text-muted" data-testid="ready-er">
-                <span className="text-ink">{er.value}</span> {er.label} · {er.short}
+                <span className="text-ink">{er.value}</span> {er.label}
               </p>
             )}
           </div>
