@@ -2,11 +2,15 @@ import "server-only";
 import { ConfigError } from "@/lib/errors";
 import { blobStorage } from "./blob";
 import { diskStorage } from "./disk";
+import { r2GetMedia, r2PutMedia } from "./r2";
 
 /*
  * Dónde se guardan los datos:
  *  - En Vercel: un Blob store PRIVADO (JSON de portafolios + imágenes).
  *  - En tu compu: la carpeta .data/ del proyecto (no se sube a git).
+ *  - Con STORAGE_DRIVER=r2: los JSON siguen en Vercel Blob, pero las IMÁGENES van a Cloudflare R2
+ *    (cada subida a Vercel Blob cuenta como operación avanzada: 2,000/mes en Hobby; en R2 el free tier
+ *    sobra). Requiere R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY y R2_BUCKET en las env vars.
  *
  * La elección es explícita a propósito: aunque bajes las variables de Vercel
  * a tu compu, en local NO se escribe en producción salvo que pongas
@@ -22,7 +26,7 @@ export type StoredMedia = {
 };
 
 export interface Storage {
-  readonly name: "blob" | "local";
+  readonly name: "blob" | "local" | "r2";
   /** Lee la última versión (sin caché) o null si no existe. */
   readJson(path: string): Promise<StoredJson | null>;
   /** Crea el archivo solo si no existe. Devuelve false si ya existía. */
@@ -60,6 +64,28 @@ export function getStorage(): Storage {
     }
     return blobStorage;
   }
+  if (choice === "r2") {
+    // Híbrido: los JSON siguen en Vercel Blob (el candado con etags ya está probado ahí); solo las imágenes
+    // van a R2. La lectura cae a Vercel Blob si la imagen es anterior a la mudanza (puente de transición).
+    if (!process.env.BLOB_READ_WRITE_TOKEN && !process.env.BLOB_STORE_ID) {
+      throw new ConfigError(
+        "STORAGE_DRIVER=r2 también necesita el Blob store de Vercel para los JSON. Conéctalo como con \"blob\".",
+      );
+    }
+    for (const name of ["R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_BUCKET"]) {
+      if (!process.env[name]?.trim()) {
+        throw new ConfigError(
+          `Falta la variable ${name} para STORAGE_DRIVER=r2. En Vercel: Settings → Environment Variables del proyecto.`,
+        );
+      }
+    }
+    return {
+      ...blobStorage,
+      name: "r2" as const,
+      putMedia: r2PutMedia,
+      getMedia: async (file: string) => (await r2GetMedia(file)) ?? blobStorage.getMedia(file),
+    };
+  }
   if (choice === "local") {
     if (onVercel) {
       throw new ConfigError(
@@ -68,5 +94,5 @@ export function getStorage(): Storage {
     }
     return diskStorage;
   }
-  throw new ConfigError(`STORAGE_DRIVER inválido ("${choice}"). Usa "local" o "blob".`);
+  throw new ConfigError(`STORAGE_DRIVER inválido ("${choice}"). Usa "local", "blob" o "r2".`);
 }
