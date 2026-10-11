@@ -1364,15 +1364,16 @@ try {
       noServices.status === 400 && noServices.data?.error?.issues?.[0]?.path === "services",
       `11.12: el paso de Servicios es obligatorio antes de generar: "${noServices.data?.error?.issues?.[0]?.message}"`,
     );
-    // 13.4: agregar por link acepta solo TikTok; Instagram queda oculto, con un mensaje amable y sin jerga técnica.
+    // 13.4 (11/10): agregar por link acepta TikTok (oEmbed) e Instagram (fachada, sin miniatura).
     const badLink = await call("POST", "/api/import/link", { json: { draftId: chipsId, url: "https://example.com/algo" } });
     const igLink = await call("POST", "/api/import/link", { json: { draftId: chipsId, url: "https://www.instagram.com/p/C1abc/" } });
     const jargon = /\b(token|oembed|api)\b|\bMeta\b/i;
     check(
-      badLink.status === 400 && badLink.data?.error?.message === "Por ahora puedes agregar por link solo videos de TikTok." &&
-        igLink.status === 400 && igLink.data?.error?.message === "Los links de Instagram estarán disponibles pronto." &&
+      badLink.status === 400 && badLink.data?.error?.message === "Por ahora puedes agregar por link videos de TikTok o Instagram." &&
+        igLink.status === 200 && igLink.data?.piece?.video?.platform === "instagram" &&
+        igLink.data?.piece?.image === null &&
         ![badLink, igLink].some((r) => jargon.test(r.data?.error?.message ?? "")),
-      "13.4: «Agregar por link» acepta solo TikTok; un link de Instagram responde «Los links de Instagram estarán disponibles pronto.» (sin jerga)",
+      "13.4: «Agregar por link» acepta TikTok e Instagram (IG como solo-video, sin jerga)",
       { badLink: badLink.data, igLink: igLink.data },
     );
     const chips = await confirm({
@@ -1453,11 +1454,10 @@ try {
   check(
     linkSection.includes("Tus últimos 12 contenidos") &&
       /¿No ves el que buscas\? Pégalo por link <span aria-hidden="true">↓<\/span>/.test(linkSection) &&
-      /<form[^>]*\bdata-add-by-link>/.test(linkSection) && /TikTok/.test(linkSection) &&
-      !/\b(instagram|token|oembed|api)\b|\bMeta\b/i.test(linkSection) &&
-      linkSourcesSrc.includes('"Los links de Instagram estarán disponibles pronto."') &&
+      /<form[^>]*\bdata-add-by-link>/.test(linkSection) && /TikTok o Instagram/.test(linkSection) &&
+      !/\b(token|oembed|api)\b|\bMeta\b/i.test(linkSection) &&
       /export const INSTAGRAM_LINKS_ENABLED: boolean = false;/.test(linkSourcesSrc),
-    "13.4: «Tus últimos 12 contenidos» / «¿No ves el que buscas? Pégalo por link ↓», solo TikTok y sin jerga ni Instagram en la sección",
+    "13.4: «Tus últimos 12 contenidos» / «¿No ves el que buscas? Pégalo por link ↓», TikTok e Instagram, sin jerga",
   );
   const previewSrc = await source("components", "design", "template-preview.tsx");
   const reviewSrc = await source("components", "import-review.tsx");
