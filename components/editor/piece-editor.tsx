@@ -5,6 +5,7 @@ import { useRef, useState } from "react";
 import type { NicheDef } from "@/lib/portfolio/niches";
 import { LIMITS, parseVideoLink, type StoredImage } from "@/lib/portfolio/schema";
 import { errorText, fieldLabel, textInput } from "../ui";
+import { VideoFacade } from "../portfolio/video-facade";
 import type { FieldErrors, PieceDraft } from "./form-model";
 import { ImagePicker } from "./image-picker";
 
@@ -178,6 +179,14 @@ export function PieceEditor({ piece, index, total, niches, errors, onChange, onM
         {cover.status === "note" && <p className="text-muted">{cover.message}</p>}
         {cover.status === "error" && <p className="text-accent-ink">{cover.message}</p>}
       </div>
+      {video && !piece.image && (
+        <div className="mt-3">
+          <p className={fieldLabel}>Vista previa</p>
+          <div className="relative mt-2 aspect-[4/5] w-40 overflow-hidden rounded-lg ring-1 ring-line">
+            <VideoFacade video={video} />
+          </div>
+        </div>
+      )}
 
       <label htmlFor={id("niche")} className={`${fieldLabel} mt-4`}>
         Nicho (opcional)

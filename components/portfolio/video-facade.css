@@ -1,0 +1,67 @@
+/* Fachada de video (prototipo exp/embed-facade): ocupa todo el contenedor del medio
+ * (los media de las plantillas son relative para el Image fill). Sin chrome de plataformas. */
+
+.vf {
+  position: absolute;
+  inset: 0;
+  display: block;
+  overflow: hidden;
+  background: #141210;
+}
+
+.vf__thumb {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Arte para IG/TikTok (sin miniatura disponible): degradado tinta con brasa. */
+.vf__art {
+  position: absolute;
+  inset: 0;
+  display: block;
+  background:
+    radial-gradient(120% 90% at 50% 0%, rgba(252, 51, 0, 0.28), transparent 60%),
+    radial-gradient(100% 100% at 80% 100%, rgba(252, 51, 0, 0.12), transparent 55%),
+    linear-gradient(160deg, #221d18 0%, #141210 70%);
+}
+
+.vf__scrim {
+  position: absolute;
+  inset: 0;
+  display: block;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.45), transparent 45%);
+}
+
+.vf__play {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  translate: -50% -50%;
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 999px;
+  background: #fc3300;
+  box-shadow: 0 6px 24px rgba(252, 51, 0, 0.45);
+}
+
+.vf__play svg {
+  width: 22px;
+  height: 22px;
+  fill: #fff;
+  margin-left: 2px;
+}
+
+.vf__platform {
+  position: absolute;
+  left: 10px;
+  bottom: 8px;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.75);
+}

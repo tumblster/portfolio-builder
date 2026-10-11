@@ -1,10 +1,13 @@
 import Image from "next/image";
 import { ArrowIcon, PlayIcon } from "./icons";
 import { NichePills } from "./niche-filter";
+import { VideoFacade } from "./video-facade";
 import {
   Avatar,
   ContactPill,
   copyrightYear,
+  HireLink,
+  KitLink,
   NicheSuffix,
   PieceLink,
   pieceMeta,
@@ -18,13 +21,14 @@ import {
 
 /*
  * Plantilla Minimal: restricción editorial de la referencia Kima, con implementación propia.
- * En escritorio, una columna fija a la izquierda (quién es, disponibilidad, cifras con el
+ * En escritorio, una columna fija a la izquierda (quién es, disponibilidad, CTAs, cifras con el
  * Engagement Rate primero, servicios numerados, contacto) y a la derecha un mosaico del trabajo
  * que se mueve con el scroll. En el celular, lo mismo en una sola columna.
  * Divisores finos, un solo acento, fotos en grises que toman color al pasar el mouse.
+ * Ronda 6 · 13.9: "Trabaja conmigo" (sólido, con flecha) y "Ver media kit" (contorno).
  */
 export function MinimalTemplate({ portfolio, variant, filter }: TemplateProps) {
-  const { name, bio, valueProp, stats, services, pieces, photo } = portfolio;
+  const { name, tagline, bio, valueProp, stats, services, pieces, photo } = portfolio;
   const view = portfolioView(portfolio, variant);
   const { filterable, filterableSlugs, email, channels, hasContact, er, id } = view;
   const { Root, H1, H2, H3 } = view.headings;
@@ -37,18 +41,19 @@ export function MinimalTemplate({ portfolio, variant, filter }: TemplateProps) {
           <aside className="min-side" aria-label={`Sobre ${name}`}>
             <Avatar photo={photo} name={name} size={56} className="min-avatar" />
             <H1 className="min-name">{name}</H1>
+            {tagline && <p className="pf-tagline">{tagline}</p>}
             {intro && <p className="min-intro">{intro}</p>}
             {valueProp && bio && <p className="min-bio">{bio}</p>}
             <p className="min-status">
               <span className="min-status__dot" aria-hidden="true" />
               Disponible para colaborar.
             </p>
-            {hasContact && (
-              <a className="min-cta" href={email ? email.href : `#${id("contacto")}`}>
-                Trabajemos juntos
+            <div className="min-actions">
+              <HireLink view={view} className="min-cta">
                 <ArrowIcon direction="right" size={16} />
-              </a>
-            )}
+              </HireLink>
+              <KitLink view={view} className={view.hire ? "min-cta min-cta--ghost" : "min-cta"} />
+            </div>
 
             {(er || stats.length > 0) && (
               <dl className="min-stats">
@@ -129,10 +134,12 @@ export function MinimalTemplate({ portfolio, variant, filter }: TemplateProps) {
                       <div className="min-item__media" style={{ aspectRatio: ratio }} data-reel-media>
                         {piece.image ? (
                           <Image src={piece.image.url} alt="" fill sizes="(min-width: 1024px) 30vw, 50vw" loading="lazy" />
+                        ) : piece.video ? (
+                          <VideoFacade video={piece.video} />
                         ) : (
                           <span className="min-item__placeholder" aria-hidden="true" />
                         )}
-                        {piece.video && (
+                        {piece.video && piece.image && (
                           <span className="min-item__play" aria-hidden="true">
                             <PlayIcon size={16} />
                           </span>

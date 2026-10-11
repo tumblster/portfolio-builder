@@ -1,9 +1,12 @@
 import Image from "next/image";
 import { ArrowIcon, PlayIcon } from "./icons";
 import { NichePills } from "./niche-filter";
+import { VideoFacade } from "./video-facade";
 import {
   ContactPill,
   copyrightYear,
+  HireLink,
+  KitLink,
   NicheSuffix,
   PieceLink,
   pieceMeta,
@@ -20,9 +23,10 @@ import {
  * oscura del color profundo de la paleta, el nombre en mayúsculas a tamaño display, el Engagement
  * Rate enorme al lado de la propuesta de valor y el trabajo como una lista numerada de revista
  * (número, título grande, cifra, miniatura). Un solo acento, usado solo para detalles.
+ * Ronda 6 · 13.9: bajo el hero, "Trabaja conmigo" (sólido en blanco) y "Ver media kit" (contorno).
  */
 export function EditorialTemplate({ portfolio, variant, filter, coverEdit }: TemplateProps) {
-  const { name, bio, valueProp, stats, services, pieces } = portfolio;
+  const { name, tagline, bio, valueProp, stats, services, pieces } = portfolio;
   const view = portfolioView(portfolio, variant);
   const { filterable, filterableSlugs, email, channels, hasContact, cover, er, id } = view;
   const { Root, H1, H2, H3 } = view.headings;
@@ -53,6 +57,7 @@ export function EditorialTemplate({ portfolio, variant, filter, coverEdit }: Tem
             <H1 id={id("nombre")} className="ed-display">
               {name}
             </H1>
+            {tagline && <p className="pf-tagline">{tagline}</p>}
             <div className="ed-hero__row">
               <div className="ed-hero__copy">
                 {valueProp && <p className="ed-lead">{valueProp}</p>}
@@ -74,6 +79,17 @@ export function EditorialTemplate({ portfolio, variant, filter, coverEdit }: Tem
                 </div>
               )}
             </div>
+            {/* 13.9: principal "Trabaja conmigo" y secundario "Ver media kit". */}
+            <ul className="ed-links ed-actions" aria-label="Acciones">
+              {view.hire && (
+                <li>
+                  <HireLink view={view} className="ed-link ed-link--solid" />
+                </li>
+              )}
+              <li>
+                <KitLink view={view} className={view.hire ? "ed-link" : "ed-link ed-link--solid"} />
+              </li>
+            </ul>
             {stats.length > 0 && (
               <dl className="ed-stats">
                 {stats.map((stat) => (
@@ -117,10 +133,12 @@ export function EditorialTemplate({ portfolio, variant, filter, coverEdit }: Tem
                       <div className="ed-row__media" data-reel-media>
                         {piece.image ? (
                           <Image src={piece.image.url} alt="" fill sizes="(min-width: 768px) 120px, 72px" loading="lazy" />
+                        ) : piece.video ? (
+                          <VideoFacade video={piece.video} />
                         ) : (
                           <span className="ed-row__placeholder" aria-hidden="true" />
                         )}
-                        {piece.video && (
+                        {piece.video && piece.image && (
                           <span className="ed-row__play" aria-hidden="true">
                             <PlayIcon size={14} />
                           </span>

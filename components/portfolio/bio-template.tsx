@@ -1,10 +1,13 @@
 import Image from "next/image";
 import { ArrowIcon, PlatformIcon, PlayIcon } from "./icons";
 import { NichePills } from "./niche-filter";
+import { VideoFacade } from "./video-facade";
 import {
   Avatar,
   ContactPill,
   copyrightYear,
+  HireLink,
+  KitLink,
   NicheSuffix,
   PieceLink,
   pieceMeta,
@@ -21,9 +24,11 @@ import {
  * Una columna centrada (~420 px) sobre un degradado que deriva despacio; avatar grande, nombre,
  * Engagement Rate justo debajo, botones de contacto a todo el ancho, el trabajo como tarjetas
  * (miniatura + título + flecha) y los nichos en una barra flotante abajo, siempre a mano.
+ * Ronda 6 · 13.9: bajo la cabecera, los dos CTAs ("Trabaja conmigo" sólido y "Ver media kit"); los links de
+ * contacto van después, todos iguales (el sólido es el CTA principal).
  */
 export function BioTemplate({ portfolio, variant, filter, coverEdit }: TemplateProps) {
-  const { name, bio, valueProp, stats, services, pieces, photo } = portfolio;
+  const { name, tagline, bio, valueProp, stats, services, pieces, photo } = portfolio;
   const view = portfolioView(portfolio, variant);
   const { filterable, filterableSlugs, links, hasContact, handle, er, id } = view;
   const { Root, H1, H2, H3 } = view.headings;
@@ -45,6 +50,7 @@ export function BioTemplate({ portfolio, variant, filter, coverEdit }: TemplateP
           <header className="bio-head">
             <Avatar photo={photo} name={name} size={112} className="bio-avatar" />
             <H1 className="bio-name">{name}</H1>
+            {tagline && <p className="pf-tagline">{tagline}</p>}
             {handle && <p className="bio-handle">{handle}</p>}
             {er && (
               <p className="bio-er" data-pf-stat="engagementRate">
@@ -56,11 +62,23 @@ export function BioTemplate({ portfolio, variant, filter, coverEdit }: TemplateP
             {bio && <p className="bio-text">{bio}</p>}
           </header>
 
+          {/* 13.9: principal "Trabaja conmigo" y secundario "Ver media kit". */}
+          <ul className="bio-links bio-ctas" aria-label="Acciones">
+            {view.hire && (
+              <li>
+                <HireLink view={view} className="bio-link bio-link--solid" />
+              </li>
+            )}
+            <li>
+              <KitLink view={view} className={view.hire ? "bio-link" : "bio-link bio-link--solid"} />
+            </li>
+          </ul>
+
           {hasContact && (
             <ul id={id("contacto")} className="bio-links" aria-label="Contacto">
-              {links.map((link, index) => (
+              {links.map((link) => (
                 <li key={link.kind}>
-                  <ContactPill link={link} className={index === 0 ? "bio-link bio-link--solid" : "bio-link"} />
+                  <ContactPill link={link} className="bio-link" />
                 </li>
               ))}
             </ul>
@@ -91,10 +109,12 @@ export function BioTemplate({ portfolio, variant, filter, coverEdit }: TemplateP
                       <div className="bio-card__media" data-reel-media>
                         {piece.image ? (
                           <Image src={piece.image.url} alt="" fill sizes="88px" loading="lazy" />
+                        ) : piece.video ? (
+                          <VideoFacade video={piece.video} />
                         ) : (
                           <span className="bio-card__placeholder" aria-hidden="true" />
                         )}
-                        {piece.video && (
+                        {piece.video && piece.image && (
                           <span className="bio-card__play" aria-hidden="true">
                             <PlayIcon size={14} />
                           </span>
