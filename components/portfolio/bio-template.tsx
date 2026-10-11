@@ -1,6 +1,7 @@
 import Image from "next/image";
 import { ArrowIcon, PlatformIcon, PlayIcon } from "./icons";
 import { NichePills } from "./niche-filter";
+import { VideoFacade } from "./video-facade";
 import {
   Avatar,
   ContactPill,
@@ -108,10 +109,12 @@ export function BioTemplate({ portfolio, variant, filter, coverEdit }: TemplateP
                       <div className="bio-card__media" data-reel-media>
                         {piece.image ? (
                           <Image src={piece.image.url} alt="" fill sizes="88px" loading="lazy" />
+                        ) : piece.video ? (
+                          <VideoFacade video={piece.video} />
                         ) : (
                           <span className="bio-card__placeholder" aria-hidden="true" />
                         )}
-                        {piece.video && (
+                        {piece.video && piece.image && (
                           <span className="bio-card__play" aria-hidden="true">
                             <PlayIcon size={14} />
                           </span>

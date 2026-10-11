@@ -1,6 +1,7 @@
 import Image from "next/image";
 import { ArrowIcon, PlayIcon } from "./icons";
 import { NichePills } from "./niche-filter";
+import { VideoFacade } from "./video-facade";
 import {
   ContactPill,
   copyrightYear,
@@ -132,10 +133,12 @@ export function EditorialTemplate({ portfolio, variant, filter, coverEdit }: Tem
                       <div className="ed-row__media" data-reel-media>
                         {piece.image ? (
                           <Image src={piece.image.url} alt="" fill sizes="(min-width: 768px) 120px, 72px" loading="lazy" />
+                        ) : piece.video ? (
+                          <VideoFacade video={piece.video} />
                         ) : (
                           <span className="ed-row__placeholder" aria-hidden="true" />
                         )}
-                        {piece.video && (
+                        {piece.video && piece.image && (
                           <span className="ed-row__play" aria-hidden="true">
                             <PlayIcon size={14} />
                           </span>

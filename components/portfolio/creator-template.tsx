@@ -4,6 +4,7 @@ import type { ResolvedPiece } from "@/lib/portfolio/resolve";
 import { CarouselControls } from "./carousel-controls";
 import { PlatformIcon, PlayIcon } from "./icons";
 import { NichePills } from "./niche-filter";
+import { VideoFacade } from "./video-facade";
 import {
   Avatar,
   ContactPill,
@@ -233,6 +234,8 @@ function PieceCard({ piece, Heading }: { piece: ResolvedPiece; Heading: "h3" | "
       <div className="pf-card__media" data-reel-media>
         {piece.image ? (
           <Image src={piece.image.url} alt="" fill sizes="(min-width: 768px) 272px, 62vw" loading="lazy" />
+        ) : piece.video ? (
+          <VideoFacade video={piece.video} />
         ) : (
           <span className="pf-card__placeholder">{platform ? `Video de ${platform}` : ""}</span>
         )}
@@ -242,7 +245,7 @@ function PieceCard({ piece, Heading }: { piece: ResolvedPiece; Heading: "h3" | "
             {platform}
           </span>
         )}
-        {piece.video && (
+        {piece.video && piece.image && (
           <span className="pf-play" aria-hidden="true">
             <PlayIcon size={22} />
           </span>

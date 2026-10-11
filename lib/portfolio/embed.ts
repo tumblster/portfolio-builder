@@ -74,6 +74,21 @@ export function embedFor(link: { platform: string; url: string }): Embed | null 
   return null;
 }
 
+/** ID de un video de YouTube (watch?v=, youtu.be, /shorts/, /embed/, /live/); null si no es un link válido. */
+export function youtubeId(raw: string): string | null {
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    return null;
+  }
+  const id =
+    url.searchParams.get("v") ??
+    /^\/(?:shorts|embed|live)\/([A-Za-z0-9_-]{6,})/.exec(url.pathname)?.[1] ??
+    (url.hostname.endsWith("youtu.be") ? url.pathname.slice(1).split("/")[0] : null);
+  return id && /^[A-Za-z0-9_-]{6,}$/.test(id) ? id : null;
+}
+
 /** Código de un post de Instagram (/p/, /reel/, /reels/ o /tv/); null si el link no es de un post de instagram.com. */
 export function instagramCode(raw: string): string | null {
   let url: URL;

@@ -1,6 +1,7 @@
 import Image from "next/image";
 import { ArrowIcon, PlayIcon } from "./icons";
 import { NichePills } from "./niche-filter";
+import { VideoFacade } from "./video-facade";
 import {
   Avatar,
   ContactPill,
@@ -133,10 +134,12 @@ export function MinimalTemplate({ portfolio, variant, filter }: TemplateProps) {
                       <div className="min-item__media" style={{ aspectRatio: ratio }} data-reel-media>
                         {piece.image ? (
                           <Image src={piece.image.url} alt="" fill sizes="(min-width: 1024px) 30vw, 50vw" loading="lazy" />
+                        ) : piece.video ? (
+                          <VideoFacade video={piece.video} />
                         ) : (
                           <span className="min-item__placeholder" aria-hidden="true" />
                         )}
-                        {piece.video && (
+                        {piece.video && piece.image && (
                           <span className="min-item__play" aria-hidden="true">
                             <PlayIcon size={16} />
                           </span>
