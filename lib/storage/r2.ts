@@ -94,7 +94,12 @@ export async function r2PutMedia(file: string, bytes: Uint8Array, contentType: s
   });
   const response = await fetch(url, { method: "PUT", headers, body: bytes as BodyInit });
   if (!response.ok) {
-    throw new Error(`R2: no se pudo guardar la imagen (${response.status}). Revisa las credenciales del bucket.`);
+    // R2 devuelve el motivo en XML (<Code>/<Message>); se incluye para diagnosticar
+    // (p. ej. credenciales mal copiadas vs. firma mal formada). Lo registra el console.warn de quien llama.
+    const detail = await response.text().catch(() => "");
+    throw new Error(
+      `R2: no se pudo guardar la imagen (${response.status}). Detalle: ${detail.slice(0, 500)}`,
+    );
   }
 }
 
@@ -104,7 +109,8 @@ export async function r2GetMedia(file: string): Promise<StoredMedia | null> {
   const response = await fetch(url, { method: "GET", headers });
   if (response.status === 404) return null;
   if (!response.ok || !response.body) {
-    throw new Error(`R2: no se pudo leer la imagen (${response.status}).`);
+    const detail = await response.text().catch(() => "");
+    throw new Error(`R2: no se pudo leer la imagen (${response.status}). Detalle: ${detail.slice(0, 500)}`);
   }
   const contentLength = Number(response.headers.get("content-length"));
   return {
