@@ -6,10 +6,9 @@ import { ChipList } from "@/components/chips/chip-list";
 import { Combobox, type ComboOption } from "@/components/chips/combobox";
 import type { DraftPiece } from "@/lib/import/events";
 import {
-  INSTAGRAM_LINKS_SOON,
   LINK_INVALID,
-  LINK_ONLY_TIKTOK,
-  instagramLinkBlocked,
+  LINK_ONLY_VIDEO,
+  isInstagramHost,
   isTikTokHost,
   linkHost,
   normalizeLink,
@@ -17,6 +16,7 @@ import {
 import { MAX_NICHES, nicheFromLabel } from "@/lib/portfolio/niches";
 import { NICHE_TAXONOMY, foldText } from "@/lib/portfolio/niche-taxonomy";
 import { InlineReel } from "@/components/reel/inline-reel";
+import { VideoFacade } from "@/components/portfolio/video-facade";
 import { showToast } from "@/components/ui/toast";
 import { ImageLightbox } from "@/components/viewer/image-lightbox";
 import { viewerFor } from "@/lib/import/piece-viewer";
@@ -33,7 +33,7 @@ import { embedFor } from "@/lib/portfolio/embed";
  *
  * Ronda 6 · 13.4: la sección de la grilla lleva los textos exactos del dueño ("Tus últimos 12 contenidos" y "¿No ves
  * el que buscas? Pégalo por link ↓"), explica en simple dónde aparece lo agregado y nunca muestra jerga técnica.
- * Agregar por link acepta solo videos de TikTok; los links de Instagram siguen ocultos (lib/import/link-sources.ts).
+ * Agregar por link (11/10): TikTok (oEmbed con miniatura) e Instagram (fachada diseñada, sin miniatura).
  *
  * Ronda 6 · 13.2 / 13.3: en la grilla, los reels y los carruseles se abren en el overlay (components/reel/
  * inline-reel.tsx); los carruseles prueban su cadena de embeds y, si no cargan, muestran la portada + un botón al
@@ -282,24 +282,19 @@ export function PiecePicker(props: {
   const chosen = new Set(pieces.map((piece) => piece.id));
   const full = pieces.length >= limits.max;
   const titleOf = (id: string) => byId.get(id)?.title ?? "Pieza";
-  // 13.4: si pega un link de Instagram (aún oculto), se le dice al instante y no se llama a nada.
-  const instagramPasted = instagramLinkBlocked(link);
 
   async function addByLink(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const raw = link.trim();
     if (!raw || linkState.busy) return;
-    if (instagramLinkBlocked(raw)) {
-      setLinkState({ busy: false, message: INSTAGRAM_LINKS_SOON });
-      return;
-    }
     const host = linkHost(raw);
     if (!host) {
       setLinkState({ busy: false, message: LINK_INVALID });
       return;
     }
-    if (!isTikTokHost(host)) {
-      setLinkState({ busy: false, message: LINK_ONLY_TIKTOK });
+    // 13.4 (11/10): TikTok por oEmbed; Instagram directo como solo-video (fachada diseñada, sin miniatura).
+    if (!isTikTokHost(host) && !isInstagramHost(host)) {
+      setLinkState({ busy: false, message: LINK_ONLY_VIDEO });
       return;
     }
     setLinkState({ busy: true, message: null });
@@ -476,13 +471,13 @@ export function PiecePicker(props: {
               setLink(event.target.value);
               setLinkState((state) => (state.message ? { ...state, message: null } : state));
             }}
-            placeholder="Pega aquí el link de tu video de TikTok"
+            placeholder="Pega aquí el link de tu video (TikTok o Instagram)"
             aria-describedby={`${uid}-link-help`}
             className="combo__input min-w-0 flex-1 basis-64"
           />
           <button
             type="submit"
-            disabled={linkState.busy || !link.trim() || instagramPasted}
+            disabled={linkState.busy || !link.trim()}
             className="inline-flex min-h-13 items-center rounded-2xl border border-ink bg-ink px-4 text-sm font-semibold text-cream disabled:opacity-50"
           >
             {linkState.busy ? "Buscando…" : "Agregar"}
@@ -492,7 +487,7 @@ export function PiecePicker(props: {
           Lo que agregues por link se suma al final de tus piezas, arriba, y aparece primero en esta lista.
         </p>
         <p aria-live="polite" className="mt-1 min-h-5 text-sm font-semibold text-ink" data-add-by-link-status>
-          {instagramPasted ? INSTAGRAM_LINKS_SOON : linkState.message}
+          {linkState.message}
         </p>
       </div>
       <ul aria-labelledby={`${uid}-profile`} className="mt-3 grid grid-cols-2 gap-3 min-[26rem]:grid-cols-3 sm:grid-cols-4" data-profile-grid>
@@ -521,8 +516,10 @@ export function PiecePicker(props: {
               ) : viewer === "reel" && piece.video ? (
                 <InlineReel link={piece.video} title={piece.title} className="block aspect-square overflow-hidden rounded-xl bg-sand">
                   <span className="absolute inset-0" data-reel-media>
-                    {piece.image && (
+                    {piece.image ? (
                       <Image src={piece.image.url} alt="" fill loading="lazy" sizes="(min-width: 640px) 160px, 45vw" className="object-cover" />
+                    ) : (
+                      <VideoFacade video={piece.video} />
                     )}
                   </span>
                   <TileBadge kind="video" />

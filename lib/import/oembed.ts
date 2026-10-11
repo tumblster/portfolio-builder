@@ -5,7 +5,7 @@ import {
   INSTAGRAM_LINKS_ENABLED,
   INSTAGRAM_LINKS_SOON,
   LINK_INVALID,
-  LINK_ONLY_TIKTOK,
+  LINK_ONLY_VIDEO,
   isInstagramHost,
   isTikTokHost,
   normalizeLink,
@@ -14,13 +14,12 @@ import { copyRemoteImage } from "@/lib/remote-image";
 import { LIMITS, type Piece } from "@/lib/portfolio/schema";
 
 /*
- * "Agregar por link" (spec 11.5): el creador pega la URL de un post PÚBLICO y se importa vía oEmbed (gratis, sin
- * Apify): portada, título y autor. oEmbed solo resuelve URLs sueltas (el import del perfil sigue con Apify).
- * - TikTok: https://www.tiktok.com/oembed?url=… (sin autenticación). Es lo único activo hoy (ronda 6 · 13.4).
- * - Instagram: OCULTO hasta que el dueño complete la verificación de empresa en Meta (decisión del 06/10/2026). Un
- *   link de Instagram responde "Los links de Instagram estarán disponibles pronto." sin llamar a Meta. El código
- *   queda listo abajo: usa el oEmbed de Meta con un app token gratuito en META_OEMBED_TOKEN ("APP_ID|CLIENT_TOKEN").
- *   Cómo activarlo: lib/import/link-sources.ts.
+ * "Agregar por link" (spec 11.5): el creador pega la URL de un post PÚBLICO.
+ * - TikTok: se importa vía oEmbed (gratis, sin Apify): portada, título y autor.
+ * - Instagram (11/10): sin oEmbed de Meta (exige verificación de empresa, el dueño no la hará por ahora):
+ *   la pieza se crea como solo-video y se muestra con la fachada diseñada (VideoFacade, sin miniatura).
+ *   El código del oEmbed queda listo abajo por si algún día se activa (lib/import/link-sources.ts).
+ * oEmbed solo resuelve URLs sueltas (el import del perfil sigue con Apify).
  * Los mensajes de error son para la creadora: nada de jerga técnica (los detalles van a los logs, nunca el token).
  * La portada se copia a nuestro almacenamiento (los links de los CDN caducan). TIKTOK_OEMBED_URL e
  * INSTAGRAM_OEMBED_URL solo existen para pruebas locales.
@@ -69,12 +68,22 @@ export async function resolvePostLink(raw: string): Promise<LinkPiece> {
     throw new InvalidInputError(LINK_INVALID);
   }
   if (url.protocol !== "https:" && url.protocol !== "http:") throw new InvalidInputError(LINK_INVALID);
-  // 13.4: Instagram por link sigue oculto: mensaje amable, sin llamar a Meta.
+  // 13.4 (11/10): Instagram por link ya no se oculta. Sin oEmbed de Meta (exige verificación de empresa),
+  // la pieza se crea como solo-video: sin miniatura, se muestra con la fachada diseñada (VideoFacade).
   if (isInstagramHost(url.hostname.replace(/^www\./i, "").toLowerCase()) && !INSTAGRAM_LINKS_ENABLED) {
-    throw new InvalidInputError(INSTAGRAM_LINKS_SOON);
+    return {
+      id: `link-${createHash("sha256").update(url.toString()).digest("hex").slice(0, 24)}`,
+      origin: "manual",
+      title: "Post de Instagram",
+      niche: null,
+      image: null,
+      video: { platform: "instagram", url: url.toString() },
+      sourcePostId: undefined,
+      author: null,
+    } as LinkPiece;
   }
   const platform = platformOf(url);
-  if (!platform) throw new InvalidInputError(LINK_ONLY_TIKTOK);
+  if (!platform) throw new InvalidInputError(LINK_ONLY_VIDEO);
   let data: Awaited<ReturnType<typeof fetchJson>>;
   if (platform === "tiktok") {
     data = await fetchJson(`${process.env.TIKTOK_OEMBED_URL?.trim() || "https://www.tiktok.com/oembed"}?url=${encodeURIComponent(url.toString())}`);
