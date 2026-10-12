@@ -17,6 +17,8 @@ export type DraftPiece = {
   postUrl: string | null;
   /** Su video, para verlo en línea (ajuste 5); null si es una foto. */
   video: { platform: "tiktok" | "instagram" | "youtube"; url: string } | null;
+  /** Obs. 4 (11/10): la creadora confirmó que tiene permiso para mostrar este contenido externo. */
+  permissionConfirmed?: boolean;
 };
 
 /** Ronda 6 · 13.6: una forma de colaborar que sugirió la IA (la creadora la revisa antes de publicarla). */

@@ -71,7 +71,11 @@ const storedDraftSchema = z.object({
   /** Se marca al confirmar: primero se reclama (slug null) y al terminar queda el slug. */
   claim: z.object({ at: z.iso.datetime(), slug: z.string().nullable() }).nullable(),
   /** Spec 11.5: piezas agregadas por link (oEmbed), con su autor. Elegibles como las del perfil. */
-  linkPieces: z.array(pieceSchema.extend({ author: z.string().max(120).nullable().default(null) })).max(LIMITS.instagramPosts).default([]),
+  linkPieces: z.array(pieceSchema.extend({
+    author: z.string().max(120).nullable().default(null),
+    /** Obs. 4 (11/10): la creadora confirmó permiso para mostrar este contenido externo. */
+    permissionConfirmed: z.boolean().default(false),
+  })).max(LIMITS.instagramPosts).default([]),
   /** Cuándo el creador pidió reintentar tras un fallo: los fallos anteriores a esto ya no cuentan. */
   retriedAt: z.iso.datetime().nullable().default(null),
 });
@@ -131,7 +135,11 @@ function piecePool(draft: StoredDraft): Map<string, Piece> {
  * Spec 11.5: agrega al borrador una pieza resuelta por link (oEmbed). Si ya estaba, la devuelve igual. Devuelve lo
  * que necesita la grilla de "De tu perfil".
  */
-export async function addLinkPiece(draftId: string, piece: Piece & { author: string | null }): Promise<DraftPiece> {
+export async function addLinkPiece(
+  draftId: string,
+  piece: Piece & { author: string | null },
+  permissionConfirmed: boolean,
+): Promise<DraftPiece> {
   const storage = getStorage();
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const stored = await storage.readJson(draftPath(draftId));
@@ -144,8 +152,8 @@ export async function addLinkPiece(draftId: string, piece: Piece & { author: str
     if (!existing && draft.linkPieces.length >= LIMITS.instagramPosts) {
       throw new InvalidInputError(`Puedes agregar hasta ${LIMITS.instagramPosts} piezas por link.`);
     }
-    const saved = existing ?? piece;
-    if (existing || (await storage.replaceJson(draftPath(draftId), { ...draft, linkPieces: [...draft.linkPieces, piece] }, stored.etag))) {
+    const saved = existing ?? { ...piece, permissionConfirmed };
+    if (existing || (await storage.replaceJson(draftPath(draftId), { ...draft, linkPieces: [...draft.linkPieces, saved] }, stored.etag))) {
       return {
         id: saved.id,
         title: saved.title,
@@ -156,6 +164,7 @@ export async function addLinkPiece(draftId: string, piece: Piece & { author: str
         postUrl: saved.video?.url ?? null,
         video: saved.video,
         author: saved.author,
+        permissionConfirmed: saved.permissionConfirmed ?? false,
       };
     }
   }

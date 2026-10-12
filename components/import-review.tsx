@@ -23,6 +23,7 @@ import { partnersPayload, type BrandPartnerDraft } from "@/lib/portfolio/media-k
 import { detectBrandMentions, mergeMentions } from "@/lib/portfolio/mentions";
 import { nicheFromLabel } from "@/lib/portfolio/niches";
 import { SUPPORT_FORM_URL } from "@/lib/site";
+import { showToast } from "@/components/ui/toast";
 import { Avatar } from "./avatar";
 import { errorText, pillButton, primaryButton, textLink } from "./brand-ui";
 
@@ -237,6 +238,20 @@ export function ImportReview({ draft, owner, onGenerated, onStartOver, onUnautho
     return true;
   }
 
+  /** Obs. 2 (11/10): los servicios son obligatorios para generar (spec 11.12): sin tarjetas confirmadas,
+   *  aviso con el pop-up con timer y vuelta al paso de servicios (en vez del rebote silencioso del servidor). */
+  function requireServices(): boolean {
+    const confirmed = services.filter((card) => !card.suggested && card.title.trim());
+    if (confirmed.length > 0) {
+      setServiceError(null);
+      return true;
+    }
+    setServiceError(null);
+    showToast("Agrega al menos un servicio: sin servicios no se puede generar el portafolio.", 5000);
+    goTo(1);
+    return false;
+  }
+
   /** E2 del dueño: los servicios son opcionales. Las sugerencias sin tocar se descartan en silencio al generar
    *  (sin avisos); solo viajan las tarjetas confirmadas con título. */
   function validateServices(): boolean {
@@ -249,6 +264,7 @@ export function ImportReview({ draft, owner, onGenerated, onStartOver, onUnautho
       goTo(0);
       return;
     }
+    if (!requireServices()) return;
     validateServices();
     const retry = retryNext.current;
     setGenerating(true);
@@ -427,6 +443,8 @@ export function ImportReview({ draft, owner, onGenerated, onStartOver, onUnautho
                 onChange={setPieces}
                 pool={pool}
                 niches={niches}
+                onNichesChange={setNiches}
+                newKey={newKey}
                 limits={draft.pieceLimits}
                 error={pieceError}
                 onError={setPieceError}
