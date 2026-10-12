@@ -261,7 +261,7 @@ try {
   check(html.includes('<meta name="theme-color" content="#faf7f2"'), "La barra del navegador toma el crema de la página (theme-color)");
   check(html.includes('data-template="creator"') && html.includes('data-pf-filter="todo"'), 'Se dibuja con la plantilla Creator, en "Todo"');
   check(text.includes(`Hola, soy ${name}.`), "El titular presenta a la creadora");
-  check(text.includes("UGC Creator") && !/Creadora UGC|Creador UGC/.test(text), "Eyebrow neutral: «UGC Creator» (sin adivinar género)");
+  check(text.includes("Marca personal para profesionales") && !/Creadora UGC|Creador UGC/.test(text), "Eyebrow con la identidad profesional (tagline; sin adivinar género)");
   check(text.includes("Contenido destacado") && !text.includes("Trabajo seleccionado"), "La sección se llama «Contenido destacado»");
   check(
     html.includes(`alt="Portada de ${name}"`) && html.includes(encodeURIComponent(image.url).slice(0, 20)) ,
@@ -1366,15 +1366,17 @@ try {
     );
     // 13.4 (11/10): agregar por link acepta TikTok (oEmbed) e Instagram (Apify: portada real; si Apify
     // 13.4 (11/10): TikTok por oEmbed; Instagram por Apify (URL falsa → 400 "no pudimos abrir").
-    const badLink = await call("POST", "/api/import/link", { json: { draftId: chipsId, url: "https://example.com/algo" } });
-    const igLink = await call("POST", "/api/import/link", { json: { draftId: chipsId, url: "https://www.instagram.com/p/C1abc/" } });
+    const badLink = await call("POST", "/api/import/link", { json: { draftId: chipsId, url: "https://example.com/algo", permissionConfirmed: true } });
+    const igLink = await call("POST", "/api/import/link", { json: { draftId: chipsId, url: "https://www.instagram.com/p/C1abc/", permissionConfirmed: true } });
+    const noPermission = await call("POST", "/api/import/link", { json: { draftId: chipsId, url: "https://www.tiktok.com/@x/video/1", permissionConfirmed: false } });
     const jargon = /\b(token|oembed|api)\b|\bMeta\b/i;
     check(
       badLink.status === 400 && badLink.data?.error?.message === "Por ahora puedes agregar por link videos de TikTok o Instagram." &&
         igLink.status === 400 && igLink.data?.error?.message === "No pudimos abrir ese video. Revisa que el link esté completo y que el video sea público." &&
-        ![badLink, igLink].some((r) => jargon.test(r.data?.error?.message ?? "")),
-      "13.4: «Agregar por link» acepta TikTok e Instagram (IG vía Apify, sin jerga)",
-      { badLink: badLink.data, igLink: igLink.data },
+        noPermission.status === 400 && noPermission.data?.error?.message === "Confirma que tienes permiso para mostrar este video en tu portafolio." &&
+        ![badLink, igLink, noPermission].some((r) => jargon.test(r.data?.error?.message ?? "")),
+      "13.4: «Agregar por link» acepta TikTok e Instagram (IG vía Apify, sin jerga); sin permiso no agrega",
+      { badLink: badLink.data, igLink: igLink.data, noPermission: noPermission.data },
     );
     const chips = await confirm({
       draftId: chipsId,
