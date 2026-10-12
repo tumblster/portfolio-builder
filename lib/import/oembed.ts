@@ -11,6 +11,7 @@ import {
   normalizeLink,
 } from "@/lib/import/link-sources";
 import { copyRemoteImage } from "@/lib/remote-image";
+import { scrapeInstagramPost } from "@/lib/instagram/apify";
 import { LIMITS, type Piece } from "@/lib/portfolio/schema";
 
 /*
@@ -68,19 +69,11 @@ export async function resolvePostLink(raw: string): Promise<LinkPiece> {
     throw new InvalidInputError(LINK_INVALID);
   }
   if (url.protocol !== "https:" && url.protocol !== "http:") throw new InvalidInputError(LINK_INVALID);
-  // 13.4 (11/10): Instagram por link ya no se oculta. Sin oEmbed de Meta (exige verificación de empresa),
-  // la pieza se crea como solo-video: sin miniatura, se muestra con la fachada diseñada (VideoFacade).
+  // 13.4 (11/10): Instagram por link trae su portada real vía Apify (un post ≈ US$0,003, típico 20-60 s).
+  // Sin oEmbed de Meta (exige verificación de empresa). Si Apify falla, la pieza se crea igual como
+  // solo-video y se muestra con la fachada diseñada (nada manual).
   if (isInstagramHost(url.hostname.replace(/^www\./i, "").toLowerCase()) && !INSTAGRAM_LINKS_ENABLED) {
-    return {
-      id: `link-${createHash("sha256").update(url.toString()).digest("hex").slice(0, 24)}`,
-      origin: "manual",
-      title: "Post de Instagram",
-      niche: null,
-      image: null,
-      video: { platform: "instagram", url: url.toString() },
-      sourcePostId: undefined,
-      author: null,
-    } as LinkPiece;
+    return resolveInstagramPost(url);
   }
   const platform = platformOf(url);
   if (!platform) throw new InvalidInputError(LINK_ONLY_VIDEO);
@@ -113,5 +106,34 @@ export async function resolvePostLink(raw: string): Promise<LinkPiece> {
     video: { platform, url: url.toString() },
     sourcePostId: undefined,
     author: data.author_name?.trim() || null,
+  } as LinkPiece;
+}
+
+/** Post de Instagram por link: portada, título y autor vía Apify (sin oEmbed de Meta). */
+async function resolveInstagramPost(url: URL): Promise<LinkPiece> {
+  const base = {
+    id: `link-${createHash("sha256").update(url.toString()).digest("hex").slice(0, 24)}`,
+    origin: "manual",
+    niche: null,
+    video: { platform: "instagram", url: url.toString() },
+    sourcePostId: undefined,
+  } as const;
+  const scraped = await scrapeInstagramPost(url.toString());
+  if (scraped.status === "not_found") throw new InvalidInputError(UNREADABLE);
+  if (scraped.status !== "ok") {
+    // Apify no respondió: la pieza se crea igual como solo-video (fachada diseñada, nada manual).
+    console.warn("[agregar por link] Apify no trajo el post; se crea la pieza sin portada.");
+    return { ...base, title: "Post de Instagram", image: null, author: null } as LinkPiece;
+  }
+  const image = await copyRemoteImage(scraped.post.thumbnailUrl, INSTAGRAM_HOSTS);
+  const clean = (scraped.post.caption ?? "").replace(/\s+/g, " ").replace(/#\S+/g, "").trim();
+  const title =
+    (clean.length > LIMITS.pieceTitle ? `${clean.slice(0, LIMITS.pieceTitle - 1).trimEnd()}…` : clean) ||
+    "Post de Instagram";
+  return {
+    ...base,
+    title,
+    image,
+    author: scraped.post.author?.trim() || null,
   } as LinkPiece;
 }

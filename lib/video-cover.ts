@@ -1,17 +1,19 @@
 import "server-only";
 import type { StoredImage, VideoLink } from "@/lib/portfolio/schema";
 import { allowedUrl, copyRemoteImage } from "@/lib/remote-image";
+import { scrapeInstagramPost } from "@/lib/instagram/apify";
 
 /*
  * Portada automática para piezas de video agregadas a mano (RF-02):
  *  - YouTube: la miniatura pública del video (i.ytimg.com).
  *  - TikTok: su oEmbed oficial devuelve la miniatura (720×1280).
- *  - Instagram no entrega portadas sin una app de Meta: se sube a mano (opcional).
+ *  - Instagram (11/10): vía Apify, un post ≈ US$0,003 (típico 20-60 s). Sin oEmbed de Meta.
  */
 
 const YOUTUBE_IMAGE_HOSTS = [/^i\.ytimg\.com$/i];
 const TIKTOK_OEMBED = "https://www.tiktok.com/oembed";
 const TIKTOK_IMAGE_HOSTS = [/(^|\.)tiktokcdn(-[a-z]+)?\.com$/i, /(^|\.)muscdn\.com$/i, /(^|\.)i?byteimg\.com$/i];
+const INSTAGRAM_IMAGE_HOSTS = [/(^|\.)cdninstagram\.com$/i, /(^|\.)fbcdn\.net$/i];
 
 /** "https://youtu.be/abc123" / "…/watch?v=abc123" / "…/shorts/abc123" → "abc123" */
 export function youTubeVideoId(raw: string): string | null {
@@ -62,6 +64,11 @@ export async function fetchVideoCover(video: VideoLink): Promise<StoredImage | n
   }
   if (video.platform === "tiktok") {
     return copyRemoteImage(await tiktokThumbnailUrl(video.url), TIKTOK_IMAGE_HOSTS);
+  }
+  if (video.platform === "instagram") {
+    const scraped = await scrapeInstagramPost(video.url);
+    if (scraped.status !== "ok") return null;
+    return copyRemoteImage(scraped.post.thumbnailUrl, INSTAGRAM_IMAGE_HOSTS);
   }
   return null;
 }

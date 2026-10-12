@@ -6,9 +6,11 @@ import { addLinkPiece } from "@/lib/import/draft";
 import { resolvePostLink } from "@/lib/import/oembed";
 
 /*
- * Spec 11.5: "Agregar por link". POST { draftId, url } → la pieza (portada, título y autor vía oEmbed), ya elegible
- * en el borrador. Requiere la clave del creador (como toda la importación).
+ * Spec 11.5: "Agregar por link". POST { draftId, url } → la pieza (portada, título y autor vía oEmbed),
+ * ya elegible en el borrador. Requiere la clave del creador (como toda la importación).
+ * Instagram trae su portada vía Apify (típico 20-60 s).
  */
+export const maxDuration = 120;
 const inputSchema = z.object({ draftId: z.uuid(), url: z.string().trim().min(8).max(500) });
 
 export async function POST(request: NextRequest) {

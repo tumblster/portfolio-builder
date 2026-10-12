@@ -43,6 +43,7 @@ const apifyPostSchema = z.object({
   caption: z.string().nullish(),
   hashtags: z.array(z.string()).nullish(),
   displayUrl: z.string().nullish(),
+  ownerUsername: z.string().nullish(),
   likesCount: count, // -1 si la creadora oculta los likes
   commentsCount: count,
   videoViewCount: count,
@@ -160,6 +161,104 @@ async function toApifyError(response: Response): Promise<Error> {
 
 const timeoutError = () =>
   new ImportError("timeout", "Instagram tardó demasiado en responder. Intenta de nuevo en un minuto o llénalo a mano.");
+
+export type ScrapePostResult =
+  | { status: "ok"; post: { thumbnailUrl: string; caption: string | null; author: string | null } }
+  | { status: "not_found" }
+  | { status: "unavailable" };
+
+/** Post con acceso restringido: el actor devuelve forma de "detalles de página" (image/description/user). */
+const apifyPageDetailsSchema = z.object({
+  image: z.string().nullish(),
+  description: z.string().nullish(),
+  user: z.object({ username: z.string().nullish() }).nullish(),
+});
+
+/** "348K likes, 21K comments - ana on April 29, 2025: \"mi caption\"" → "mi caption". */
+function captionFromDescription(description: string | null | undefined): string | null {
+  if (!description) return null;
+  const match = /:\s*"([\s\S]*?)"?\s*$/.exec(description);
+  const caption = (match?.[1] ?? description).trim();
+  return caption || null;
+}
+
+/*
+ * Scrapeo de UN post suelto (decisión del dueño 11/10/2026): trae la portada real de un Reel/post de
+ * Instagram pegado por link, sin oEmbed de Meta. Cobra por resultado: 1 post ≈ US$0,003.
+ * El endpoint síncrono espera a que termine (típico 20-60 s); nunca se reintenta solo.
+ */
+const POST_RUN_TIMEOUT_SECONDS = 60;
+/** Tope de gasto por corrida de un post suelto. */
+const POST_MAX_CHARGE_USD = 0.2;
+
+export async function scrapeInstagramPost(postUrl: string): Promise<ScrapePostResult> {
+  const url = new URL(ENDPOINT);
+  url.searchParams.set("timeout", String(POST_RUN_TIMEOUT_SECONDS));
+  url.searchParams.set("maxTotalChargeUsd", String(POST_MAX_CHARGE_USD));
+  url.searchParams.set("format", "json");
+  url.searchParams.set("clean", "true");
+
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${readToken()}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ directUrls: [postUrl], resultsType: "details" }),
+      signal: AbortSignal.timeout((POST_RUN_TIMEOUT_SECONDS + 30) * 1000),
+      cache: "no-store",
+    });
+  } catch (error) {
+    if (isTimeoutError(error)) return { status: "unavailable" };
+    console.error("[apify] no se pudo conectar (post):", error);
+    return { status: "unavailable" };
+  }
+
+  if (!response.ok) {
+    console.error(`[apify] post suelto HTTP ${response.status}`);
+    return { status: "unavailable" };
+  }
+
+  const items: unknown = await response.json().catch(() => null);
+  if (!Array.isArray(items)) return { status: "unavailable" };
+  // Dos pasadas: primero items limpios, luego items con error pero con datos (ej. "restricted_page"
+  // igual trae image/description/user). Los items de puro error ({ error, errorDescription }) se evalúan al final.
+  for (const allowError of [false, true]) {
+    for (const item of items) {
+      if (!isRecord(item)) continue;
+      if (!allowError && typeof item.error === "string") continue;
+      // Post normal: displayUrl + caption + ownerUsername.
+      const parsed = apifyPostSchema.safeParse(item);
+      if (parsed.success && parsed.data.displayUrl) {
+        return {
+          status: "ok",
+          post: {
+            thumbnailUrl: parsed.data.displayUrl,
+            caption: parsed.data.caption ?? null,
+            author: parsed.data.ownerUsername ?? null,
+          },
+        };
+      }
+      // Post con acceso restringido: image + description + user.username (datos parciales, pero con portada).
+      const page = apifyPageDetailsSchema.safeParse(item);
+      if (page.success && page.data.image) {
+        return {
+          status: "ok",
+          post: {
+            thumbnailUrl: page.data.image,
+            caption: captionFromDescription(page.data.description),
+            author: page.data.user?.username ?? null,
+          },
+        };
+      }
+    }
+  }
+  const failure = items.find((item) => isRecord(item) && typeof item.error === "string");
+  if (isRecord(failure)) {
+    const text = `${failure.error} ${failure.errorDescription ?? ""}`.toLowerCase();
+    if (/not.?found|does not exist|no existe/.test(text)) return { status: "not_found" };
+  }
+  return { status: "unavailable" };
+}
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);

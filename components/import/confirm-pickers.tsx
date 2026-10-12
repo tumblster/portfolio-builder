@@ -480,7 +480,7 @@ export function PiecePicker(props: {
             disabled={linkState.busy || !link.trim()}
             className="inline-flex min-h-13 items-center rounded-2xl border border-ink bg-ink px-4 text-sm font-semibold text-cream disabled:opacity-50"
           >
-            {linkState.busy ? "Buscando…" : "Agregar"}
+            {linkState.busy ? (isInstagramHost(linkHost(link)) ? "Trayendo tu video…" : "Buscando…") : "Agregar"}
           </button>
         </form>
         <p id={`${uid}-link-help`} className="mt-2 text-sm text-muted" data-add-by-link-help>

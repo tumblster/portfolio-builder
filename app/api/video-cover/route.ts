@@ -9,7 +9,10 @@ const bodySchema = z.object({ url: z.string({ error: "Falta el link del video." 
 
 const PLATFORM = { tiktok: "TikTok", youtube: "YouTube", instagram: "Instagram" } as const;
 
-/** Busca la portada de un video de YouTube o TikTok y la guarda. Cuerpo: { url }. */
+/** Instagram vía Apify tarda típico 20-60 s. */
+export const maxDuration = 120;
+
+/** Busca la portada de un video de YouTube, TikTok o Instagram y la guarda. Cuerpo: { url }. */
 export async function POST(request: NextRequest) {
   const denied = requireCreator(request);
   if (denied) return denied;
@@ -18,9 +21,6 @@ export async function POST(request: NextRequest) {
     const { url } = bodySchema.parse(await readJsonBody(request));
     const video = parseVideoLink(url);
     if (!video) throw new InvalidInputError("Pega un link de video de TikTok, Instagram o YouTube.");
-    if (video.platform === "instagram") {
-      throw new InvalidInputError("Instagram no comparte la portada de sus videos: si quieres, súbela a mano.", 422);
-    }
     const image = await fetchVideoCover(video);
     if (!image) {
       throw new HttpError(

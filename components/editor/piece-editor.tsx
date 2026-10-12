@@ -22,7 +22,10 @@ type PieceEditorProps = {
   onPending: (delta: 1 | -1) => void;
 };
 
-type CoverState = { status: "idle" } | { status: "loading" } | { status: "note" | "error"; message: string };
+type CoverState =
+  | { status: "idle" }
+  | { status: "loading"; slow?: boolean }
+  | { status: "note" | "error"; message: string };
 
 const COVER_DELAY_MS = 700;
 
@@ -40,13 +43,10 @@ export function PieceEditor({ piece, index, total, niches, errors, onChange, onM
       setCover({ status: "idle" });
       return;
     }
-    if (video.platform === "instagram") {
-      setCover({ status: "note", message: "Instagram no comparte la portada de sus videos: si quieres, súbela." });
-      return;
-    }
+    // Instagram trae su portada vía Apify (típico 20-60 s); YouTube y TikTok son instantáneos.
     if (keepCurrentImage || lastRequested.current === video.url) return;
     lastRequested.current = video.url;
-    setCover({ status: "loading" });
+    setCover({ status: "loading", slow: video.platform === "instagram" });
     onPending(1);
     try {
       const response = await fetch("/api/video-cover", {
@@ -175,7 +175,9 @@ export function PieceEditor({ piece, index, total, niches, errors, onChange, onM
       />
       <div id={id("video-note")} aria-live="polite" className="mt-2 text-sm">
         {error("videoUrl") && <p className={errorText}>{error("videoUrl")}</p>}
-        {cover.status === "loading" && <p className="text-muted">Buscando la portada…</p>}
+        {cover.status === "loading" && (
+          <p className="text-muted">{cover.slow ? "Trayendo la portada de Instagram… puede tomar un minuto." : "Buscando la portada…"}</p>
+        )}
         {cover.status === "note" && <p className="text-muted">{cover.message}</p>}
         {cover.status === "error" && <p className="text-accent-ink">{cover.message}</p>}
       </div>

@@ -3,10 +3,11 @@
  * dependencias de servidor: lo usan el studio (components/import/confirm-pickers.tsx) y el servidor
  * (lib/import/oembed.ts), así el mensaje es el mismo en los dos lados.
  *
- * Decisión del dueño (11/10/2026, reemplaza la del 06/10): los links de Instagram SÍ se aceptan, sin oEmbed
- * de Meta (exige verificación de empresa y el dueño no cambiará su RUC por esto). La pieza se crea como
- * solo-video y se muestra con la fachada diseñada (VideoFacade). TikTok sigue por oEmbed (público, con miniatura).
- * El interruptor INSTAGRAM_LINKS_ENABLED queda para el día en que se active el oEmbed de Meta con miniatura.
+ * Decisión del dueño (11/10/2026, reemplaza la del 06/10): los links de Instagram SÍ se aceptan. Sin oEmbed
+ * de Meta (exige verificación de empresa y el dueño no cambiará su RUC por esto): la portada, el título y el
+ * autor se traen vía Apify (un post ≈ US$0,003, típico 20-60 s; sin membresía por ahora). TikTok sigue por oEmbed
+ * (público, con miniatura). El interruptor INSTAGRAM_LINKS_ENABLED queda para el día en que se active el oEmbed
+ * de Meta con miniatura.
  */
 
 export const INSTAGRAM_LINKS_ENABLED: boolean = false;
