@@ -174,6 +174,34 @@ export function NicheSuffix({ niches }: { niches: readonly NicheDef[] }) {
   ));
 }
 
+/*
+ * Obs. 5 (11/10): el eyebrow refleja la identidad profesional real, no siempre "UGC Creator".
+ * - Si hay tagline (la "descripción profesional") → se usa como eyebrow (ej. "Marca personal para profesionales").
+ * - Si no hay tagline pero hay nichos → "UGC Creator" (el caso estándar del producto).
+ * - Si no hay ni tagline ni nichos → sin eyebrow.
+ */
+export function CreatorEyebrow({
+  tagline,
+  niches,
+  className,
+  ornament,
+}: {
+  tagline?: string | null;
+  niches: readonly NicheDef[];
+  className: string;
+  ornament: React.ReactNode;
+}) {
+  const label = tagline?.trim() ? tagline.trim() : niches.length > 0 ? "UGC Creator" : null;
+  if (!label) return null;
+  return (
+    <p className={className}>
+      {ornament}
+      {label}
+      <NicheSuffix niches={niches} />
+    </p>
+  );
+}
+
 export function Avatar({ photo, name, size, className }: { photo: StoredImage | null; name: string; size: number; className?: string }) {
   const style = { width: size, height: size, fontSize: Math.round(size * 0.42) };
   return (

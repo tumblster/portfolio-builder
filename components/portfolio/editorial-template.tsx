@@ -13,6 +13,7 @@ import {
   pieceShow,
   portfolioView,
   ServiceText,
+  CreatorEyebrow,
   STAT_LABEL,
   TemplateFrame,
   type TemplateProps,
@@ -49,11 +50,12 @@ export function EditorialTemplate({ portfolio, variant, filter, coverEdit }: Tem
 
         <Root id={id("inicio")}>
           <section className="ed-hero" aria-labelledby={id("nombre")}>
-            <p className="ed-kicker">
-              <span className="ed-dot" aria-hidden="true" />
-              UGC Creator
-              <NicheSuffix niches={filterable} />
-            </p>
+            <CreatorEyebrow
+              tagline={tagline}
+              niches={filterable}
+              className="ed-kicker"
+              ornament={<span className="ed-dot" aria-hidden="true" />}
+            />
             <H1 id={id("nombre")} className="ed-display">
               {name}
             </H1>

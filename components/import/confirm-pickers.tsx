@@ -264,6 +264,9 @@ export function PiecePicker(props: {
   /** Todas las piezas elegibles: las agregadas por link primero, luego las de la IA y las de su perfil. */
   pool: DraftPiece[];
   niches: NicheChip[];
+  /** Para agregar un nicho "Otro" desde el selector por pieza (obs. 1 del dueño, 11/10). */
+  onNichesChange: (niches: NicheChip[]) => void;
+  newKey: () => string;
   limits: { min: number; max: number };
   error: string | null;
   onError: (message: string | null) => void;
@@ -274,10 +277,17 @@ export function PiecePicker(props: {
   const { pieces, onChange, onError, limits } = props;
   const uid = useId();
   const inputRef = useRef<HTMLInputElement>(null);
+  // Obs. 1 (11/10): "Otro" en el selector de nicho por pieza → cuadro de texto para escribir el nicho.
+  const [customFor, setCustomFor] = useState<string | null>(null);
+  const [customText, setCustomText] = useState("");
+  const [customError, setCustomError] = useState<string | null>(null);
+  const customRef = useRef<HTMLInputElement>(null);
   // Spec 11.5: la grilla muestra 12 por defecto y "VER MÁS" suma de a 12 (las imágenes cargan perezosas).
   const [shown, setShown] = useState(PROFILE_PAGE);
   const [link, setLink] = useState("");
   const [linkState, setLinkState] = useState<{ busy: boolean; message: string | null }>({ busy: false, message: null });
+  // Obs. 4 (11/10): confirmación de permiso para contenido externo.
+  const [permissionOk, setPermissionOk] = useState(false);
   const byId = new Map(props.pool.map((piece) => [piece.id, piece]));
   const chosen = new Set(pieces.map((piece) => piece.id));
   const full = pieces.length >= limits.max;
@@ -287,6 +297,11 @@ export function PiecePicker(props: {
     event.preventDefault();
     const raw = link.trim();
     if (!raw || linkState.busy) return;
+    // Obs. 3 (11/10): con el cupo lleno no se llama a nada: pop-up de advertencia para que quite una.
+    if (full) {
+      showToast(`Ya tienes ${limits.max} piezas: quita una para agregar este video.`, 5000);
+      return;
+    }
     const host = linkHost(raw);
     if (!host) {
       setLinkState({ busy: false, message: LINK_INVALID });
@@ -297,12 +312,17 @@ export function PiecePicker(props: {
       setLinkState({ busy: false, message: LINK_ONLY_VIDEO });
       return;
     }
+    // Obs. 4: sin confirmación de permiso no se agrega.
+    if (!permissionOk) {
+      setLinkState({ busy: false, message: "Marca la confirmación de permiso para agregar este video." });
+      return;
+    }
     setLinkState({ busy: true, message: null });
     try {
       const response = await fetch("/api/import/link", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ draftId: props.draftId, url: normalizeLink(raw) }),
+        body: JSON.stringify({ draftId: props.draftId, url: normalizeLink(raw), permissionConfirmed: true }),
       });
       const data = await response.json().catch(() => null);
       if (!response.ok || !data?.piece) {
@@ -318,14 +338,13 @@ export function PiecePicker(props: {
       const already = chosen.has(piece.id);
       props.onLinkPiece(piece);
       setLink("");
+      setPermissionOk(false);
       // Dónde quedó, en simple: al final de sus piezas (arriba) y primero en la grilla de abajo.
       setLinkState({
         busy: false,
         message: already
           ? `«${piece.title}» ya estaba en tus piezas.`
-          : full
-            ? `«${piece.title}» quedó primero en esta lista. Ya tienes ${limits.max} piezas: quita una para sumarlo.`
-            : `Listo: «${piece.title}» se sumó al final de tus piezas.`,
+          : `Listo: «${piece.title}» se sumó al final de tus piezas.`,
       });
     } catch {
       setLinkState({ busy: false, message: "Se cortó la conexión. Intenta de nuevo." });
@@ -361,6 +380,42 @@ export function PiecePicker(props: {
     add(id);
   }
 
+  /** Obs. 1: guarda el nicho "Otro" escrito a mano: lo suma a los nichos y se lo asigna a la pieza. */
+  function saveCustomNiche(pieceId: string) {
+    const label = customText.trim();
+    if (!label) {
+      setCustomError("Escribe el nicho.");
+      customRef.current?.focus();
+      return;
+    }
+    const niche = nicheFromLabel(label);
+    if (!niche) {
+      setCustomError('Ese nombre no sirve: usa letras o números (y no "Todo").');
+      return;
+    }
+    const taken = new Set(props.niches.map((item) => nicheFromLabel(item.label)?.slug));
+    if (taken.has(niche.slug)) {
+      setCustomError(`«${niche.label}» ya está en tus nichos: elígelo en la lista.`);
+      return;
+    }
+    if (props.niches.length >= MAX_NICHES) {
+      setCustomError(`Puedes tener hasta ${MAX_NICHES} nichos: quita uno para agregar otro.`);
+      return;
+    }
+    const key = props.newKey();
+    props.onNichesChange([...props.niches, { key, label: niche.label }]);
+    onChange(pieces.map((item) => (item.id === pieceId ? { ...item, nicheKey: key, pending: false } : item)));
+    setCustomFor(null);
+    setCustomText("");
+    setCustomError(null);
+  }
+
+  function cancelCustomNiche() {
+    setCustomFor(null);
+    setCustomText("");
+    setCustomError(null);
+  }
+
   const options: ComboOption[] = props.pool
     .filter((piece) => !chosen.has(piece.id))
     .map((piece) => ({ id: piece.id, label: piece.title, thumb: <Thumb piece={piece} size={36} /> }));
@@ -384,6 +439,49 @@ export function PiecePicker(props: {
           getLabel={(piece) => titleOf(piece.id)}
           renderContent={(chip) => {
             const piece = byId.get(chip.id);
+            // Obs. 1: "Otro" → cuadro de texto para escribir el nicho a mano.
+            if (customFor === chip.id) {
+              return (
+                <span className="flex min-w-0 flex-1 flex-col gap-2 py-0.5">
+                  <span className="flex min-w-0 flex-1 gap-2">
+                    <input
+                      ref={customRef}
+                      type="text"
+                      value={customText}
+                      maxLength={24}
+                      aria-label={`Otro nicho para «${titleOf(chip.id)}»`}
+                      placeholder="Escribe el nicho"
+                      onChange={(event) => {
+                        setCustomText(event.target.value);
+                        if (customError) setCustomError(null);
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          saveCustomNiche(chip.id);
+                        } else if (event.key === "Escape") {
+                          event.preventDefault();
+                          cancelCustomNiche();
+                        }
+                      }}
+                      className="min-h-tap w-full min-w-0 flex-1 rounded-field border border-ink bg-paper px-3 text-sm"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => saveCustomNiche(chip.id)}
+                      className="inline-flex min-h-tap shrink-0 items-center rounded-2xl border border-ink bg-ink px-3 text-sm font-semibold text-cream"
+                    >
+                      Guardar
+                    </button>
+                  </span>
+                  {customError && (
+                    <span role="alert" className="text-sm font-semibold text-accent-ink">
+                      {customError}
+                    </span>
+                  )}
+                </span>
+              );
+            }
             return (
               <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-2 py-0.5">
                 {piece && <Thumb piece={piece} />}
@@ -391,13 +489,20 @@ export function PiecePicker(props: {
                 <select
                   aria-label={`Nicho de «${titleOf(chip.id)}»`}
                   value={chip.pending ? "__elegir" : (chip.nicheKey ?? "")}
-                  onChange={(event) =>
+                  onChange={(event) => {
+                    if (event.target.value === "__otro") {
+                      setCustomFor(chip.id);
+                      setCustomText("");
+                      setCustomError(null);
+                      requestAnimationFrame(() => customRef.current?.focus());
+                      return;
+                    }
                     onChange(
                       pieces.map((item) =>
                         item.id === chip.id ? { id: item.id, nicheKey: event.target.value || null, pending: false } : item,
                       ),
-                    )
-                  }
+                    );
+                  }}
                   data-niche-pending={chip.pending ? "" : undefined}
                   className={`min-h-tap w-full rounded-field border bg-paper px-3 text-sm sm:w-40 ${
                     chip.pending ? "border-accent-ink text-accent-ink" : "border-ink/60"
@@ -414,6 +519,7 @@ export function PiecePicker(props: {
                       {niche.label}
                     </option>
                   ))}
+                  <option value="__otro">Otro…</option>
                 </select>
               </span>
             );
@@ -483,6 +589,16 @@ export function PiecePicker(props: {
             {linkState.busy ? (isInstagramHost(linkHost(link)) ? "Trayendo tu video…" : "Buscando…") : "Agregar"}
           </button>
         </form>
+        {/* Obs. 4 (11/10): confirmación de permiso para contenido externo. */}
+        <label className="mt-3 flex cursor-pointer items-start gap-2 text-sm text-muted" data-add-by-link-permission>
+          <input
+            type="checkbox"
+            checked={permissionOk}
+            onChange={(event) => setPermissionOk(event.target.checked)}
+            className="mt-0.5 size-4 shrink-0 accent-ink"
+          />
+          <span>Confirmo que tengo permiso para mostrar este video en mi portafolio.</span>
+        </label>
         <p id={`${uid}-link-help`} className="mt-2 text-sm text-muted" data-add-by-link-help>
           Lo que agregues por link se suma al final de tus piezas, arriba, y aparece primero en esta lista.
         </p>

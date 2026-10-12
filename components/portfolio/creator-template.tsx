@@ -18,6 +18,7 @@ import {
   portfolioView,
   ServiceText,
   Star,
+  CreatorEyebrow,
   STAT_LABEL,
   TemplateFrame,
   type TemplateProps,
@@ -87,11 +88,7 @@ export function CreatorTemplate({ portfolio, variant, filter, coverEdit }: Templ
 
               <div className="pf-hero__copy">
                 {!cover && <Avatar photo={portfolio.photo} name={name} size={72} className="pf-hero__avatar" />}
-                <p className="pf-eyebrow">
-                  <Star />
-                  UGC Creator
-                  <NicheSuffix niches={filterable} />
-                </p>
+                <CreatorEyebrow tagline={tagline} niches={filterable} className="pf-eyebrow" ornament={<Star />} />
                 <H1 id={id("nombre")} className="pf-h1">
                   Hola, soy {name}.
                 </H1>
