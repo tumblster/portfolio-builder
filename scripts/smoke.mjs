@@ -1364,16 +1364,16 @@ try {
       noServices.status === 400 && noServices.data?.error?.issues?.[0]?.path === "services",
       `11.12: el paso de Servicios es obligatorio antes de generar: "${noServices.data?.error?.issues?.[0]?.message}"`,
     );
-    // 13.4 (11/10): agregar por link acepta TikTok (oEmbed) e Instagram (fachada, sin miniatura).
+    // 13.4 (11/10): agregar por link acepta TikTok (oEmbed) e Instagram (Apify: portada real; si Apify
+    // 13.4 (11/10): TikTok por oEmbed; Instagram por Apify (URL falsa → 400 "no pudimos abrir").
     const badLink = await call("POST", "/api/import/link", { json: { draftId: chipsId, url: "https://example.com/algo" } });
     const igLink = await call("POST", "/api/import/link", { json: { draftId: chipsId, url: "https://www.instagram.com/p/C1abc/" } });
     const jargon = /\b(token|oembed|api)\b|\bMeta\b/i;
     check(
       badLink.status === 400 && badLink.data?.error?.message === "Por ahora puedes agregar por link videos de TikTok o Instagram." &&
-        igLink.status === 200 && igLink.data?.piece?.video?.platform === "instagram" &&
-        igLink.data?.piece?.image === null &&
+        igLink.status === 400 && igLink.data?.error?.message === "No pudimos abrir ese video. Revisa que el link esté completo y que el video sea público." &&
         ![badLink, igLink].some((r) => jargon.test(r.data?.error?.message ?? "")),
-      "13.4: «Agregar por link» acepta TikTok e Instagram (IG como solo-video, sin jerga)",
+      "13.4: «Agregar por link» acepta TikTok e Instagram (IG vía Apify, sin jerga)",
       { badLink: badLink.data, igLink: igLink.data },
     );
     const chips = await confirm({
