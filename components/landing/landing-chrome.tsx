@@ -27,12 +27,12 @@ export function LandingLogo({ mascotTarget = false, compact = false }: { mascotT
   );
 }
 
-/** Lockup del producto (13.16): "Payfolio" + byline "by Supercreador". Sin el mark de Supercreador: la landing es
- *  la del producto, con navegación propia mínima. En móvil, solo "Payfolio" (E2: sin la palabra Supercreador). */
-export function PayfolioLockup() {
+/** Lockup del producto (13.16): "Superfolio" + byline "by Supercreador". Sin el mark de Supercreador: la landing es
+ *  la del producto, con navegación propia mínima. En móvil, solo "Superfolio" (E2: sin la palabra Supercreador). */
+export function SuperfolioLockup() {
   return (
     <Link href="/" className="flex min-h-11 shrink-0 items-center gap-2 text-[1.0625rem] font-semibold tracking-[-0.02em]">
-      Payfolio
+      Superfolio
       <span className="hidden text-sm font-medium text-muted md:inline">by Supercreador</span>
     </Link>
   );
@@ -41,13 +41,13 @@ export function PayfolioLockup() {
 /**
  * `nav`: reemplaza la navegación de la landing (anclas + CTA del piloto) por otra, p. ej. en /crear, donde quien
  * entra ya es del piloto y solo necesita "Salir".
- * `brand`: "payfolio" en la landing del producto (13.16); "supercreador" en el resto (default, sin cambios).
+ * `brand`: "superfolio" en la landing del producto (13.16); "supercreador" en el resto (default, sin cambios).
  */
-export function LandingHeader({ base = "", nav, below, brand = "supercreador" }: { base?: "" | "/"; nav?: ReactNode; below?: ReactNode; brand?: "supercreador" | "payfolio" }) {
+export function LandingHeader({ base = "", nav, below, brand = "supercreador" }: { base?: "" | "/"; nav?: ReactNode; below?: ReactNode; brand?: "supercreador" | "superfolio" }) {
   return (
     <header className="landing-glass fixed inset-x-0 top-0 z-40">
       <div className={`${landingContainer} flex h-16 items-center justify-between gap-2 sm:gap-4`}>
-        {brand === "payfolio" ? <PayfolioLockup /> : <LandingLogo compact />}
+        {brand === "superfolio" ? <SuperfolioLockup /> : <LandingLogo compact />}
         {nav !== undefined ? (
           nav
         ) : (
@@ -82,10 +82,10 @@ export function LandingHeader({ base = "", nav, below, brand = "supercreador" }:
 }
 
 /** `mascotTarget`: el mark del footer es donde aterriza la carita viajera (solo en la landing).
- *  `brand`: "payfolio" usa el footer del producto (13.16): "Hecho por Supercreador" + link; conserva el mark para
+ *  `brand`: "superfolio" usa el footer del producto (13.16): "Hecho por Supercreador" + link; conserva el mark para
  *  que la viajera tenga dónde aterrizar. */
-export function LandingFooter({ mascotTarget = false, brand = "supercreador" }: { mascotTarget?: boolean; brand?: "supercreador" | "payfolio" }) {
-  if (brand === "payfolio") {
+export function LandingFooter({ mascotTarget = false, brand = "supercreador" }: { mascotTarget?: boolean; brand?: "supercreador" | "superfolio" }) {
+  if (brand === "superfolio") {
     return (
       <footer>
         <div className={`${landingContainer} flex flex-col gap-4 py-10 sm:flex-row sm:items-center sm:justify-between`}>
