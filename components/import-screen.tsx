@@ -260,7 +260,7 @@ export function ImportScreen() {
               </p>
             )}
             <button type="submit" disabled={running} className={`${primaryButton} mt-4 w-full`}>
-              {running ? "Creando portafolio…" : "Crear portafolio"}
+              {running ? "Creando tu portafolio…" : "Quiero mi portafolio"}
             </button>
           </form>
 

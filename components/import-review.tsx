@@ -25,7 +25,7 @@ import { nicheFromLabel } from "@/lib/portfolio/niches";
 import { SUPPORT_FORM_URL } from "@/lib/site";
 import { showToast } from "@/components/ui/toast";
 import { Avatar } from "./avatar";
-import { errorText, pillButton, primaryButton, textLink } from "./brand-ui";
+import { errorText, fieldLabel, pillButton, primaryButton, textInput, textLink } from "./brand-ui";
 
 /*
  * Antes de generar (v2 · M2): el creador corrige lo que sugirió la IA y elige cómo se ve.
@@ -119,6 +119,12 @@ export function ImportReview({ draft, owner, onGenerated, onStartOver, onUnautho
   const [partnerError, setPartnerError] = useState<string | null>(null);
   // E2 del dueño: el sitio web pineado en su IG solo va si lo marca (opt-in, apagado por defecto).
   const [includeWebsite, setIncludeWebsite] = useState(false);
+  // 15/10 (obs. Fer): contacto opcional en el paso Servicios (WhatsApp + correo). Viaja al generar.
+  const [contactWhatsapp, setContactWhatsapp] = useState("");
+  const [contactEmail, setContactEmail] = useState("");
+  const [contactError, setContactError] = useState<{ whatsapp?: string; email?: string }>({});
+  // 15/10 (obs. Fer): avisar al avanzar si quedó un link sin permiso marcado (lo expone PiecePicker).
+  const linkPermissionCheck = useRef<(() => boolean) | null>(null);
   // Subidas de logo en curso: no se genera a medias.
   const [uploads, setUploads] = useState(0);
   // Spec 11.5: piezas agregadas por link en esta sesión (la más nueva primero).
@@ -204,8 +210,12 @@ export function ImportReview({ draft, owner, onGenerated, onStartOver, onUnautho
   function goTo(next: number) {
     setFormError(null);
     focusHeading.current = true;
-    // E2 del dueño: cada paso es una "página"; al cambiar, se vuelve arriba del todo, con desplazamiento suave.
-    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
+    // 15/10 (obs. Fer): en TODO cambio de paso se vuelve arriba del todo. Instantáneo (no suave): el suave se
+    // cancela en mobile con el cambio de contenido y nunca llegaba arriba.
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, behavior: "auto" });
+      requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: "auto" }));
+    }
     startTransition(() => setStep(next));
   }
 
@@ -252,11 +262,70 @@ export function ImportReview({ draft, owner, onGenerated, onStartOver, onUnautho
     return false;
   }
 
-  /** E2 del dueño: los servicios son opcionales. Las sugerencias sin tocar se descartan en silencio al generar
-   *  (sin avisos); solo viajan las tarjetas confirmadas con título. */
+  /** Servicios confirmados: tarjetas que la creadora tocó/escribió, con título (las sugerencias sin tocar no cuentan). */
+  function hasConfirmedServices(): boolean {
+    return services.some((card) => !card.suggested && card.title.trim());
+  }
+
+  /**
+   * 15/10 (obs. Fer): la advertencia de servicios sale AQUÍ, en el paso, no al generar.
+   * Bloquea el avance con error en línea + pop-up con timer.
+   */
   function validateServices(): boolean {
-    setServiceError(null);
-    return true;
+    if (hasConfirmedServices()) {
+      setServiceError(null);
+      return true;
+    }
+    setServiceError("Agrega al menos un servicio: sin servicios no se puede generar el portafolio.");
+    showToast("Agrega al menos un servicio: sin servicios no se puede generar el portafolio.", 5000);
+    return false;
+  }
+
+  /**
+   * 15/10 (obs. Fer): contacto opcional del paso Servicios. Valida formato solo si escribió algo.
+   * Al fallar, vuelve al paso Servicios con el error en línea.
+   */
+  function validateContact(): boolean {
+    const errors: { whatsapp?: string; email?: string } = {};
+    const phone = contactWhatsapp.trim();
+    const mail = contactEmail.trim();
+    if (phone && !/^\+?\d{8,15}$/.test(phone.replace(/[\s().-]/g, ""))) {
+      errors.whatsapp = "Escribe el WhatsApp con código de país, por ejemplo +51 987 654 321.";
+    }
+    if (mail && !/^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i.test(mail)) {
+      errors.email = "Escribe un correo válido, por ejemplo tu@correo.com.";
+    }
+    setContactError(errors);
+    return Object.keys(errors).length === 0;
+  }
+
+  /**
+   * 15/10 (obs. Fer): los pills de pasos sí navegan. Hacia atrás, siempre. Hacia adelante, solo si el paso
+   * actual está completo; si no, avisa qué falta y no se mueve.
+   */
+  function tryGoTo(index: number) {
+    if (index <= step) {
+      goTo(index);
+      return;
+    }
+    if (step === 0 && !validateSelection()) return;
+    if (step === 1 && !validateServices()) return;
+    goTo(index);
+  }
+
+  /** Avanzar con "Siguiente": valida el paso actual y avisa lo pendiente sin bloquear de más. */
+  function next() {
+    if (step === 0) {
+      if (!validateSelection()) return;
+      // 15/10: si quedó un link escrito sin permiso marcado, se avisa pero igual avanza.
+      if (linkPermissionCheck.current?.()) {
+        showToast("Marca la confirmación de permiso para agregar ese video por link.", 5000);
+      }
+      goTo(1);
+      return;
+    }
+    if (step === 1 && !validateServices()) return;
+    goTo(step + 1);
   }
 
   async function generate() {
@@ -265,7 +334,10 @@ export function ImportReview({ draft, owner, onGenerated, onStartOver, onUnautho
       return;
     }
     if (!requireServices()) return;
-    validateServices();
+    if (!validateContact()) {
+      goTo(1);
+      return;
+    }
     const retry = retryNext.current;
     setGenerating(true);
     setRetrying(false);
@@ -289,6 +361,15 @@ export function ImportReview({ draft, owner, onGenerated, onStartOver, onUnautho
       ...(partners.length > 0 ? { brandPartners: partnersPayload(partners) } : {}),
       // E2 del dueño: el sitio web pineado en su IG solo va si lo marcó con el checkbox.
       ...(includeWebsite ? { website: true } : {}),
+      // 15/10 (obs. Fer): contacto opcional del paso Servicios (solo viaja lo que llenó).
+      ...(contactWhatsapp.trim() || contactEmail.trim()
+        ? {
+            contact: {
+              ...(contactWhatsapp.trim() ? { whatsapp: contactWhatsapp.trim() } : {}),
+              ...(contactEmail.trim() ? { email: contactEmail.trim() } : {}),
+            },
+          }
+        : {}),
       // 13.15: el onboarding (correo = cuenta, y el género para los textos de WhatsApp).
       ...(owner ? { owner } : {}),
       ...(retry ? { retry: true } : {}),
@@ -409,7 +490,7 @@ export function ImportReview({ draft, owner, onGenerated, onStartOver, onUnautho
           <li key={label} className="min-w-0 flex-1">
             <button
               type="button"
-              onClick={() => (index <= step || (validateSelection() && (index <= 1 || validateServices())) ? goTo(index) : undefined)}
+              onClick={() => tryGoTo(index)}
               aria-current={index === step ? "step" : undefined}
               data-step-pill
               className={`min-h-tap w-full rounded-full border-2 px-2 py-2 text-[0.8125rem] leading-tight font-semibold [overflow-wrap:anywhere] transition sm:px-3 sm:text-sm ${
@@ -449,6 +530,7 @@ export function ImportReview({ draft, owner, onGenerated, onStartOver, onUnautho
                 error={pieceError}
                 onError={setPieceError}
                 draftId={draft.draftId}
+                linkPermissionCheckRef={linkPermissionCheck}
                 onLinkPiece={(piece) => {
                   setLinkPieces((current) => (current.some((item) => item.id === piece.id) ? current : [piece, ...current]));
                   setPieces((current) =>
@@ -467,9 +549,7 @@ export function ImportReview({ draft, owner, onGenerated, onStartOver, onUnautho
             <h2 id={`${uid}-h`} ref={stepHeading} tabIndex={-1} className="title-2 outline-none">
               Sus servicios
             </h2>
-            <p className="mt-2 mb-5 text-sm text-muted">
-              Cómo trabaja con marcas, en tarjetas: un título y un link o una descripción. Al menos una.
-            </p>
+            <p className="mt-2 mb-5 text-sm text-muted">¿Qué ofreces? Agrega al menos un servicio.</p>
             <ServicesStep
               cards={services}
               onChange={(cards) => {
@@ -478,7 +558,6 @@ export function ImportReview({ draft, owner, onGenerated, onStartOver, onUnautho
               }}
               newKey={newKey}
               error={serviceError}
-              brands={draft.brandMentions ?? []}
             />
             {/* 13.19: Brand partners (opcional). Solo lo confirmado aparece en su Media kit. */}
             <section aria-labelledby={`${uid}-marcas`} className="mt-12" data-review-brands>
@@ -519,6 +598,62 @@ export function ImportReview({ draft, owner, onGenerated, onStartOver, onUnautho
                 </label>
               </section>
             )}
+            {/* 15/10 (obs. Fer): contacto opcional. Sin WhatsApp ni correo, el "Trabaja conmigo"
+                del portafolio no lleva a nada: por eso se pide aquí, sin paso adicional. */}
+            <section aria-labelledby={`${uid}-contacto`} className="mt-12" data-review-contact>
+              <h3 id={`${uid}-contacto`} className="title-3">
+                Contacto
+              </h3>
+              <p className="mt-2 mb-5 text-sm text-muted">
+                ¿Cómo te contactan las marcas? Opcional: en tu portafolio aparece lo que llenes.
+              </p>
+              <div className="grid gap-5 sm:grid-cols-2">
+                <div>
+                  <label htmlFor={`${uid}-contact-whatsapp`} className={fieldLabel}>
+                    WhatsApp
+                  </label>
+                  <input
+                    id={`${uid}-contact-whatsapp`}
+                    type="tel"
+                    inputMode="tel"
+                    autoComplete="tel"
+                    value={contactWhatsapp}
+                    onChange={(event) => {
+                      setContactWhatsapp(event.target.value);
+                      if (contactError.whatsapp) setContactError((current) => ({ ...current, whatsapp: undefined }));
+                    }}
+                    placeholder="+51 987 654 321"
+                    aria-invalid={contactError.whatsapp ? true : undefined}
+                    className={`${textInput} mt-2`}
+                    data-contact-whatsapp
+                  />
+                  {contactError.whatsapp && (
+                    <p className={`${errorText} mt-2`}>{contactError.whatsapp}</p>
+                  )}
+                </div>
+                <div>
+                  <label htmlFor={`${uid}-contact-email`} className={fieldLabel}>
+                    Correo
+                  </label>
+                  <input
+                    id={`${uid}-contact-email`}
+                    type="email"
+                    inputMode="email"
+                    autoComplete="email"
+                    value={contactEmail}
+                    onChange={(event) => {
+                      setContactEmail(event.target.value);
+                      if (contactError.email) setContactError((current) => ({ ...current, email: undefined }));
+                    }}
+                    placeholder="tu@correo.com"
+                    aria-invalid={contactError.email ? true : undefined}
+                    className={`${textInput} mt-2`}
+                    data-contact-email
+                  />
+                  {contactError.email && <p className={`${errorText} mt-2`}>{contactError.email}</p>}
+                </div>
+              </div>
+            </section>
           </section>
         )}
 
@@ -605,11 +740,7 @@ export function ImportReview({ draft, owner, onGenerated, onStartOver, onUnautho
           </button>
         )}
         {step < STEPS.length - 1 ? (
-          <button
-            type="button"
-            onClick={() => ((step === 0 && !validateSelection()) || (step === 1 && !validateServices()) ? undefined : goTo(step + 1))}
-            className={`${primaryButton} flex-1 sm:flex-none sm:px-8`}
-          >
+          <button type="button" onClick={next} className={`${primaryButton} flex-1 sm:flex-none sm:px-8`}>
             {step === 0 ? "Agregar servicios" : step === 1 ? "Elegir plantilla" : "Elegir paleta"}
           </button>
         ) : (
