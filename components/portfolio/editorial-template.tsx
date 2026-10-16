@@ -62,7 +62,8 @@ export function EditorialTemplate({ portfolio, variant, filter, coverEdit }: Tem
             <div className="ed-hero__row">
               <div className="ed-hero__copy">
                 {valueProp && <p className="ed-lead">{valueProp}</p>}
-                {bio && <p className="ed-bio">{bio}</p>}
+                {/* 15/10 (obs. Fer, ronda 2): solo la propuesta de la IA; la bio de IG no sale por defecto. */}
+                {!valueProp && bio && <p className="ed-bio">{bio}</p>}
               </div>
               {er && (
                 <p className="ed-er" data-pf-stat="engagementRate">

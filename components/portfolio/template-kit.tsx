@@ -175,9 +175,10 @@ export function NicheSuffix({ niches }: { niches: readonly NicheDef[] }) {
 }
 
 /*
- * Obs. 5 (11/10) + obs. 15/10 del dueño: el eyebrow refleja la identidad profesional por nichos
- * ("UGC Creator · belleza"), NUNCA el tagline: el tagline ya se muestra como la descripción bajo el
- * "Hola, soy…" y repetirlo arriba duplica el contenido. Sin nichos, sin eyebrow.
+ * Obs. 5 (11/10) + obs. 15/10 del dueño + ronda 15/10 (obs. 5): el eyebrow refleja la identidad profesional por
+ * nichos ("Content creator · belleza"), NUNCA el tagline: el tagline ya se muestra como la descripción bajo el
+ * "Hola, soy…" y repetirlo arriba duplica el contenido. La etiqueta base es global ("Content creator", no "UGC
+ * Creator"): la boca del funnel es creadores en general, no solo UGC. Sin nichos, sin eyebrow.
  */
 export function CreatorEyebrow({
   niches,
@@ -192,7 +193,7 @@ export function CreatorEyebrow({
   return (
     <p className={className}>
       {ornament}
-      UGC Creator
+      Content creator
       <NicheSuffix niches={niches} />
     </p>
   );

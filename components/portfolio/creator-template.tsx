@@ -94,7 +94,8 @@ export function CreatorTemplate({ portfolio, variant, filter, coverEdit }: Templ
                 </H1>
                 {tagline && <p className="pf-tagline">{tagline}</p>}
                 {valueProp && <p className="pf-lead">{valueProp}</p>}
-                {bio && <p className="pf-bio">{bio}</p>}
+                {/* 15/10 (obs. Fer, ronda 2): solo la propuesta de la IA; la bio de IG no sale por defecto. */}
+                {!valueProp && bio && <p className="pf-bio">{bio}</p>}
                 {/* 13.9: principal "Trabaja conmigo" y secundario "Ver media kit". */}
                 <div className="pf-actions">
                   <HireLink view={view} className="pf-btn pf-btn--solid" />

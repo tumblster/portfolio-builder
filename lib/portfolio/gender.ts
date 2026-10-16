@@ -4,7 +4,7 @@
  * "Portafolio listo" y la prueba de humo.
  *
  * Nunca se infiere por la foto ni por el nombre (13.11): lo elige ella (onboarding, 13.15). Sin dato, o con "Otro" o
- * "Prefiero no decirlo", los textos van en neutro. El eyebrow del portafolio sigue siendo "UGC Creator" (11.7).
+ * "Prefiero no decirlo", los textos van en neutro. El eyebrow del portafolio es "Content creator" (ronda 15/10).
  */
 
 export const GENDERS = ["hombre", "mujer", "otro", "prefiero-no-decirlo"] as const;

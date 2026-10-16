@@ -43,7 +43,7 @@ export function MinimalTemplate({ portfolio, variant, filter }: TemplateProps) {
             <H1 className="min-name">{name}</H1>
             {tagline && <p className="pf-tagline">{tagline}</p>}
             {intro && <p className="min-intro">{intro}</p>}
-            {valueProp && bio && <p className="min-bio">{bio}</p>}
+            {/* 15/10 (obs. Fer, ronda 2): intro ya es valueProp o bio (una sola); la bio de IG no se duplica. */}
             <p className="min-status">
               <span className="min-status__dot" aria-hidden="true" />
               Disponible para colaborar.
