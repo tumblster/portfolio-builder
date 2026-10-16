@@ -46,10 +46,6 @@ export default async function CreatePage() {
           <div>
             <p className="eyebrow">Nuevo portafolio</p>
             <h1 className="title-1 mt-4">De Instagram a portafolio</h1>
-            <p className="lead mt-5 max-w-prose">
-              Pega el perfil de tu clienta. Leemos su foto, bio y publicaciones, la IA propone nichos y textos, tú
-              confirmas y eliges cómo se ve.
-            </p>
           </div>
           <div className="order-first w-24 sm:order-none sm:w-full" aria-hidden="true">
             <Chispa expression="sonriente" className="mascot-static block h-auto w-full text-ink" />

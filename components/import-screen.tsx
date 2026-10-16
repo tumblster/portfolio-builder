@@ -46,7 +46,7 @@ type State =
 const STEP_LABELS: Record<ImportStep, string> = {
   scrape: "Leemos el perfil de Instagram",
   images: "Copiamos sus fotos",
-  ai: "La IA detecta sus nichos y escribe los textos",
+  ai: "La IA detecta tus nichos y escribe tus textos",
 };
 
 const CONNECTION_LOST = "Se cortó la conexión antes de terminar. Revisa tu internet e intenta de nuevo.";

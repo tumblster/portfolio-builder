@@ -226,9 +226,7 @@ export function BrandPartnersField({ partners, setPartners, detected, newKey, on
       )}
 
       <div className="mt-6 rounded-card border border-dashed border-ink/50 p-4 sm:p-5" data-brand-manual>
-        <p className="text-sm font-semibold">Agregar una marca a mano</p>
-        <p className="mt-1 text-sm text-muted">Para colaboraciones antiguas o que no aparecen arriba.</p>
-        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <label htmlFor={`${uid}-nueva-nombre`} className={fieldLabel}>
               Nombre de la marca

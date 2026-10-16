@@ -13,7 +13,7 @@ export const metadata: Metadata = {
     default: "Supercreador · Portafolios UGC",
     template: "%s · Supercreador",
   },
-  description: "Arma en minutos el portafolio UGC de tu clienta y compártelo con un link.",
+  description: "Arma en minutos tu portafolio UGC y compártelo con un link.",
   applicationName: "Supercreador",
 };
 

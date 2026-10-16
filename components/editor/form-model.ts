@@ -343,7 +343,7 @@ export function toPreview(form: FormState, extras: PreviewExtras = NO_EXTRAS): R
   }
   return {
     slug: "vista-previa",
-    name: form.name.trim() || "Nombre de tu clienta",
+    name: form.name.trim() || "Tu nombre",
     tagline: form.tagline.trim(),
     bio: form.bio.trim(),
     photo: form.photo,

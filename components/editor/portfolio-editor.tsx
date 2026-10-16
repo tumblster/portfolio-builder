@@ -99,7 +99,7 @@ const CONTACT_FIELDS: Record<
   instagram: { label: "Instagram", placeholder: "@usuario" },
   tiktok: { label: "TikTok", placeholder: "@usuario" },
   youtube: { label: "YouTube", placeholder: "Link del canal o @usuario" },
-  website: { label: "Sitio web", placeholder: "misitio.com", inputMode: "url" },
+  website: { label: "Link", placeholder: "Landing page, video de YouTube, portafolio en Behance...", inputMode: "url" },
 };
 
 type SaveStatus = { kind: "idle" } | { kind: "saving" } | { kind: "saved" } | { kind: "error"; message: string };

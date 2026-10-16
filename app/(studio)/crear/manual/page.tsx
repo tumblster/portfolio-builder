@@ -25,7 +25,7 @@ export default async function ManualFormPage() {
         <p className="eyebrow">Nuevo portafolio</p>
         <h1 className="title-1 mt-5">Llénalo a mano</h1>
         <p className="lead mt-5 max-w-prose">
-          Llena los datos de tu clienta: la vista previa se actualiza mientras escribes.
+          Llena tus datos: la vista previa se actualiza mientras escribes.
         </p>
         {access.status === "not-configured" ? (
           <ConfigNotice message={access.message} />
