@@ -23,10 +23,15 @@ const tileActive = "border-accent bg-highlight text-ink shadow-accent";
  */
 export function BannerPicker({
   value,
+  aspect = 4 / 3,
+  sizeHint = "1600 × 1200 px o más",
   onChange,
   onPending,
 }: {
   value: StoredImage | null;
+  /** Formato del banner de la plantilla elegida (Creator 4:3, Bio 21:9). */
+  aspect?: number;
+  sizeHint?: string;
   onChange: (image: StoredImage | null) => void;
   onPending: (delta: 1 | -1) => void;
 }) {
@@ -61,7 +66,7 @@ export function BannerPicker({
       <p className="mt-1 mb-1 text-sm text-muted">
         La imagen ancha arriba del portafolio. Se puede cambiar después.
       </p>
-      <p className="mb-3 text-xs text-muted">Tamaño recomendado: 1600 × 1200 px o más (se muestra recortada).</p>
+      <p className="mb-3 text-xs text-muted">Tamaño recomendado: {sizeHint} (se muestra recortada).</p>
       <div className="flex flex-wrap gap-3">
         <button
           type="button"
@@ -121,6 +126,7 @@ export function BannerPicker({
       {cropping && (
         <BannerCropModal
           file={cropping}
+          aspect={aspect}
           onClose={() => setCropping(null)}
           onConfirm={(cropped) => {
             setCropping(null);

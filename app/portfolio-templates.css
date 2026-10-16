@@ -359,6 +359,9 @@
   @container pf (min-width: 40rem) {
     .bio-mesh {
       height: 208px;
+      /* 15/10 (obs. Fer, ronda 3): en desktop el banner no va full-bleed: franja contenida y centrada. */
+      max-width: 38rem;
+      margin-inline: auto;
     }
     .bio-col {
       padding-top: 160px;

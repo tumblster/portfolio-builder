@@ -4,22 +4,24 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 
 /*
  * Modal para encuadrar la foto del banner (obs. Fer, ronda 3 15/10). Al subir una foto se abre: muestra cómo se
- * verá recortada a 4:3 (el formato del banner), se arrastra para encuadrar y un deslizador acerca/aleja.
- * Funciona con dedo y con ratón (pointer events). Al confirmar se recorta en el navegador (canvas, 1200×900)
+ * verá recortada al formato del banner (Creator 4:3, Bio 21:9), se arrastra para encuadrar y un deslizador
+ * acerca/aleja. Funciona con dedo y con ratón (pointer events). Al confirmar se recorta en el navegador (canvas)
  * y se devuelve el archivo listo para subir.
  */
 
 const OUTPUT_W = 1200;
-const OUTPUT_H = 900;
 
 type Offset = { x: number; y: number };
 
 export function BannerCropModal({
   file,
+  aspect = 4 / 3,
   onConfirm,
   onClose,
 }: {
   file: File;
+  /** Relación de aspecto del recorte (ancho/alto): la del banner de la plantilla elegida. */
+  aspect?: number;
   onConfirm: (file: File) => void;
   onClose: () => void;
 }) {
@@ -88,6 +90,7 @@ export function BannerCropModal({
   async function confirm() {
     const img = imgRef.current;
     if (!img || natural.w === 0) return;
+    const outputH = Math.round(OUTPUT_W / aspect);
     const scale = s0 * zoom;
     const sx = Math.max(0, -safeOffset.x / scale);
     const sy = Math.max(0, -safeOffset.y / scale);
@@ -95,10 +98,10 @@ export function BannerCropModal({
     const sh = Math.min(natural.h - sy, area.h / scale);
     const canvas = document.createElement("canvas");
     canvas.width = OUTPUT_W;
-    canvas.height = OUTPUT_H;
+    canvas.height = outputH;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-    ctx.drawImage(img, sx, sy, sw, sh, 0, 0, OUTPUT_W, OUTPUT_H);
+    ctx.drawImage(img, sx, sy, sw, sh, 0, 0, OUTPUT_W, outputH);
     const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.88));
     if (!blob) return;
     onConfirm(new File([blob], "banner.jpg", { type: "image/jpeg" }));
@@ -140,7 +143,8 @@ export function BannerCropModal({
           <>
             <div
               ref={areaRef}
-              className="relative aspect-[4/3] w-full cursor-grab touch-none overflow-hidden rounded-2xl bg-cream active:cursor-grabbing"
+              className="relative w-full cursor-grab touch-none overflow-hidden rounded-2xl bg-cream active:cursor-grabbing"
+              style={{ aspectRatio: `${aspect}` }}
               onPointerDown={onPointerDown}
               onPointerMove={onPointerMove}
               onPointerUp={onPointerUp}

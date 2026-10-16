@@ -689,10 +689,13 @@ export function ImportReview({ draft, owner, onGenerated, onStartOver, onUnautho
                 onViewChange={setPreviewView}
               />
             </div>
-            {/* 15/10 (obs. Fer, ronda 3): si la plantilla lleva banner, elegir la foto antes de generar. */}
+            {/* 15/10 (obs. Fer, ronda 3): si la plantilla lleva banner, elegir la foto antes de generar.
+                El encuadre usa el formato del banner de cada plantilla (Creator 4:3, Bio 21:9). */}
             {TEMPLATES_WITH_BANNER.includes(template) && (
               <BannerPicker
                 value={cover}
+                aspect={template === "bio" ? 21 / 9 : 4 / 3}
+                sizeHint={template === "bio" ? "2100 × 900 px o más (panorámica)" : "1600 × 1200 px o más"}
                 onChange={setCover}
                 onPending={(delta) => setUploads((count) => Math.max(0, count + delta))}
               />
