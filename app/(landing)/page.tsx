@@ -84,12 +84,10 @@ export default function LandingPage() {
 
       <main className="overflow-x-clip">
         {/* 1 · Hero: copy, Chispa protagonista y la mini-mock */}
-        {/* r3 · 4: ~45 % menos de aire (arriba se descuentan los 64 px de la navegación fija). */}
-        <section className={`${container} landing-hero pt-18 pb-11 md:pt-28 md:pb-18 lg:pb-22`} data-hero>
+        {/* 16/10 (obs. Fer): el hero centra su contenido en la pantalla (no solo padding arriba); sin eyebrow: duplicaba la marca del navbar. */}
+        <section className={`${container} landing-hero py-12 md:py-16`} data-hero>
           {/* En el celular el stack de texto va centrado bajo la cara; desde tablet, a la izquierda. */}
           <div className="landing-hero__copy text-center md:text-left">
-            {/* 13.16: byline del producto */}
-            <p className={`${eyebrow} mb-5 md:mb-6`}>Superfolio by Supercreador</p>
             <h1
               className={`${interTight.variable} ${fontTmj.variable} landing-h1 text-[2.375rem] leading-[1.06] font-semibold tracking-[-0.03em] sm:text-5xl lg:text-[3.75rem]`}
             >
@@ -113,7 +111,7 @@ export default function LandingPage() {
         </section>
 
         {/* 2 · Roadmap de producto: lo que ya se puede usar y lo que viene */}
-        <section id="como-funciona" aria-labelledby="como-funciona-titulo" className="py-24 md:py-32 lg:py-40">
+        <section id="como-funciona" aria-labelledby="como-funciona-titulo" className="py-16 md:py-24 lg:py-28">
           <div className={container}>
             <div className={column}>
               <p className={eyebrow}>For you page</p>
@@ -159,7 +157,7 @@ export default function LandingPage() {
         </section>
 
         {/* 3 · Esto es parte de Supercreador (13.16): misión del hub + carta del fundador */}
-        <section aria-labelledby="supercreador-titulo" className="pb-24 md:pb-32 lg:pb-40">
+        <section aria-labelledby="supercreador-titulo" className="pb-16 md:pb-24 lg:pb-28">
           <div className={container}>
             <div className={column}>
               <p className={eyebrow}>Esto es parte de Supercreador</p>
@@ -186,7 +184,7 @@ export default function LandingPage() {
         </section>
 
         {/* 4 · Cierre: captura de correo del programa piloto */}
-        <section id="piloto" aria-labelledby="piloto-titulo" className="pb-28 md:pb-32 lg:pb-40">
+        <section id="piloto" aria-labelledby="piloto-titulo" className="pb-20 md:pb-24 lg:pb-28">
           <div className={container}>
             <div
               className={`${column} landing-ember rounded-[2rem] px-6 py-14 text-center text-cream sm:px-12 md:py-20`}

@@ -43,7 +43,11 @@
     gap: 28px;
     max-width: 440px;
     margin: 0 auto;
-    padding: 124px 20px 128px; /* abajo: aire para la barra de nichos */
+    padding: 124px 20px 64px;
+  }
+  /* 16/10 (obs. Fer, auditoría): los 128px de aire eran para la barra de nichos, que solo existe en el editor. */
+  .pf[data-variant="preview"] .bio-col {
+    padding-bottom: 128px;
   }
   .bio-head {
     display: flex;

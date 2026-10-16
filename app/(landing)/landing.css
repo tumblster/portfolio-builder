@@ -44,6 +44,9 @@ html:has(.landing) {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   grid-template-areas: "copy" "mock";
+  /* 16/10 (obs. Fer): el hero llena la pantalla y centra su contenido (antes quedaba cargado arriba). */
+  min-height: calc(100svh - 4rem);
+  align-content: center;
 }
 .landing-hero__copy {
   grid-area: copy;

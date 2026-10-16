@@ -165,10 +165,10 @@ export const Star = () => (
   </span>
 );
 
-/** " · Belleza" junto a un texto, solo en la vista de ese nicho (lo decide la regla del filtro). */
+/** " · Belleza" junto a un texto: en público (vista "todo") salen todos los nichos como texto; al filtrar, solo el del nicho. */
 export function NicheSuffix({ niches }: { niches: readonly NicheDef[] }) {
   return niches.map((niche) => (
-    <span key={niche.slug} data-pf-show={niche.slug}>
+    <span key={niche.slug} data-pf-show={`todo ${niche.slug}`}>
       {` · ${niche.label}`}
     </span>
   ));

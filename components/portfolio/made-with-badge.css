@@ -1,7 +1,7 @@
 /*
- * Badge flotante "Hecho con Supercreador" (ronda 6 · 13.17). Chico y neutro (blanco, tinta), abajo a la izquierda, con
- * su zona segura; la página gana aire abajo para que nunca tape el final. Contraste: tinta sobre blanco 19:1; texto
- * secundario (#3f4236) sobre blanco 10:1. El naranja solo en el anillo de foco.
+ * Badge flotante "Hecho con Supercreador" (ronda 6 · 13.17). Chico y neutro (blanco, tinta), abajo a la DERECHA
+ * (16/10, obs. Fer), con su zona segura; la página gana aire abajo para que nunca tape el final. Contraste: tinta
+ * sobre blanco 19:1; texto secundario (#3f4236) sobre blanco 10:1. El naranja solo en el anillo de foco.
  */
 .pf-views:has(.pf-made) {
   padding-bottom: 64px;
@@ -10,7 +10,7 @@
   position: fixed;
   z-index: 25;
   bottom: calc(12px + env(safe-area-inset-bottom, 0px));
-  left: 12px;
+  right: 12px;
   display: flex;
   flex-direction: row;
   align-items: center;
@@ -51,7 +51,7 @@
 .pf-made__panel {
   position: absolute;
   bottom: calc(100% + 8px);
-  left: 0;
+  right: 0;
   width: min(280px, calc(100vw - 24px));
   padding: 14px 16px;
   border: 1px solid rgb(14 17 11 / 0.12);

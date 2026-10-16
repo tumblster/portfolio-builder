@@ -580,7 +580,7 @@ export function ImportReview({ draft, owner, onGenerated, onStartOver, onUnautho
                 Brand Partners
               </h3>
               <p className="mt-2 mb-5 text-sm text-muted">
-                Opcional. Las marcas con las que trabajó de verdad: aparecen en su Media kit.
+                Opcional. ¿Con qué marcas trabajaste de verdad? Agrégalas: aparecen en tu media kit.
               </p>
               <BrandPartnersField
                 partners={partners}

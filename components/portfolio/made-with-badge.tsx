@@ -6,7 +6,7 @@ import "./made-with-badge.css";
 
 /*
  * Badge flotante "Hecho con Supercreador" (ronda 6 · 13.17; 13.23 · 6: en TODOS los portafolios mientras no haya plan
- * pago). Discreto: una píldora chica abajo a la izquierda, con la marca (la sonrisa) y el texto; no tapa contenido ni
+ * pago). Discreto: una píldora chica abajo a la derecha, con la marca (la sonrisa) y el texto; no tapa contenido ni
  * compite con los CTAs. Al tocarla se abre una tarjetita con un CTA al producto ("Crea tu portafolio", con ?ref=badge
  * para saber cuántos llegan por aquí). Se cierra con otro toque, tocando fuera o con Escape (el foco vuelve a la
  * píldora). Solo en la página pública: el editor no lo muestra.
