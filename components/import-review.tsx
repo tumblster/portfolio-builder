@@ -692,7 +692,6 @@ export function ImportReview({ draft, owner, onGenerated, onStartOver, onUnautho
             {/* 15/10 (obs. Fer, ronda 3): si la plantilla lleva banner, elegir la foto antes de generar. */}
             {TEMPLATES_WITH_BANNER.includes(template) && (
               <BannerPicker
-                photo={draft.photo}
                 value={cover}
                 onChange={setCover}
                 onPending={(delta) => setUploads((count) => Math.max(0, count + delta))}
