@@ -618,6 +618,8 @@ export const confirmImportInputSchema = z.object({
     .object({
       whatsapp: contactSchema.shape.whatsapp,
       email: contactSchema.shape.email,
+      // 16/10 (obs. Fer): link nuevo que la creadora pegó en la revisión (no solo el de su IG).
+      website: contactSchema.shape.website,
     })
     .optional(),
   /**
