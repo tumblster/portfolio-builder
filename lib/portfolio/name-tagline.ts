@@ -22,3 +22,17 @@ export function splitNameTagline(fullName: string): { name: string; tagline: str
   if (!name || !tagline) return { name: clean, tagline: "" };
   return { name, tagline };
 }
+
+/*
+ * 15/10 (obs. Fer, ronda 3): la IA también discierne cuando el nombre de IG viene mal escrito: si el perfil dice
+ * "andresbilbao", el titular no puede decir "Soy andresbilbao". La IA devuelve la versión bien escrita
+ * ("Andrés Bilbao") y solo se usa cuando el nombre determinista se ve sin formato (sin mayúsculas o igual al
+ * usuario): los nombres que ya vienen bien escritos no se tocan.
+ */
+export function humanizeName(name: string, username: string, aiName: string | null | undefined): string {
+  const candidate = (aiName ?? "").trim();
+  if (!candidate) return name;
+  const looksUnformatted =
+    name.length > 0 && (!/[A-ZÁÉÍÓÚÜÑ]/.test(name) || name.toLowerCase() === username.toLowerCase());
+  return looksUnformatted ? candidate : name;
+}

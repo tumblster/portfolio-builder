@@ -3,14 +3,14 @@ import type { FormState } from "./form-model";
 
 /*
  * Spec 12.8 (gamificación, activación): "Tu portafolio está al X %" con lo que falta: foto, servicios, piezas y
- * WhatsApp. Se calcula en vivo con lo que hay en el formulario.
+ * contacto. Se calcula en vivo con lo que hay en el formulario.
  */
 export function Completeness({ form }: { form: FormState }) {
   const checks = [
     { label: "Foto", done: Boolean(form.photo) },
     { label: "Servicios", done: form.services.some((service) => service.title.trim()) },
     { label: `${LIMITS.minPieces}+ piezas`, done: form.pieces.filter((piece) => piece.image || piece.videoUrl.trim()).length >= LIMITS.minPieces },
-    { label: "WhatsApp", done: Boolean(form.contact.whatsapp?.trim()) },
+    { label: "Contacto", done: Boolean(form.contact.whatsapp?.trim() || form.contact.email?.trim()) },
   ];
   const percent = Math.round((100 * checks.filter((check) => check.done).length) / checks.length);
   return (

@@ -102,18 +102,10 @@ export default function LandingPage() {
               <a href="#piloto" className={primary}>
                 Únete al programa piloto
               </a>
-              <a href="#como-funciona" className={`${textLink} text-[0.9375rem]`}>
-                Ver el roadmap <Chevron />
-              </a>
-            </div>
-            <p className="mt-3 text-[0.9375rem] text-muted md:mt-4" data-hero-access>
-              <Link
-                href="/acceso"
-                className="font-medium text-ink underline decoration-accent decoration-2 underline-offset-4 hover:text-accent-ink"
-              >
-                ¿Tienes un código? Accede aquí
+              <Link href="/acceso" className={`${textLink} text-[0.9375rem]`}>
+                ¿Tienes un código? Accede desde acá <Chevron />
               </Link>
-            </p>
+            </div>
           </div>
           <div className="landing-hero__mock">
             <HeroMorph />

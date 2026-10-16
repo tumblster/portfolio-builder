@@ -74,11 +74,9 @@ function Avatar({ name, size }: { name: string; size: "sm" | "md" | "lg" }) {
 }
 
 function Pills({ niches }: { niches: string[] }) {
+  // 15/10 (obs. Fer, ronda 3): sin "Todo": el portafolio público no tiene filtros.
   return (
     <span className="tpv-pills">
-      <span className="tpv-pill" data-on="">
-        Todo
-      </span>
       {niches.map((niche) => (
         <span key={niche} className="tpv-pill">
           {niche}

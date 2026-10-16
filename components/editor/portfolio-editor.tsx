@@ -338,7 +338,7 @@ function EditorForm({ initial, initialBaseline }: { initial: FormState; initialB
               Datos
             </h2>
 
-            <Field id="campo-name" label="Nombre de la clienta" error={errors.name}>
+            <Field id="campo-name" label="Nombre del creador" error={errors.name}>
               <input
                 id="campo-name"
                 value={form.name}
