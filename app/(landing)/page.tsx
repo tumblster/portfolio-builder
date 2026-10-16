@@ -85,7 +85,8 @@ export default function LandingPage() {
       <main className="overflow-x-clip">
         {/* 1 · Hero: copy, Chispa protagonista y la mini-mock */}
         {/* 16/10 (obs. Fer): el hero centra su contenido en la pantalla (no solo padding arriba); sin eyebrow: duplicaba la marca del navbar. */}
-        <section className={`${container} landing-hero py-12 md:py-16`} data-hero>
+        {/* 16/10 (bug Fer): en mobile el pt-12 (48px) quedaba bajo el navbar fijo (64px) y comía el H1: pt-24. */}
+        <section className={`${container} landing-hero pt-24 pb-12 md:py-16`} data-hero>
           {/* En el celular el stack de texto va centrado bajo la cara; desde tablet, a la izquierda. */}
           <div className="landing-hero__copy text-center md:text-left">
             <h1
