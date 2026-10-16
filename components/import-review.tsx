@@ -8,6 +8,7 @@ import { PreviewViews, type PreviewData, type PreviewView } from "@/components/d
 import { NichePicker, PiecePicker, type NicheChip, type PieceChip } from "@/components/import/confirm-pickers";
 import type { Onboarding } from "@/components/import/onboarding-step";
 import { ServicesStep, initialServiceCards, type ServiceCard } from "@/components/import/services-step";
+import { BannerPicker, TEMPLATES_WITH_BANNER } from "@/components/import/banner-picker";
 import type { DraftPiece } from "@/lib/import/events";
 import "@/components/import/review.css";
 import { ChispaLoader } from "@/components/mascot/chispa-loader";
@@ -19,6 +20,7 @@ import {
 import type { DraftPreview, ImportResult } from "@/lib/import/events";
 import { resolvePalette } from "@/lib/palette/palettes";
 import { DEFAULT_DESIGN, TEMPLATE_INFO, type PaletteId, type TemplateId } from "@/lib/portfolio/design";
+import type { StoredImage } from "@/lib/portfolio/schema";
 import { partnersPayload, type BrandPartnerDraft } from "@/lib/portfolio/media-kit-drafts";
 import { detectBrandMentions, mergeMentions } from "@/lib/portfolio/mentions";
 import { nicheFromLabel } from "@/lib/portfolio/niches";
@@ -132,6 +134,8 @@ export function ImportReview({ draft, owner, onGenerated, onStartOver, onUnautho
   const [pieceError, setPieceError] = useState<string | null>(null);
   const [template, setTemplate] = useState<TemplateId>(DEFAULT_DESIGN.template);
   const [palette, setPalette] = useState<PaletteId>(() => recommendedPalette(draft.photo));
+  // 15/10 (obs. Fer, ronda 3): foto del banner elegida en el paso Plantilla (solo Creator/Bio).
+  const [cover, setCover] = useState<StoredImage | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [expired, setExpired] = useState(false);
   const [generating, setGenerating] = useState(false);
@@ -379,6 +383,8 @@ export function ImportReview({ draft, owner, onGenerated, onStartOver, onUnautho
             },
           }
         : {}),
+      // 15/10 (obs. Fer, ronda 3): la foto del banner elegida en el paso Plantilla.
+      ...(cover ? { cover } : {}),
       // 13.15: el onboarding (correo = cuenta, y el género para los textos de WhatsApp).
       ...(owner ? { owner } : {}),
       ...(retry ? { retry: true } : {}),
@@ -683,6 +689,15 @@ export function ImportReview({ draft, owner, onGenerated, onStartOver, onUnautho
                 onViewChange={setPreviewView}
               />
             </div>
+            {/* 15/10 (obs. Fer, ronda 3): si la plantilla lleva banner, elegir la foto antes de generar. */}
+            {TEMPLATES_WITH_BANNER.includes(template) && (
+              <BannerPicker
+                photo={draft.photo}
+                value={cover}
+                onChange={setCover}
+                onPending={(delta) => setUploads((count) => Math.max(0, count + delta))}
+              />
+            )}
           </section>
         )}
 
