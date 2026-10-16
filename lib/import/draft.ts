@@ -9,7 +9,7 @@ import { detectBrandMentions } from "@/lib/portfolio/mentions";
 import { creatorMetrics } from "@/lib/portfolio/metrics";
 import { nicheFromLabel, type NicheDef } from "@/lib/portfolio/niches";
 import { createPortfolio, getPortfolio } from "@/lib/portfolio/repository";
-import { splitNameTagline } from "@/lib/portfolio/name-tagline";
+import { humanizeName, splitNameTagline } from "@/lib/portfolio/name-tagline";
 import { slugCandidates, slugify } from "@/lib/portfolio/slug";
 import {
   LIMITS,
@@ -183,7 +183,9 @@ function toPreview(draft: StoredDraft): DraftPreview {
   const engagementRate = computeEngagementRate(snapshot);
   // E2 del dueño: el nombre de IG suele traer el "qué hace" pegado ("Daniela Gadea | Marca Personal para
   // profesionales"): se separa en nombre + tagline; el tagline va bajo el nombre en el hero.
-  const { name, tagline } = splitNameTagline(snapshot.fullName || "");
+  // 15/10 (obs. Fer, ronda 3): si el nombre viene como el usuario en minúsculas, la IA lo humaniza.
+  const { name: rawName, tagline } = splitNameTagline(snapshot.fullName || "");
+  const name = humanizeName(rawName, draft.username, generated?.displayName);
   return {
     draftId: draft.id,
     username: draft.username,
@@ -456,7 +458,10 @@ export async function confirmDraft(input: ConfirmImportInput, options: { gender?
     // E2 del dueño: el nombre de IG se parte en nombre + tagline; ambos quedan en manual (el nombre corto manda
     // sobre el `fullName` de Instagram y el tagline va bajo el nombre, no en el título). Sin separador, `name`
     // es el nombre tal cual y no cambia nada.
-    const { name, tagline } = splitNameTagline(draft.snapshot.fullName || "");
+    // 15/10 (obs. Fer, ronda 3): si el nombre viene como el usuario en minúsculas ("andresbilbao"), la IA lo
+    // humaniza ("Andrés Bilbao").
+    const { name: rawName, tagline } = splitNameTagline(draft.snapshot.fullName || "");
+    const name = humanizeName(rawName, draft.username, draft.generated?.displayName);
     portfolio = await createPortfolio(
       {
         source: "instagram",

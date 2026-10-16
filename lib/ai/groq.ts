@@ -69,6 +69,8 @@ export type PortfolioCopy = {
   pieces: Map<string, { title: string; niche: string | null }>;
   /** Formas de colaborar SUGERIDAS (13.6): la creadora las revisa antes de que se publiquen. */
   services: Service[];
+  /** Nombre bien escrito por la IA ("Andrés Bilbao" aunque el perfil diga "andresbilbao"). Null si no es plausible. */
+  displayName: string | null;
 };
 
 /** Error que vale la pena reintentar (red, 429, 5xx, respuesta que no pasó la validación). */
@@ -138,6 +140,7 @@ function buildMessages(input: CopyInput, refs: { ref: string; post: CopyInput["p
 4. services: de 3 a 4 formas de colaborar que esta creadora puede ofrecer a marcas. Son SUGERENCIAS que ella va a revisar, editar o borrar antes de publicar, así que deben salir de lo que se ve en sus publicaciones (texto y hashtags) y del tipo de marcas que menciona (marcas_mencionadas), no de suposiciones:
    - title: de 2 a 4 palabras, máximo 32 caracteres. Ejemplo: "Videos UGC para anuncios".
    - description: una frase de máximo 90 caracteres, concreta y sin cifras ni precios. Si ayuda, nombra el rubro de las marcas que menciona (ej.: "para marcas de skincare"), pero no escribas @usuarios ni digas que ya trabajó con ellas: una mención no prueba una colaboración.
+5. display_name: el nombre de la persona bien escrito, para el titular del portafolio. Si el nombre del perfil viene en minúsculas, pegado o igual al usuario (ej. "andresbilbao"), devuélvelo con formato de nombre propio (ej. "Andrés Bilbao"). Si ya viene bien escrito, devuélvelo igual. Solo el nombre: sin tagline, sin @ y sin emojis.
 
 <perfil>
 ${JSON.stringify(profile, null, 2)}
@@ -193,8 +196,9 @@ function responseSchema(refs: string[]) {
           additionalProperties: false,
         },
       },
+      display_name: { type: "string" },
     },
-    required: ["value_prop", "niches", "pieces", "services"],
+    required: ["value_prop", "niches", "pieces", "services", "display_name"],
     additionalProperties: false,
   };
 }
@@ -257,6 +261,7 @@ const outputSchema = z.object({
   niches: z.array(z.object({ id: z.string(), name: z.string() })).default([]),
   pieces: z.array(z.object({ id: z.string(), title: z.string(), niche: z.string() })),
   services: z.array(z.object({ title: z.string(), description: z.string() })).default([]),
+  display_name: z.string(),
 });
 
 /** Quita emojis, hashtags y comillas envolventes; deja una sola línea. */
@@ -268,6 +273,16 @@ function cleanLine(text: string): string {
     .trim()
     .replace(/^["'“”«»]+|["'“”«»]+$/g, "")
     .trim();
+}
+
+/** Nombre bien escrito o null: debe tener letras, sin @ ni URLs. */
+function sanitizeDisplayName(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const name = cleanLine(value).replace(/@[\w.]+/g, "").trim();
+  if (name.length < 2 || name.length > 60) return null;
+  if (!/[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]/.test(name)) return null;
+  if (/https?:|\.(com|pe|mx|co|ar|cl|io|net|org)\b/i.test(name)) return null;
+  return name;
 }
 
 function parseCopy(content: string, refs: { ref: string; post: CopyInput["posts"][number] }[]): PortfolioCopy {
@@ -317,7 +332,11 @@ function parseCopy(content: string, refs: { ref: string; post: CopyInput["posts"
     .filter((service) => service.title.length >= 3)
     .slice(0, LIMITS.maxServices);
 
-  return { model: GROQ_MODEL, valueProp, niches, pieces, services };
+  // 15/10 (obs. Fer, ronda 3): el nombre del perfil a veces viene como el usuario en minúsculas ("andresbilbao").
+  // La IA devuelve la versión bien escrita ("Andrés Bilbao"); si no es un nombre plausible, se ignora.
+  const displayName = sanitizeDisplayName(parsed.data.display_name);
+
+  return { model: GROQ_MODEL, valueProp, niches, pieces, services, displayName };
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>

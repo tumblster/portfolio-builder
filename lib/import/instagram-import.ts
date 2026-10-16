@@ -122,6 +122,7 @@ export async function importFromInstagram(
       }),
       niches: copy.niches,
       services: copy.services,
+      displayName: copy.displayName,
     };
   } catch (error) {
     // El scrapeo ya se pagó: se crea igual, con títulos sacados del texto de cada post.

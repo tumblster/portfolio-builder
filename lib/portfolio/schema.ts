@@ -337,6 +337,8 @@ export const generatedContentSchema = z.object({
   niches: nichesSchema.optional(),
   /** v2: formas de colaborar sugeridas. Ausente en portafolios de la v1. */
   services: servicesSchema.optional(),
+  /** 15/10 (obs. Fer, ronda 3): nombre bien escrito por la IA ("Andrés Bilbao" aunque el perfil diga "andresbilbao"). */
+  displayName: z.string().trim().min(1).max(60).nullish(),
 });
 export type GeneratedContent = z.infer<typeof generatedContentSchema>;
 
