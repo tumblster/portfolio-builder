@@ -618,6 +618,11 @@ export const confirmImportInputSchema = z.object({
       email: contactSchema.shape.email,
     })
     .optional(),
+  /**
+   * 15/10 (obs. Fer, ronda 3): foto del banner elegida antes de generar (plantillas Creator/Bio).
+   * Si no viene, el hero sale sin banner (layout "solo").
+   */
+  cover: storedImageSchema.nullable().optional(),
   design: designSchema,
 });
 export type ConfirmImportInput = z.output<typeof confirmImportInputSchema>;

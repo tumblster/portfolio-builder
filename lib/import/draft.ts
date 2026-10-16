@@ -482,6 +482,8 @@ export async function confirmDraft(input: ConfirmImportInput, options: { gender?
           ...(services.length > 0 ? { services } : {}),
           ...(brandPartners.length > 0 ? { brandPartners } : {}),
           ...(options.gender ? { gender: options.gender } : {}),
+          // 15/10 (obs. Fer, ronda 3): la foto del banner elegida en el paso Plantilla.
+          ...(input.cover ? { cover: input.cover } : {}),
         },
         pieces,
         design: input.design,
