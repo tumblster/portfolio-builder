@@ -470,7 +470,15 @@ export async function confirmDraft(input: ConfirmImportInput, options: { gender?
           ...(tagline ? { tagline } : {}),
           // E2 del dueño: el sitio web pineado en su IG solo va si lo marcó con el checkbox; si no, "" lo oculta
           // aunque Instagram tenga el dato (así lo define el esquema de contacto).
-          ...(input.website === true ? {} : { contact: { website: "" } }),
+          // 15/10 (obs. Fer): el contacto opcional del paso Servicios (WhatsApp/correo) se suma al mismo contact.
+          ...(input.website === true && !input.contact
+            ? {}
+            : {
+                contact: {
+                  ...(input.website === true ? {} : { website: "" }),
+                  ...input.contact,
+                },
+              }),
           ...(services.length > 0 ? { services } : {}),
           ...(brandPartners.length > 0 ? { brandPartners } : {}),
           ...(options.gender ? { gender: options.gender } : {}),

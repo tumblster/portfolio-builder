@@ -162,7 +162,6 @@ export function BioTemplate({ portfolio, variant, filter, coverEdit }: TemplateP
             <p>
               © {copyrightYear()} {name}
             </p>
-            <p>Hecho con Supercreador</p>
           </footer>
         </Root>
       </div>

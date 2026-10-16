@@ -111,7 +111,7 @@ export function MinimalTemplate({ portfolio, variant, filter }: TemplateProps) {
 
             <footer className="min-footer">
               <p>
-                © {copyrightYear()} {name} · Hecho con Supercreador
+                © {copyrightYear()} {name}
               </p>
             </footer>
           </aside>

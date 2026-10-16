@@ -51,7 +51,6 @@ export function EditorialTemplate({ portfolio, variant, filter, coverEdit }: Tem
         <Root id={id("inicio")}>
           <section className="ed-hero" aria-labelledby={id("nombre")}>
             <CreatorEyebrow
-              tagline={tagline}
               niches={filterable}
               className="ed-kicker"
               ornament={<span className="ed-dot" aria-hidden="true" />}
@@ -210,7 +209,6 @@ export function EditorialTemplate({ portfolio, variant, filter, coverEdit }: Tem
           <p>
             © {copyrightYear()} {name}
           </p>
-          <p>Hecho con Supercreador</p>
         </footer>
       </div>
     </TemplateFrame>

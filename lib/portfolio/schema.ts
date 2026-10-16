@@ -608,6 +608,16 @@ export const confirmImportInputSchema = z.object({
   brandPartners: brandPartnersSchema.optional(),
   /** E2 del dueño: true = agrega al portafolio el sitio web pineado en su IG (opt-in con checkbox). */
   website: z.boolean().optional(),
+  /**
+   * 15/10 (obs. Fer): contacto opcional pedido en el paso Servicios (WhatsApp + correo). Solo viaja lo que
+   * la creadora llenó; los validadores son los mismos del esquema de contacto (vacío = se ignora).
+   */
+  contact: z
+    .object({
+      whatsapp: contactSchema.shape.whatsapp,
+      email: contactSchema.shape.email,
+    })
+    .optional(),
   design: designSchema,
 });
 export type ConfirmImportInput = z.output<typeof confirmImportInputSchema>;
