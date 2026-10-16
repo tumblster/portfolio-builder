@@ -443,7 +443,7 @@ export function PiecePicker(props: {
         </span>
       </h3>
       <p id={`${uid}-help`} className="mt-1 text-sm text-muted">
-        Van en este orden en el portafolio. Cambia el nicho de cada una o súmale piezas de su perfil.
+        Van en este orden en el portafolio. Cambia el nicho de cada una o súmale piezas de tu perfil.
       </p>
       <div className="mt-3">
         <ChipList

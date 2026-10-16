@@ -121,6 +121,8 @@ export function ImportReview({ draft, owner, onGenerated, onStartOver, onUnautho
   const [partnerError, setPartnerError] = useState<string | null>(null);
   // E2 del dueño: el sitio web pineado en su IG solo va si lo marca (opt-in, apagado por defecto).
   const [includeWebsite, setIncludeWebsite] = useState(false);
+  // 16/10 (obs. Fer): la creadora puede pegar un link nuevo (no solo el de su IG). Si lo llena, manda sobre el checkbox.
+  const [customWebsite, setCustomWebsite] = useState("");
   // 15/10 (obs. Fer): contacto opcional en el paso Servicios (WhatsApp + correo). Viaja al generar.
   const [contactWhatsapp, setContactWhatsapp] = useState("");
   const [contactEmail, setContactEmail] = useState("");
@@ -373,13 +375,15 @@ export function ImportReview({ draft, owner, onGenerated, onStartOver, onUnautho
       // 13.19: solo las marcas que ella agregó (las menciones sin tocar no viajan).
       ...(partners.length > 0 ? { brandPartners: partnersPayload(partners) } : {}),
       // E2 del dueño: el sitio web pineado en su IG solo va si lo marcó con el checkbox.
-      ...(includeWebsite ? { website: true } : {}),
+      // 16/10 (obs. Fer): si pegó un link nuevo, ese manda (viaja en contact.website, ya validado por el esquema).
+      ...(customWebsite.trim() ? {} : includeWebsite ? { website: true } : {}),
       // 15/10 (obs. Fer): contacto opcional del paso Servicios (solo viaja lo que llenó).
-      ...(contactWhatsapp.trim() || contactEmail.trim()
+      ...(contactWhatsapp.trim() || contactEmail.trim() || customWebsite.trim()
         ? {
             contact: {
               ...(contactWhatsapp.trim() ? { whatsapp: contactWhatsapp.trim() } : {}),
               ...(contactEmail.trim() ? { email: contactEmail.trim() } : {}),
+              ...(customWebsite.trim() ? { website: customWebsite.trim() } : {}),
             },
           }
         : {}),
@@ -523,7 +527,7 @@ export function ImportReview({ draft, owner, onGenerated, onStartOver, onUnautho
         {step === 0 && (
           <section aria-labelledby={`${uid}-h`}>
             <h2 id={`${uid}-h`} ref={stepHeading} tabIndex={-1} className="title-2 outline-none">
-              Confirma sus nichos y sus piezas
+              Confirma tus nichos y tus piezas
             </h2>
             <div className="mt-6 space-y-9">
               <NichePicker
@@ -591,13 +595,16 @@ export function ImportReview({ draft, owner, onGenerated, onStartOver, onUnautho
                 error={partnerError}
               />
             </section>
-            {/* E2 del dueño: el sitio web pineado en su IG es opt-in (checkbox, apagado por defecto). */}
-            {draft.website && (
-              <section aria-labelledby={`${uid}-web`} className="mt-12" data-review-website>
-                <h3 id={`${uid}-web`} className="title-3">
-                  Sitio web
-                </h3>
-                <p className="mt-2 mb-4 text-sm text-muted">Opcional. El link pineado en su Instagram.</p>
+            {/* E2 del dueño: el sitio web pineado en su IG es opt-in (checkbox, apagado por defecto).
+                16/10 (obs. Fer): la sección se llama "Link" y permite pegar uno nuevo, no solo el del IG. */}
+            <section aria-labelledby={`${uid}-web`} className="mt-12" data-review-website>
+              <h3 id={`${uid}-web`} className="title-3">
+                Link
+              </h3>
+              <p className="mt-2 mb-4 text-sm text-muted">
+                Opcional. El link que aparece en tu portafolio, junto a tus redes.
+              </p>
+              {draft.website && (
                 <label className="flex min-h-tap cursor-pointer items-start gap-3 rounded-card border border-line bg-paper p-4">
                   <input
                     type="checkbox"
@@ -607,12 +614,26 @@ export function ImportReview({ draft, owner, onGenerated, onStartOver, onUnautho
                     data-website-checkbox
                   />
                   <span className="text-sm">
-                    <span className="font-semibold">Agregar su sitio web al portafolio</span>
+                    <span className="font-semibold">Agregar el link de tu Instagram</span>
                     <span className="mt-0.5 block break-all text-muted">{draft.website}</span>
                   </span>
                 </label>
-              </section>
-            )}
+              )}
+              <div className="mt-4">
+                <label htmlFor={`${uid}-web-custom`} className={fieldLabel}>
+                  O pega otro link
+                </label>
+                <input
+                  id={`${uid}-web-custom`}
+                  type="url"
+                  inputMode="url"
+                  value={customWebsite}
+                  onChange={(event) => setCustomWebsite(event.target.value)}
+                  placeholder="Landing page, video de YouTube, portafolio en Behance..."
+                  className={`${textInput} mt-2`}
+                />
+              </div>
+            </section>
             {/* 15/10 (obs. Fer): contacto opcional. Sin WhatsApp ni correo, el "Trabaja conmigo"
                 del portafolio no lleva a nada: por eso se pide aquí, sin paso adicional. */}
             <section aria-labelledby={`${uid}-contacto`} className="mt-12" data-review-contact>
