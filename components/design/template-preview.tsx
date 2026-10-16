@@ -93,7 +93,7 @@ function Body({ template, data }: { template: TemplateId; data: PreviewData }) {
   const { name, handle, niches } = data;
   const thumb = (index: number) => data.thumbs?.[index] ?? null;
   const firstName = name.split(/\s+/)[0] || name;
-  const kicker = ["UGC Creator", ...niches].join(" · ");
+  const kicker = ["Content creator", ...niches].join(" · ");
   switch (template) {
     case "creator":
       return (

@@ -37,55 +37,40 @@ html:has(.landing) {
   outline-offset: 3px;
 }
 
-/* ── Hero: un solo elemento de Chispa, reubicado por ancho ─────────────
- * Celular: la cara es el bloque visual del hero, centrada arriba (160 px) y separada del titular: entre su
- * mentón y el H1 quedan ≥ 48 px (su propio aire de lienzo + el margen); el texto va centrado debajo. Tablet y escritorio: dos columnas,
- * copy y columna visual; en la visual, la cara arriba presentando la mini-mock, que pasa por delante y tapa
- * apenas el borde inferior de la sonrisa (--face: ancho de la cara; su aire de abajo es el 25,5 % del lienzo). */
+/* ── Hero: copy + mock del portafolio (ronda 15/10: sin carita; la firma visual del producto es el mock) ──
+ * Celular: el texto va centrado y el mock debajo. Tablet y escritorio: dos columnas, copy a la izquierda y el
+ * mock a la derecha como columna visual. */
 .landing-hero {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  grid-template-areas: "face" "copy" "mock";
+  grid-template-areas: "copy" "mock";
 }
 .landing-hero__copy {
   grid-area: copy;
-}
-.landing-hero__face {
-  grid-area: face;
-  justify-self: center;
-  width: 10rem;
-  margin-bottom: 1rem;
 }
 .landing-hero__mock {
   grid-area: mock;
   justify-self: center;
   width: min(100%, 17rem);
-  margin-top: 4rem;
+  margin-top: 2.5rem;
 }
 @media (width >= 48rem) {
   .landing-hero {
-    --face: 16rem;
     grid-template-columns: minmax(0, 1fr) minmax(0, 18rem);
-    grid-template-areas: "copy face" "copy mock";
+    grid-template-areas: "copy mock";
     column-gap: 3rem;
   }
   .landing-hero__copy {
     align-self: center;
   }
-  .landing-hero__face {
-    width: var(--face);
-    margin: 0;
-  }
   .landing-hero__mock {
-    position: relative;
-    z-index: 1;
     width: 82%;
-    margin-top: calc(var(--face) * -0.255 - 1rem);
+    margin-top: 0;
+    align-self: center;
   }
 }
 @media (width >= 64rem) {
   .landing-hero {
-    --face: 18.75rem; /* 300 px */
     grid-template-columns: minmax(0, 1fr) minmax(0, 21rem);
     column-gap: 4rem;
   }
@@ -94,83 +79,14 @@ html:has(.landing) {
   }
 }
 
-/* Después del hero, el contenido usa todo el ancho menos una columna derecha angosta (15rem): por ahí baja la
- * carita viajera en escritorio, pegada al contenido en vez de tapar el texto. */
+/* El contenido usa todo el ancho (ronda 15/10: sin carita viajera no hay carril lateral). */
 .landing-column {
-  margin-right: 1.75rem; /* celular: el borde derecho es el carril de la carita viajera (52 px) */
-}
-@media (width >= 48rem) {
-  .landing-column {
-    max-width: calc(100% - 15rem);
-    margin-right: 0;
-  }
+  margin-right: 0;
 }
 
-/* ── Carita viajera (components/mascot/mascot-traveler.tsx, B1) ──────────
- * Un solo elemento fijo del tamaño del lienzo de Chispa (330 px): el JS lo ubica y lo escala solo con transform.
- * Invisible hasta que se desprende del hero; mientras viaja, la cara del hero se esconde (visibility: sin mover
- * nada) y el mark del footer espera a que la cara llegue para cruzarse con ella. */
-.mascot-traveler {
-  position: fixed;
-  top: 0;
-  left: 0;
-  z-index: 30; /* sobre el contenido y el botón flotante; bajo la navegación fija */
-  width: 330px;
-  height: 330px;
-  color: var(--color-ink);
-  transform-origin: 0 0;
-  pointer-events: none;
-  visibility: hidden;
-  will-change: transform;
-}
-.mascot-traveler[data-ready]:not([data-state="hero"]) {
-  visibility: visible;
-}
-.mascot-traveler__pop {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  transition: opacity 260ms ease;
-}
-/* El logo la absorbe: la cara se funde mientras el mark aparece (y al revés si se vuelve a subir). */
-.mascot-traveler[data-state="absorbed"] .mascot-traveler__pop {
-  opacity: 0;
-}
-.mascot-traveler svg {
-  display: block;
-  width: 100%;
-  height: 100%;
-}
-.mascot-traveler [data-face] {
-  position: absolute;
-  inset: 0;
-  opacity: 0;
-  transition: opacity 200ms ease;
-}
-.mascot-traveler [data-face][data-active] {
-  opacity: 1;
-}
-.mascot-traveler [data-face]:not([data-active]) * {
-  animation-play-state: paused;
-}
-/* Para calzar exacto con el mark, la sonrisa deja de "respirar" al aterrizar. */
-.mascot-traveler:is([data-state="landing"], [data-state="absorbed"], [data-state="leaving"]) .mascot-mouth {
-  animation: none;
-}
-html[data-mascot-traveling] [data-hero-mascot] {
-  visibility: hidden;
-}
-[data-mascot-target] {
-  transition: opacity 260ms ease;
-}
-html[data-mascot-hide-mark] [data-mascot-target] {
-  opacity: 0;
-}
-@media (prefers-reduced-motion: reduce) {
-  .mascot-traveler {
-    display: none;
-  }
-}
+/* ── Carita viajera: eliminada en la ronda 15/10 (obs. Fer) ──
+ * La mascota vive solo en el home paraguas; la landing del producto no la usa.
+ * (Se conserva el componente components/mascot/mascot-traveler.tsx por si se reutiliza.) */
 
 /* ── Botón flotante del piloto (components/landing/pilot-float.tsx, B6) ─── */
 .pilot-float {

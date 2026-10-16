@@ -7,16 +7,15 @@ import { InstagramGlyph } from "@/components/landing/instagram-glyph";
 import { LandingFooter, LandingHeader, landingContainer as container, landingPrimary as primary } from "@/components/landing/landing-chrome";
 import { PilotFloat } from "@/components/landing/pilot-float";
 import { PilotSignup } from "@/components/landing/pilot-signup";
-import { Chispa, type Expression } from "@/components/mascot/chispa";
-import { MascotTraveler } from "@/components/mascot/mascot-traveler";
 import { interTight } from "@/lib/fonts/inter-tight";
 import { fontTmj } from "@/lib/fonts/tmj";
 
 /*
  * Landing del producto "/" (v2 · M4-rev r2; 13.16: branding Superfolio). Cuatro bloques: hero → roadmap de producto
  * ("For you page") → "Esto es parte de Supercreador" → cierre con la captura de correo del programa piloto.
- * Chispa es la protagonista: en el hero se ríe (carcajada) y, al bajar, viaja con quien lee cambiando de expresión
- * en cada tramo (data-mascot-zone) hasta que el logo del footer la absorbe. Estática y `noindex`.
+ * Ronda 15/10 (obs. Fer): página de producto, sin mascota. La carita (hero + viajera del scroll) vive solo en el
+ * home paraguas: aquí el protagonista visual es el mock del portafolio que muta entre plantillas. Estática y
+ * `noindex`.
  */
 
 export const metadata: Metadata = {
@@ -31,7 +30,6 @@ type RoadmapItem = {
   status: "Disponible ahora" | "En construcción" | "Próximo";
   text: ReactNode;
   cta: { label: string; href: string } | null;
-  zone: Expression;
 };
 
 const ROADMAP: RoadmapItem[] = [
@@ -44,21 +42,18 @@ const ROADMAP: RoadmapItem[] = [
       </>
     ),
     cta: { label: "Probarlo", href: "/crear" },
-    zone: "sorprendida",
   },
   {
     name: "Tablero de oportunidades",
     status: "En construcción",
     text: "Las marcas publican oportunidades reales; tú postulas con tu portafolio.",
     cta: null,
-    zone: "picara",
   },
   {
     name: "Tarifar sin fricción",
     status: "Próximo",
     text: "Descubre cuánto cobrar por cada colaboración según tu nicho y tus métricas.",
     cta: null,
-    zone: "estrella",
   },
 ];
 
@@ -69,10 +64,7 @@ const STATUS_PILL: Record<RoadmapItem["status"], string> = {
   Próximo: "border border-line bg-paper text-ink",
 };
 
-/** Expresiones de la carita viajera, en el orden en que aparecen al bajar (las mismas zonas de la página). */
-const TRAVELER: Expression[] = ["guino", "sorprendida", "picara", "estrella", "carcajada"];
-
-/** Después del hero, el contenido deja libre el costado derecho: por ahí baja la carita viajera. */
+/** El contenido usa todo el ancho: sin carita viajera no hay carril lateral. */
 const column = "landing-column";
 const eyebrow = "text-xs font-semibold tracking-[0.16em] text-muted uppercase";
 const textLink = "group inline-flex h-12 items-center gap-1.5 font-medium hover:underline hover:decoration-accent hover:decoration-2 hover:underline-offset-4";
@@ -123,9 +115,6 @@ export default function LandingPage() {
               </Link>
             </p>
           </div>
-          <div className="landing-hero__face" data-hero-mascot>
-            <Chispa expression="carcajada" id="chispa-hero" className="block h-auto w-full text-ink" />
-          </div>
           <div className="landing-hero__mock">
             <HeroMorph />
           </div>
@@ -134,7 +123,7 @@ export default function LandingPage() {
         {/* 2 · Roadmap de producto: lo que ya se puede usar y lo que viene */}
         <section id="como-funciona" aria-labelledby="como-funciona-titulo" className="py-24 md:py-32 lg:py-40">
           <div className={container}>
-            <div className={column} data-mascot-zone="guino">
+            <div className={column}>
               <p className={eyebrow}>For you page</p>
               <h2
                 id="como-funciona-titulo"
@@ -145,7 +134,7 @@ export default function LandingPage() {
             </div>
             <ol className={`${column} landing-roadmap mt-12 md:mt-16`}>
               {ROADMAP.map((item) => (
-                <li key={item.name} className="landing-roadmap__item" data-mascot-zone={item.zone} data-roadmap-status={item.status}>
+                <li key={item.name} className="landing-roadmap__item" data-roadmap-status={item.status}>
                   <span className="landing-roadmap__node" aria-hidden="true" />
                   <div className="reveal-on-scroll rounded-[1.75rem] border border-line bg-paper p-7 sm:p-9">
                     <p>
@@ -209,7 +198,6 @@ export default function LandingPage() {
           <div className={container}>
             <div
               className={`${column} landing-ember rounded-[2rem] px-6 py-14 text-center text-cream sm:px-12 md:py-20`}
-              data-mascot-zone="carcajada"
             >
               <p className="text-xs font-semibold tracking-[0.16em] text-sand uppercase">Programa piloto</p>
               <h2 id="piloto-titulo" className="mt-5 text-[2.5rem] leading-[1.05] font-medium tracking-[-0.03em] sm:text-[3.25rem]">
@@ -228,16 +216,9 @@ export default function LandingPage() {
         </section>
 
         <PilotFloat />
-        <MascotTraveler>
-          {TRAVELER.map((expression) => (
-            <span key={expression} data-face={expression} data-active={expression === "carcajada" ? "" : undefined}>
-              <Chispa expression={expression} />
-            </span>
-          ))}
-        </MascotTraveler>
       </main>
 
-      <LandingFooter brand="superfolio" mascotTarget />
+      <LandingFooter brand="superfolio" />
     </>
   );
 }
