@@ -158,6 +158,9 @@ export function ImportReview({ draft, owner, onGenerated, onStartOver, onUnautho
   }, [generating]);
   const stepHeading = useRef<HTMLHeadingElement>(null);
   const focusHeading = useRef(false);
+  // 15/10 (obs. Fer, ronda 2): el autoscroll aterriza donde empieza la tarjeta de edición (foto + nombre),
+  // no arriba del todo en "De Instagram a portafolio".
+  const panelRef = useRef<HTMLDivElement>(null);
   // Si la pantalla se desmonta (Empezar de nuevo) mientras espera un reintento, no se sigue.
   const mounted = useRef(true);
   useEffect(() => {
@@ -210,11 +213,17 @@ export function ImportReview({ draft, owner, onGenerated, onStartOver, onUnautho
   function goTo(next: number) {
     setFormError(null);
     focusHeading.current = true;
-    // 15/10 (obs. Fer): en TODO cambio de paso se vuelve arriba del todo. Instantáneo (no suave): el suave se
-    // cancela en mobile con el cambio de contenido y nunca llegaba arriba.
+    // 15/10 (obs. Fer, ronda 2): en TODO cambio de paso se vuelve al inicio de la tarjeta de edición
+    // (foto + nombre), no arriba del todo. Instantáneo (no suave): el suave se cancela en mobile con el
+    // cambio de contenido y nunca llegaba.
     if (typeof window !== "undefined") {
-      window.scrollTo({ top: 0, behavior: "auto" });
-      requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: "auto" }));
+      const panel = panelRef.current;
+      const land = () => {
+        if (panel) panel.scrollIntoView({ behavior: "auto", block: "start" });
+        else window.scrollTo({ top: 0, behavior: "auto" });
+      };
+      land();
+      requestAnimationFrame(land);
     }
     startTransition(() => setStep(next));
   }
@@ -454,7 +463,7 @@ export function ImportReview({ draft, owner, onGenerated, onStartOver, onUnautho
 
 
   return (
-    <div className="panel p-5 sm:p-7" data-testid="import-review">
+    <div ref={panelRef} className="panel scroll-mt-24 p-5 sm:p-7 md:scroll-mt-32" data-testid="import-review">
       {/* Quién se importó */}
       <div className="flex items-center gap-4">
         <Avatar photo={draft.photo} name={draft.name} />
@@ -610,7 +619,7 @@ export function ImportReview({ draft, owner, onGenerated, onStartOver, onUnautho
               <div className="grid gap-5 sm:grid-cols-2">
                 <div>
                   <label htmlFor={`${uid}-contact-whatsapp`} className={fieldLabel}>
-                    WhatsApp
+                    WhatsApp <span className="font-normal text-muted">(opcional)</span>
                   </label>
                   <input
                     id={`${uid}-contact-whatsapp`}
@@ -633,7 +642,7 @@ export function ImportReview({ draft, owner, onGenerated, onStartOver, onUnautho
                 </div>
                 <div>
                   <label htmlFor={`${uid}-contact-email`} className={fieldLabel}>
-                    Correo
+                    Correo <span className="font-normal text-muted">(opcional)</span>
                   </label>
                   <input
                     id={`${uid}-contact-email`}

@@ -59,7 +59,8 @@ export function BioTemplate({ portfolio, variant, filter, coverEdit }: TemplateP
               </p>
             )}
             {valueProp && <p className="bio-lead">{valueProp}</p>}
-            {bio && <p className="bio-text">{bio}</p>}
+            {/* 15/10 (obs. Fer, ronda 2): solo la propuesta de la IA; la bio de IG no sale por defecto. */}
+            {!valueProp && bio && <p className="bio-text">{bio}</p>}
           </header>
 
           {/* 13.9: principal "Trabaja conmigo" y secundario "Ver media kit". */}

@@ -12,6 +12,10 @@ import { useId } from "react";
  * menciona (lib/ai/groq.ts). Se ven como chips, igual que las marcas mencionadas: tocar uno lo suma como servicio
  * confirmado. E2 del dueño: las sugerencias sin tocar no hacen nada (se descartan en silencio al generar, sin
  * avisos) y nunca se publica un servicio que ella no confirmó.
+ *
+ * Ronda 15/10 (obs. Fer): tocar una sugerencia LLENA la primera cajita vacía que haya (no suma otra tarjeta: la
+ * sugerencia desaparece y la vacía se completa). Y "Agregar servicio" se deshabilita mientras exista una cajita
+ * vacía: no tiene sentido sumar otra vacía al lado.
  */
 
 export type ServiceCard = {
@@ -48,6 +52,31 @@ export function initialServiceCards(suggestions: readonly { title: string; descr
 /** Cuántas sugerencias quedan sin tocar. */
 export const pendingSuggestions = (cards: readonly ServiceCard[]) => cards.filter((card) => card.suggested).length;
 
+/** Una cajita está vacía si no tiene ni título ni descripción. */
+const isEmptyCard = (card: ServiceCard) => !card.title.trim() && !card.description.trim();
+
+/**
+ * Confirma una sugerencia dentro de una lista: si hay una cajita vacía, la sugerencia LA LLENA (la tarjeta
+ * vacía se completa y la sugerencia desaparece, sin sumar tarjetas); si no hay vacía y hay cupo, la sugerencia
+ * se vuelve tarjeta confirmada. Pura: no muta la lista.
+ */
+function confirmIn(list: ServiceCard[], key: string): ServiceCard[] {
+  const suggestion = list.find((card) => card.key === key);
+  if (!suggestion || !suggestion.suggested) return list;
+  const rest = list.filter((card) => card.key !== key);
+  const sugg = rest.filter((card) => card.suggested);
+  const man = rest.filter((card) => !card.suggested);
+  const emptyIdx = man.findIndex(isEmptyCard);
+  if (emptyIdx >= 0) {
+    const filled = man.map((card, index) =>
+      index === emptyIdx ? { ...card, title: suggestion.title, description: suggestion.description } : card,
+    );
+    return [...sugg, ...filled];
+  }
+  if (rest.length >= SERVICES_MAX) return list;
+  return [...rest, { ...suggestion, suggested: false }];
+}
+
 export function ServicesStep({
   cards,
   onChange,
@@ -64,8 +93,10 @@ export function ServicesStep({
   const manual = cards.filter((card) => !card.suggested);
   const pending = suggestions.length;
   const update = (key: string, patch: Partial<ServiceCard>) => onChange(cards.map((card) => (card.key === key ? { ...card, ...patch } : card)));
-  /** Tocar una sugerencia la suma como servicio confirmado (aparece en las cajitas de abajo). */
-  const confirmSuggestion = (key: string) => update(key, { suggested: false });
+  /** Tocar una sugerencia la confirma: llena la cajita vacía si hay una, si no la vuelve tarjeta. */
+  const confirmSuggestion = (key: string) => onChange(confirmIn(cards, key));
+  /** "Usar todas": confirma las sugerencias una por una, con la misma regla (llenar vacías primero). */
+  const useAll = () => onChange(cards.filter((card) => card.suggested).reduce((acc, s) => confirmIn(acc, s.key), cards));
   const move = (key: string, delta: -1 | 1) => {
     const index = manual.findIndex((card) => card.key === key);
     const to = index + delta;
@@ -103,7 +134,7 @@ export function ServicesStep({
           {pending > 1 && (
             <button
               type="button"
-              onClick={() => onChange(cards.map((card) => (card.suggested ? { ...card, suggested: false } : card)))}
+              onClick={useAll}
               className="mt-3 inline-flex min-h-tap items-center rounded-full border border-ink bg-paper px-5 text-sm font-semibold text-ink hover:bg-highlight"
               data-services-use-all
             >
@@ -176,7 +207,8 @@ export function ServicesStep({
       <button
         type="button"
         onClick={() => onChange([...cards, { key: newKey(), title: "", description: "" }])}
-        disabled={cards.length >= SERVICES_MAX}
+        disabled={cards.length >= SERVICES_MAX || manual.some(isEmptyCard)}
+        title={manual.some(isEmptyCard) ? "Ya tienes una tarjeta vacía para escribir" : undefined}
         className="mt-4 inline-flex min-h-tap items-center rounded-full border border-ink/60 bg-paper px-5 text-sm font-semibold disabled:opacity-40"
       >
         {cards.length >= SERVICES_MAX ? `Máximo ${SERVICES_MAX} servicios` : "Agregar servicio"}
