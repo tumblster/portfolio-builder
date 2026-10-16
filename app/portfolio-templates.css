@@ -120,6 +120,10 @@
     flex-direction: column;
     gap: 10px;
   }
+  /* 16/10 (obs. Fer, auditoría): los CTAs y el contacto son una sola columna visual: mismo ritmo de 10px. */
+  .bio-links + .bio-links {
+    margin-top: -18px;
+  }
   .bio-link {
     display: flex;
     align-items: center;

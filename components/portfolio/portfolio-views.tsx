@@ -3,7 +3,6 @@
 import { usePathname } from "next/navigation";
 import {
   useEffect,
-  useRef,
   useState,
   useSyncExternalStore,
   type CSSProperties,
@@ -78,7 +77,6 @@ export function PortfolioViews({ about, kit, style, nav }: { about: ReactNode; k
   const kitActive = useSyncExternalStore(subscribe, isKit, () => false);
   const pathname = usePathname();
   const activeNiche = pathname.startsWith(`${nav.basePath}/`) ? pathname.slice(nav.basePath.length + 1).split("/")[0] : null;
-  const scroller = useRef<HTMLDivElement>(null);
   const [views, setViews] = useState<number | null>(null);
   const slug = nav.basePath.split("/").filter(Boolean).pop() ?? "";
   const firstName = nav.name.trim().split(/\s+/)[0] ?? nav.name;
@@ -107,22 +105,8 @@ export function PortfolioViews({ about, kit, style, nav }: { about: ReactNode; k
       .catch(() => {});
   }, [slug, nav.basePath]);
 
-  // Fundidos de los chips: a la izquierda si ya se desplazó, a la derecha si quedan más (sin re-render).
-  useEffect(() => {
-    const node = scroller.current;
-    if (!node) return;
-    const update = () => {
-      node.toggleAttribute("data-scrolled", node.scrollLeft > 2);
-      node.toggleAttribute("data-more", node.scrollWidth - node.clientWidth - node.scrollLeft > 2);
-    };
-    update();
-    node.addEventListener("scroll", update, { passive: true });
-    window.addEventListener("resize", update);
-    return () => {
-      node.removeEventListener("scroll", update);
-      window.removeEventListener("resize", update);
-    };
-  }, []);
+  // 16/10 (obs. Fer, auditoría): el portafolio público no lleva píldoras clicables de nicho.
+  // Los nichos salen como texto en el eyebrow; las URLs por nicho siguen funcionando si se comparten directo.
 
   function onSegmentKey(event: KeyboardEvent<HTMLDivElement>) {
     if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
@@ -146,8 +130,7 @@ export function PortfolioViews({ about, kit, style, nav }: { about: ReactNode; k
     : nav.contactId
       ? `#${nav.contactId}`
       : null;
-  // 13.13: con un link de nicho, sin los chips (la página ya viene con ese nicho elegido).
-  const hasNiches = nav.niches.length > 0 && activeNiche === null;
+  // 13.13: con un link de nicho, la página ya viene con ese nicho elegido.
 
   return (
     <div
@@ -218,24 +201,6 @@ export function PortfolioViews({ about, kit, style, nav }: { about: ReactNode; k
         </div>
       </header>
       <div role="tabpanel" id="pf-panel-about" aria-labelledby="pf-tab-content" hidden={kitActive} className="pf-views__panel">
-        {/* E2 del dueño: los nichos salen del navbar fijo; van estáticos arriba del contenido, como botones. */}
-        {hasNiches && (
-          <div className="pf-niches">
-            <div ref={scroller} className="pf-niches__scroller">
-              <nav aria-label={`Nichos de ${nav.name}`}>
-                <ul>
-                  {nav.niches.map((niche) => (
-                    <li key={niche.slug}>
-                      <a className="pf-chip" href={`${nav.basePath}/${niche.slug}`} data-pf-chip={niche.slug}>
-                        {niche.label}
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              </nav>
-            </div>
-          </div>
-        )}
         {about}
       </div>
       <div role="tabpanel" id="pf-panel-kit" aria-labelledby="pf-tab-kit" hidden={!kitActive} className="pf-views__panel pf-views__kit">

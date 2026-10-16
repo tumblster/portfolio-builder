@@ -28,7 +28,6 @@
   scroll-margin-top: calc(var(--pf-bar-h) + 12px);
 }
 .pf-views__kit {
-  min-height: 100dvh;
   background: var(--pf-bg);
   color: var(--pf-ink);
 }
