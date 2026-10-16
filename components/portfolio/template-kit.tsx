@@ -175,28 +175,24 @@ export function NicheSuffix({ niches }: { niches: readonly NicheDef[] }) {
 }
 
 /*
- * Obs. 5 (11/10): el eyebrow refleja la identidad profesional real, no siempre "UGC Creator".
- * - Si hay tagline (la "descripción profesional") → se usa como eyebrow (ej. "Marca personal para profesionales").
- * - Si no hay tagline pero hay nichos → "UGC Creator" (el caso estándar del producto).
- * - Si no hay ni tagline ni nichos → sin eyebrow.
+ * Obs. 5 (11/10) + obs. 15/10 del dueño: el eyebrow refleja la identidad profesional por nichos
+ * ("UGC Creator · belleza"), NUNCA el tagline: el tagline ya se muestra como la descripción bajo el
+ * "Hola, soy…" y repetirlo arriba duplica el contenido. Sin nichos, sin eyebrow.
  */
 export function CreatorEyebrow({
-  tagline,
   niches,
   className,
   ornament,
 }: {
-  tagline?: string | null;
   niches: readonly NicheDef[];
   className: string;
   ornament: React.ReactNode;
 }) {
-  const label = tagline?.trim() ? tagline.trim() : niches.length > 0 ? "UGC Creator" : null;
-  if (!label) return null;
+  if (niches.length === 0) return null;
   return (
     <p className={className}>
       {ornament}
-      {label}
+      UGC Creator
       <NicheSuffix niches={niches} />
     </p>
   );

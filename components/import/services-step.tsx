@@ -5,8 +5,8 @@ import { useId } from "react";
 /*
  * Paso "Servicios" de /crear (spec 11.12): va ANTES de generar. Tarjetas tipo Linktree, con un título y un link o
  * una descripción. Se agregan, se quitan y se reordenan (↑ ↓). Si el segundo campo es un link, el portafolio lo
- * muestra como link. Los servicios son opcionales: si no elige ni escribe ninguno, el portafolio se genera sin
- * ellos (la sección se oculta).
+ * muestra como link. Los servicios son obligatorios para generar (obs. 2 del dueño, 11/10; la advertencia sale en
+ * este paso, 15/10): mínimo un servicio confirmado con título.
  *
  * Ronda 6 · 13.6: el paso llega con SUGERENCIAS de la IA (máximo 2), sacadas de sus captions y de las marcas que
  * menciona (lib/ai/groq.ts). Se ven como chips, igual que las marcas mencionadas: tocar uno lo suma como servicio
@@ -53,14 +53,11 @@ export function ServicesStep({
   onChange,
   newKey,
   error,
-  brands = [],
 }: {
   cards: ServiceCard[];
   onChange: (cards: ServiceCard[]) => void;
   newKey: () => string;
   error: string | null;
-  /** 13.6: las @cuentas que menciona en sus captions, como contexto de las sugerencias. */
-  brands?: readonly string[];
 }) {
   const uid = useId();
   const suggestions = cards.filter((card) => card.suggested);
@@ -82,21 +79,12 @@ export function ServicesStep({
     const nextManual = manual.filter((card) => card.key !== key);
     onChange([...suggestions, ...(nextManual.length > 0 ? nextManual : [{ key: newKey(), title: "", description: "" }])]);
   };
-  const shownBrands = brands.slice(0, 4).map((brand) => `@${brand}`);
 
   return (
     <div data-services-step>
       {pending > 0 && (
         <div className="mb-6 rounded-2xl border border-line bg-cream p-4 sm:p-5" data-services-suggestions>
-          <p className="text-sm leading-relaxed text-ink">
-            <span className="font-semibold">{pending === 1 ? "1 sugerencia por revisar." : `${pending} sugerencias por revisar.`}</span>{" "}
-            Las armamos a partir de sus publicaciones
-            {shownBrands.length > 0
-              ? ` y de las marcas que menciona (${shownBrands.join(", ")}${brands.length > shownBrands.length ? "…" : ""})`
-              : ""}
-            . Toca las que quieras sumar.
-          </p>
-          <ul className="mt-3 flex flex-wrap gap-2">
+          <ul className="flex flex-wrap gap-2">
             {suggestions.map((suggestion) => (
               <li key={suggestion.key}>
                 <button
@@ -128,21 +116,30 @@ export function ServicesStep({
         {manual.map((card, index) => (
           <li key={card.key} className="rounded-card border border-line bg-paper p-4 sm:p-5" data-service-card>
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="font-mono text-xs text-muted">tarjeta {String(index + 1).padStart(2, "0")}</p>
+              <p className="font-mono text-xs text-muted">Servicio {index + 1}</p>
               <div className="flex flex-wrap items-center gap-1">
-                <button type="button" onClick={() => move(card.key, -1)} disabled={index === 0} aria-label={`Subir la tarjeta ${index + 1}`} className="flex min-h-tap min-w-tap items-center justify-center rounded-full text-muted hover:text-ink disabled:opacity-40">
+                <button type="button" onClick={() => move(card.key, -1)} disabled={index === 0} aria-label={`Subir el servicio ${index + 1}`} className="flex min-h-tap min-w-tap items-center justify-center rounded-full text-muted hover:text-ink disabled:opacity-40">
                   <span aria-hidden="true">↑</span>
                 </button>
-                <button type="button" onClick={() => move(card.key, 1)} disabled={index === manual.length - 1} aria-label={`Bajar la tarjeta ${index + 1}`} className="flex min-h-tap min-w-tap items-center justify-center rounded-full text-muted hover:text-ink disabled:opacity-40">
+                <button type="button" onClick={() => move(card.key, 1)} disabled={index === manual.length - 1} aria-label={`Bajar el servicio ${index + 1}`} className="flex min-h-tap min-w-tap items-center justify-center rounded-full text-muted hover:text-ink disabled:opacity-40">
                   <span aria-hidden="true">↓</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => remove(card.key)}
                   disabled={manual.length === 1 && !card.title.trim() && !card.description.trim()}
-                  className="flex min-h-tap items-center px-2 text-sm text-muted hover:text-ink disabled:opacity-40"
+                  className="flex min-h-tap items-center gap-1.5 rounded-full bg-[#FDECEC] px-3 text-sm font-semibold text-[#B3261E] disabled:opacity-40"
                 >
-                  Quitar<span className="sr-only"> la tarjeta {index + 1}</span>
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true" className="shrink-0">
+                    <path
+                      d="M2.5 4h11M6.5 4V2.75A.75.75 0 0 1 7.25 2h1.5a.75.75 0 0 1 .75.75V4M4 4l.7 8.2a1.5 1.5 0 0 0 1.5 1.3h3.6a1.5 1.5 0 0 0 1.5-1.3L12 4M6.5 7v4M9.5 7v4"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                  Quitar<span className="sr-only"> el servicio {index + 1}</span>
                 </button>
               </div>
             </div>
@@ -182,7 +179,7 @@ export function ServicesStep({
         disabled={cards.length >= SERVICES_MAX}
         className="mt-4 inline-flex min-h-tap items-center rounded-full border border-ink/60 bg-paper px-5 text-sm font-semibold disabled:opacity-40"
       >
-        {cards.length >= SERVICES_MAX ? `Máximo ${SERVICES_MAX} tarjetas` : "Agregar tarjeta"}
+        {cards.length >= SERVICES_MAX ? `Máximo ${SERVICES_MAX} servicios` : "Agregar servicio"}
       </button>
     </div>
   );

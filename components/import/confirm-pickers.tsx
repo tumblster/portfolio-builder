@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useId, useRef, useState, type FormEvent } from "react";
+import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { ChipList } from "@/components/chips/chip-list";
 import { Combobox, type ComboOption } from "@/components/chips/combobox";
 import type { DraftPiece } from "@/lib/import/events";
@@ -273,6 +273,11 @@ export function PiecePicker(props: {
   /** Spec 11.5: "Agregar por link" necesita el borrador; la pieza nueva vuelve por onLinkPiece. */
   draftId: string;
   onLinkPiece: (piece: DraftPiece) => void;
+  /**
+   * 15/10 (obs. Fer): el wizard avisa al avanzar si quedó un link escrito sin marcar el permiso.
+   * Se evalúa en vivo al hacer clic (el link y el check son estado interno).
+   */
+  linkPermissionCheckRef?: { current: (() => boolean) | null };
 }) {
   const { pieces, onChange, onError, limits } = props;
   const uid = useId();
@@ -288,6 +293,13 @@ export function PiecePicker(props: {
   const [linkState, setLinkState] = useState<{ busy: boolean; message: string | null }>({ busy: false, message: null });
   // Obs. 4 (11/10): confirmación de permiso para contenido externo.
   const [permissionOk, setPermissionOk] = useState(false);
+  // 15/10: expone si hay un link pendiente sin permiso, para avisar al avanzar de paso.
+  const { linkPermissionCheckRef } = props;
+  useEffect(() => {
+    if (linkPermissionCheckRef) {
+      linkPermissionCheckRef.current = () => link.trim() !== "" && !permissionOk;
+    }
+  });
   const byId = new Map(props.pool.map((piece) => [piece.id, piece]));
   const chosen = new Set(pieces.map((piece) => piece.id));
   const full = pieces.length >= limits.max;
@@ -312,8 +324,10 @@ export function PiecePicker(props: {
       setLinkState({ busy: false, message: LINK_ONLY_VIDEO });
       return;
     }
-    // Obs. 4: sin confirmación de permiso no se agrega.
+    // Obs. 4: sin confirmación de permiso no se agrega: pop-up de advertencia con timer (15/10, como las
+    // demás advertencias) + el mensaje en línea.
     if (!permissionOk) {
+      showToast("Marca la confirmación de permiso para agregar este video.", 5000);
       setLinkState({ busy: false, message: "Marca la confirmación de permiso para agregar este video." });
       return;
     }
