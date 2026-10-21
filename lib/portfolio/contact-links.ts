@@ -30,6 +30,9 @@ function toLink(kind: keyof Contact, value: string): ContactLink {
       return { kind, label: "Instagram", href: `https://www.instagram.com/${value}/`, external: true };
     case "tiktok":
       return { kind, label: "TikTok", href: `https://www.tiktok.com/@${value}`, external: true };
+    case "telegram":
+      // Canva v2 · R9: el schema ya normalizó el valor (@usuario, usuario o número).
+      return { kind, label: "Telegram", href: `https://t.me/${value.replace(/^@/, "").replace(/^\+/, "")}`, external: true };
     case "youtube":
       return { kind, label: "YouTube", href: value, external: true };
     case "website":

@@ -18,7 +18,7 @@ import { slugSchema } from "./slug";
  * Guarda tres fuentes por separado, sin mezclarlas:
  * instagram → lo que se scrapeó del perfil con Apify. No se edita.
  * generated → lo que redactó la IA con Groq: propuesta de valor y, por cada
- *           post elegido, un título y un nicho sugeridos. No se edita.
+ *          post elegido, un título y un nicho sugeridos. No se edita.
  * manual → lo que se escribe a mano. Siempre gana.
  *
  * La página pública muestra: manual → si no hay, IA → si no hay, Instagram
@@ -39,11 +39,17 @@ kit. Solo existen como dato
  *
  * Importador de Canva v1: el tope de piezas sube de 6 a 30 (un portafolio de Canva trae
 decenas de videos por sector).
-
  * La selección inicial del import de Instagram sigue en 6 (LIMITS.importSelectPieces). Los
 MP4 de un sitio de Canva
  * son una plataforma de video más ("canva"): quedan enlazados (hotlink) y se reproducen
 con <video> nativo.
+ *
+ * Importador de Canva v2: `manual.canva` guarda el diseño de su Canva (tema: bandas,
+colores, lado del hero, fuentes)
+ * y lo que solo muestra la variante clonada (logos, logos por pieza, capturas de métricas,
+tarifario, fotos de apoyo).
+ * Es opcional: sin él, el portafolio se ve con su plantilla como siempre. El contacto suma
+Telegram (opcional).
  *
  * Este archivo no depende del servidor: el formulario también lo puede usar.
  */
@@ -51,35 +57,40 @@ con <video> nativo.
 export const SCHEMA_VERSION = 2;
 
 export const LIMITS = {
-  name: 80,
-  /** Lo que va después del separador en el nombre de IG ("Daniela Gadea | Marca Personal
+ name: 80,
+ /** Lo que va después del separador en el nombre de IG ("Daniela Gadea | Marca Personal
 para profesionales"). */
-  tagline: 60,
-  bio: 220,
-  valueProp: 160,
-  pieceTitle: 80,
-  minPieces: 3,
-  /** Canva v1: tope duro de piezas del portafolio (antes 6). */
-  maxPieces: 30,
-  /** Canva v1: cuántas piezas elige de entrada el import de Instagram (el comportamiento
+ tagline: 60,
+ bio: 220,
+ valueProp: 160,
+ pieceTitle: 80,
+ minPieces: 3,
+ /** Canva v1: tope duro de piezas del portafolio (antes 6). */
+ maxPieces: 30,
+ /** Canva v1: cuántas piezas elige de entrada el import de Instagram (el comportamiento
 de siempre). */
-  importSelectPieces: 6,
-  instagramPosts: 12,
-  serviceTitle: 40,
-  serviceDescription: 120,
-  maxServices: 4,
-  /** Ronda 6 · 13.19: Brand partners. */
-  brandName: 60,
-  maxBrandPartners: 12,
-  /** Ronda 6 · 13.20: case studies. */
-  campaignName: 80,
-  maxCaseStudies: 6,
+ importSelectPieces: 6,
+ instagramPosts: 12,
+ serviceTitle: 40,
+ serviceDescription: 120,
+ maxServices: 4,
+ /** Ronda 6 · 13.19: Brand partners. */
+ brandName: 60,
+ maxBrandPartners: 12,
+ /** Ronda 6 · 13.20: case studies. */
+ campaignName: 80,
+ maxCaseStudies: 6,
+ /** Canva v2: logos de marcas que se guardan de su sitio. */
+ maxCanvaLogos: 24,
+ /** Canva v2: capturas de métricas que se guardan de su sitio. */
+ maxCanvaMetrics: 12,
 } as const;
 
 const utcDate = z.iso.datetime(); // ISO 8601 en UTC, p. ej. 2026-09-28T15:04:05.000Z
 
 // ── Nichos (propios de cada portafolio) ─────────────────────────────
-export { LEGACY_NICHES, MAX_NICHES, MAX_PORTFOLIO_NICHES, type NicheDef } from "./niches";
+export { LEGACY_NICHES, MAX_NICHES, MAX_PORTFOLIO_NICHES, type NicheDef }
+from "./niches";
 
 /** Slug de un nicho, tal como va en la URL: /p/<slug>/<nicho>. */
 export const nicheSlugSchema = z
@@ -88,7 +99,6 @@ export const nicheSlugSchema = z
   .regex(NICHE_SLUG_PATTERN, { error: "Nicho inválido." });
 
 export const nicheDefSchema = z.object({
-
   slug: nicheSlugSchema.refine((slug) => !RESERVED_NICHE_SLUGS.includes(slug), {
     error: '"todo" está reservado para la versión general.',
   }),
@@ -98,7 +108,8 @@ export const nicheDefSchema = z.object({
 
 export const nichesSchema = z
  .array(nicheDefSchema)
- .max(MAX_PORTFOLIO_NICHES, { error: `Hasta ${MAX_PORTFOLIO_NICHES} nichos por portafolio.` })
+ .max(MAX_PORTFOLIO_NICHES, { error: `Hasta ${MAX_PORTFOLIO_NICHES} nichos
+por portafolio.` })
  .refine((niches) => new Set(niches.map((niche) => niche.slug)).size === niches.length, {
    error: "Hay dos nichos con el mismo link.",
  });
@@ -125,10 +136,11 @@ export const servicesSchema = z
  .max(LIMITS.maxServices, { error: `Puedes mostrar hasta ${LIMITS.maxServices}
 servicios.` });
 
-// ── Imágenes ────────────────────────────────────────────────────────
+// ── Imágenes
+// ────────────────────────────────────────────────────────
 /** Nombre que el servidor le da a cada imagen guardada: <uuid>.webp */
 export const MEDIA_FILE_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.webp$/;
+/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.webp$/;
 
 /**
  * Imagen guardada en NUESTRO almacenamiento. Nunca se guardan URLs de
@@ -136,7 +148,6 @@ export const MEDIA_FILE_PATTERN =
  */
 export const storedImageSchema = z.object({
   url: z.string().refine(
-
     (url) => url.startsWith("/media/") &&
 MEDIA_FILE_PATTERN.test(url.slice("/media/".length)),
     { error: "La imagen tiene que subirse primero (POST /api/media)." },
@@ -147,6 +158,9 @@ MEDIA_FILE_PATTERN.test(url.slice("/media/".length)),
   /** v2 · M2: color dominante (#rrggbb), para la paleta "de su foto". Ausente en imágenes
 anteriores. */
   swatch: z.string().regex(/^#[0-9a-f]{6}$/i).optional(),
+  /** Canva v2 · R5: true = el archivo ya trae transparencia (logo sin fondo). Ausente =
+opaca. */
+  transparent: z.boolean().optional(),
 });
 export type StoredImage = z.infer<typeof storedImageSchema>;
 
@@ -166,27 +180,26 @@ host.endsWith(".canva.com");
 /**
  * Reconoce un link de video de TikTok, Instagram (post o reel), YouTube o un MP4 de un
 sitio de Canva.
- * Si no lo es, devuelve null.
- */
+* Si no lo es, devuelve null.
+*/
 export function parseVideoLink(raw: string): VideoLink | null {
-  let url: URL;
-  try {
-    url = new URL(raw.trim());
-  } catch {
-    return null;
-  }
-  if (url.protocol !== "https:" && url.protocol !== "http:") return null;
-  url.protocol = "https:";
-  const host = url.hostname.toLowerCase().replace(/^(www|m)\./, "");
-  const path = url.pathname;
-
- // Canva v1: el video vive en el sitio de la creadora (hotlink). Solo archivos .mp4.
- if (isCanvaVideoHost(host) && /\.mp4$/i.test(path)) {
-   return { platform: "canva", url: url.toString() };
+ let url: URL;
+ try {
+   url = new URL(raw.trim());
+ } catch {
+   return null;
  }
- if ((host === "tiktok.com" || host.endsWith(".tiktok.com")) && path.length > 1) {
+ if (url.protocol !== "https:" && url.protocol !== "http:") return null;
+ url.protocol = "https:";
+ const host = url.hostname.toLowerCase().replace(/^(www|m)\./, "");
+ const path = url.pathname;
 
-     return { platform: "tiktok", url: url.toString() };
+    // Canva v1: el video vive en el sitio de la creadora (hotlink). Solo archivos .mp4.
+    if (isCanvaVideoHost(host) && /\.mp4$/i.test(path)) {
+      return { platform: "canva", url: url.toString() };
+    }
+    if ((host === "tiktok.com" || host.endsWith(".tiktok.com")) && path.length > 1) {
+      return { platform: "tiktok", url: url.toString() };
     }
     if (host === "instagram.com" && /^\/(p|reel|reels|tv)\/[\w-]+/.test(path)) {
       return { platform: "instagram", url: url.toString() };
@@ -200,7 +213,8 @@ export function parseVideoLink(raw: string): VideoLink | null {
     return null;
 }
 
-// ── Contacto y redes ────────────────────────────────────────────────
+// ── Contacto y redes
+// ────────────────────────────────────────────────
 // Texto vacío ("") = "no mostrar", aunque Instagram tenga ese dato.
 
 /** Campo opcional que se normaliza y luego se valida; "" siempre es válido. */
@@ -214,7 +228,6 @@ error: string) {
    .refine((value) => value === "" || isValid(value), { error })
    .optional();
 }
-
 /** Acepta "@usuario", "usuario" o el link del perfil, y guarda solo "usuario". */
 function handleFrom(hostPattern: RegExp) {
   return (value: string) => {
@@ -223,32 +236,44 @@ function handleFrom(hostPattern: RegExp) {
   };
 }
 
-const withProtocol = (value: string) =>
- value === "" || /^https?:\/\//i.test(value) ? value : `https://${value}`;
+/** Canva v2 · R9: Telegram acepta "@usuario", "usuario", el link t.me/… o un número con
+código de país. */
+function telegramFrom(value: string): string {
+  const fromUrl = value.match(/(?:t|telegram)\.me\/([+\w]+)/i);
+  const raw = (fromUrl ? fromUrl[1] : value).replace(/^@/, "").replace(/\/+$/, "");
+  return /^\+?[\d\s().-]+$/.test(raw) ? raw.replace(/[\s().-]/g, "") : raw;
+}
+
+const withProtocol = (value: string) => (value === "" || /^https?:\/\//i.test(value) ? value :
+`https://${value}`);
 
 const isHttpUrl = (value: string) => {
- try {
-   const url = new URL(value);
-   return (url.protocol === "https:" || url.protocol === "http:") && url.hostname.includes(".");
- } catch {
-   return false;
- }
-
+  try {
+    const url = new URL(value);
+    return (url.protocol === "https:" || url.protocol === "http:") && url.hostname.includes(".");
+  } catch {
+    return false;
+  }
 };
 
 export const contactSchema = z.object({
-  email: contactField(
-    (v) => v.toLowerCase(),
-    (v) => /^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i.test(v),
-    "El correo no es válido.",
-  ),
-  whatsapp: contactField(
-    (v) => v.replace(/[\s().-]/g, ""),
-    (v) => /^\+?\d{8,15}$/.test(v),
-    "Escribe el WhatsApp con código de país, por ejemplo +51 987 654 321.",
-  ),
-  instagram: contactField(
-    handleFrom(/instagram\.com\/([A-Za-z0-9._]+)/i),
+ email: contactField(
+   (v) => v.toLowerCase(),
+   (v) => /^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i.test(v),
+   "El correo no es válido.",
+ ),
+ whatsapp: contactField(
+   (v) => v.replace(/[\s().-]/g, ""),
+   (v) => /^\+?\d{8,15}$/.test(v),
+   "Escribe el WhatsApp con código de país, por ejemplo +51 987 654 321.",
+ ),
+ telegram: contactField(
+   telegramFrom,
+   (v) => /^\+?\d{8,15}$/.test(v) || /^[A-Za-z][A-Za-z0-9_]{4,31}$/.test(v),
+   "Escribe tu usuario de Telegram (por ejemplo valen_ugc) o tu número con código de país.",
+ ),
+ instagram: contactField(
+   handleFrom(/instagram\.com\/([A-Za-z0-9._]+)/i),
     (v) => /^[A-Za-z0-9._]{1,30}$/.test(v),
     "Escribe solo el usuario de Instagram, por ejemplo valen.ugc",
   ),
@@ -266,7 +291,8 @@ export const contactSchema = z.object({
 });
 export type Contact = z.infer<typeof contactSchema>;
 
-// ── Piezas del portafolio ───────────────────────────────────────────
+// ── Piezas del portafolio
+// ───────────────────────────────────────────
 export const PIECE_ORIGINS = ["instagram", "manual"] as const;
 
 export const pieceSchema = z
@@ -274,13 +300,13 @@ export const pieceSchema = z
    id: z.string().min(1).max(64),
    origin: z.enum(PIECE_ORIGINS),
    title: z.string().trim().min(1).max(LIMITS.pieceTitle),
-   niche: nicheSlugSchema.nullable(), // nicho de la pieza (uno de los del portafolio); null = solo en "Todo"
+   niche: nicheSlugSchema.nullable(), // nicho de la pieza (uno de los del portafolio); null =
+// solo en "Todo"
    image: storedImageSchema.nullable(), // foto, o portada si es video
    video: videoLinkSchema.nullable(),
    sourcePostId: z.string().max(64).optional(), // id del post de Instagram, si vino de ahí
  })
  .refine((piece) => piece.image !== null || piece.video !== null, {
-
    error: "Cada pieza necesita una imagen o un link de video.",
  });
 export type Piece = z.infer<typeof pieceSchema>;
@@ -327,9 +353,8 @@ const piecesInputSchema = z
 const count = z.number().int().nonnegative().nullable(); // null = Instagram no lo muestra
 
 export const instagramPostSchema = z.object({
- id: z.string(),
- shortCode: z.string(),
-
+  id: z.string(),
+  shortCode: z.string(),
   url: z.url(),
   type: z.enum(["image", "video", "carousel"]),
   caption: z.string().max(2200),
@@ -344,7 +369,7 @@ export const instagramPostSchema = z.object({
 export type InstagramPost = z.infer<typeof instagramPostSchema>;
 
 export const instagramSnapshotSchema = z.object({
-  source: z.literal("apify/instagram-scraper"),
+ source: z.literal("apify/instagram-scraper"),
   scrapedAt: utcDate,
   username: z.string().min(1),
   profileUrl: z.url(),
@@ -371,14 +396,13 @@ export const generatedPieceSchema = z.object({
 export type GeneratedPiece = z.infer<typeof generatedPieceSchema>;
 
 export const generatedContentSchema = z.object({
- provider: z.literal("groq"),
- model: z.string().min(1).max(100),
- generatedAt: utcDate,
- valueProp: z.string().trim().min(1).max(LIMITS.valueProp),
- /** Sugerencias de la IA por post. Se copian a `pieces`, que es lo que se edita. */
- pieces: z.array(generatedPieceSchema).max(LIMITS.instagramPosts).default([]),
- /** v2: nichos detectados en el contenido. Ausente en portafolios de la v1. */
-
+  provider: z.literal("groq"),
+  model: z.string().min(1).max(100),
+  generatedAt: utcDate,
+  valueProp: z.string().trim().min(1).max(LIMITS.valueProp),
+  /** Sugerencias de la IA por post. Se copian a `pieces`, que es lo que se edita. */
+  pieces: z.array(generatedPieceSchema).max(LIMITS.instagramPosts).default([]),
+  /** v2: nichos detectados en el contenido. Ausente en portafolios de la v1. */
   niches: nichesSchema.optional(),
   /** v2: formas de colaborar sugeridas. Ausente en portafolios de la v1. */
   services: servicesSchema.optional(),
@@ -426,7 +450,6 @@ caracteres.` }),
 export type BrandPartner = z.output<typeof brandPartnerSchema>;
 
 export const brandPartnersSchema = z
-
  .array(brandPartnerSchema)
  .max(LIMITS.maxBrandPartners, { error: `Puedes mostrar hasta
 ${LIMITS.maxBrandPartners} marcas.` })
@@ -442,7 +465,7 @@ const caseMetric = z
   .nonnegative({ error: "No puede ser negativo." })
   .max(100_000_000_000)
   .nullable()
-  .default(null);
+ .default(null);
 
 export const caseStudySchema = z.object({
   /** La publicación importada (id del post de Instagram). */
@@ -473,53 +496,117 @@ casos de estudio.` })
    error: "Esa publicación ya es un caso de estudio.",
  });
 
+// ── Diseño importado de Canva (importador v2) ───────────────────────
+/*
+ * El tema de su Canva (R1) y lo que solo muestra la variante clonada (R4–R6). Lo lee el
+parser
+ * (lib/import/canva.ts), viaja en el prefill y se guarda en `manual.canva` al crear el portafolio.
+No se edita en el
+ * formulario: se conserva tal cual al guardar. Sin defaults: lo que entra es lo que sale (el
+formulario lo reenvía).
+ */
+const hexColorSchema = z.string().regex(/^#[0-9A-Fa-f]{6}$/);
+const canvaFontNameSchema = z.string().trim().min(1).max(60).regex(/^[A-Za-z0-9 ]+$/);
+const canvaHeadingSchema = z.string().trim().max(80).nullable();
+
+export const canvaThemeSchema = z.object({
+ /** Fondos de las bandas de ancho completo, en orden de aparición (puede venir vacío). */
+ bands: z.array(hexColorSchema).max(24),
+ heroBg: hexColorSchema.nullable(),
+  inkColor: hexColorSchema.nullable(),
+  accentColor: hexColorSchema.nullable(),
+  heroSide: z.enum(["left", "right"]),
+  heroFramed: z.boolean(),
+  /** Nombres tal como los trae Canva ("Pinyon Script"); se resuelven a Google Fonts al
+dibujar (font-map.ts). */
+  fonts: z.object({
+    display: canvaFontNameSchema.nullable(),
+    headings: canvaFontNameSchema.nullable(),
+    body: canvaFontNameSchema.nullable(),
+  }),
+});
+export type CanvaTheme = z.infer<typeof canvaThemeSchema>;
+
+export const canvaDataSchema = z.object({
+  theme: canvaThemeSchema,
+  /** Todos los logos detectados (la franja de marcas). */
+  logos: z.array(storedImageSchema).max(LIMITS.maxCanvaLogos),
+  /** Logo de la marca de cada pieza, por link de su video (sobrevive a reordenar o editar las
+piezas). */
+  pieceLogos: z
+    .record(z.string().max(500), storedImageSchema)
+    .refine((logos) => Object.keys(logos).length <= LIMITS.maxPieces, { error: "Demasiados logos por pieza." }),
+  /** Capturas de analytics: van al Media kit. */
+  metricsImages: z.array(storedImageSchema).max(LIMITS.maxCanvaMetrics),
+  /** Su tarifario como imagen: va en contacto, bajo "Tarifas". */
+  rateCard: storedImageSchema.nullable(),
+  /** Foto de apoyo de su bio. */
+  supportPhoto: storedImageSchema.nullable(),
+  /** Foto de apoyo del selector de sectores. */
+  selectorPhoto: storedImageSchema.nullable(),
+  /** Sus títulos de sección, tal como los escribió. */
+  headings: z.object({
+    sectors: canvaHeadingSchema,
+    bio: canvaHeadingSchema,
+    metrics: canvaHeadingSchema,
+    contact: canvaHeadingSchema,
+  }),
+  /** El sitio de Canva de donde salió (soporte). */
+  source: z.url({ protocol: /^https$/ }).nullable(),
+});
+export type CanvaData = z.infer<typeof canvaDataSchema>;
+
+/** Un portafolio (resuelto o de vista previa) que puede traer el diseño de su Canva. */
+export type WithCanva<T> = T & { canva?: CanvaData | null };
+
 // ── Datos escritos a mano (siempre ganan) ───────────────────────────
 export const manualDataSchema = z.object({
-
-  name: z
-    .string()
-    .trim()
-    .min(1, { error: "El nombre no puede quedar vacío." })
-    .max(LIMITS.name, { error: `El nombre admite hasta ${LIMITS.name} caracteres.` })
-    .optional(),
-  bio: z
-    .string()
-    .trim()
-    .max(LIMITS.bio, { error: `La bio admite hasta ${LIMITS.bio} caracteres.` })
-    .optional(),
-  photo: storedImageSchema.nullable().optional(), // null = sin foto
-  /** Lo que sigue al separador del nombre de IG; va bajo el nombre en el hero (E2 del
+ name: z
+   .string()
+   .trim()
+   .min(1, { error: "El nombre no puede quedar vacío." })
+   .max(LIMITS.name, { error: `El nombre admite hasta ${LIMITS.name} caracteres.` })
+   .optional(),
+ bio: z
+   .string()
+   .trim()
+   .max(LIMITS.bio, { error: `La bio admite hasta ${LIMITS.bio} caracteres.` })
+   .optional(),
+ photo: storedImageSchema.nullable().optional(), // null = sin foto
+ /** Lo que sigue al separador del nombre de IG; va bajo el nombre en el hero (E2 del
 dueño). */
-  tagline: z.string().trim().max(LIMITS.tagline).optional(),
-  /** Foto del banner del hero (ajuste 7). Ausente o null = el banner usa la foto de perfil o la
+ tagline: z.string().trim().max(LIMITS.tagline).optional(),
+ /** Foto del banner del hero (ajuste 7). Ausente o null = el banner usa la foto de perfil o la
 primera pieza. */
-  cover: storedImageSchema.nullable().optional(),
-  valueProp: z
-    .string()
-    .trim()
-    .max(LIMITS.valueProp, { error: `La propuesta de valor admite hasta ${LIMITS.valueProp}
+ cover: storedImageSchema.nullable().optional(),
+ valueProp: z
+   .string()
+   .trim()
+   .max(LIMITS.valueProp, { error: `La propuesta de valor admite hasta ${LIMITS.valueProp}
 caracteres.` })
-    .optional(),
-  contact: contactSchema.optional(),
-  /** Reemplaza los nichos de la IA (editor, M3). */
-  niches: nichesSchema.optional(),
-  /** Reemplaza los servicios de la IA. [] = no mostrar el bloque. */
-  services: servicesSchema.optional(),
-  /**
-   * Ronda 6 · 13.11: el género que eligió la creadora (Hombre / Mujer / Otro / Prefiero no
+   .optional(),
+ contact: contactSchema.optional(),
+ /** Reemplaza los nichos de la IA (editor, M3). */
+ niches: nichesSchema.optional(),
+ /** Reemplaza los servicios de la IA. [] = no mostrar el bloque. */
+ services: servicesSchema.optional(),
+ /**
+  * Ronda 6 · 13.11: el género que eligió la creadora (Hombre / Mujer / Otro / Prefiero no
 decirlo). Solo adapta los
-   * textos de WhatsApp (13.8, lib/portfolio/gender.ts). Nunca se infiere; ausente = textos en
+  * textos de WhatsApp (13.8, lib/portfolio/gender.ts). Nunca se infiere; ausente = textos en
 neutro.
-   */
-  gender: z
-    .enum(GENDERS, { error: "Elige una de las opciones: Hombre, Mujer, Otro o Prefiero no decirlo." })
-    .optional(),
-  /** Ronda 6 · 13.19: Brand partners confirmados por la creadora. Ausente o [] = sin la
+  */
+ gender: z
+   .enum(GENDERS, { error: "Elige una de las opciones: Hombre, Mujer, Otro o Prefiero no decirlo." })
+   .optional(),
+ /** Ronda 6 · 13.19: Brand partners confirmados por la creadora. Ausente o [] = sin la
 sección en el Media kit. */
-  brandPartners: brandPartnersSchema.optional(),
-  /** Ronda 6 · 13.20: case studies sobre sus publicaciones importadas. Ausente o [] = sin la
+ brandPartners: brandPartnersSchema.optional(),
+ /** Ronda 6 · 13.20: case studies sobre sus publicaciones importadas. Ausente o [] = sin la
 sección. */
-  caseStudies: caseStudiesSchema.optional(),
+ caseStudies: caseStudiesSchema.optional(),
+ /** Canva v2: el diseño de su Canva. Ausente o null = su plantilla de siempre. */
+ canva: canvaDataSchema.nullable().optional(),
 });
 export type ManualData = z.infer<typeof manualDataSchema>;
 
@@ -556,20 +643,21 @@ export const insightsSchema = z.object({
   computedAt: utcDate,
 });
 
-// ── Documento completo ──────────────────────────────────────────────
+// ── Documento completo
+// ──────────────────────────────────────────────
 export const PORTFOLIO_SOURCES = ["instagram", "manual"] as const;
 
 export const portfolioSchema = z
  .object({
-  // Se aceptan JSON de la v1; al guardarse de nuevo quedan como v2 (los campos nuevos son opcionales).
+  // Se aceptan JSON de la v1; al guardarse de nuevo quedan como v2 (los campos
+// nuevos son opcionales).
   schemaVersion: z.literal([1, SCHEMA_VERSION]).transform((): typeof
 SCHEMA_VERSION => SCHEMA_VERSION),
   slug: slugSchema,
   revision: z.number().int().positive(), // sube en cada guardado; evita pisar cambios ajenos
-  createdAt: utcDate,
-  updatedAt: utcDate,
-  source: z.enum(PORTFOLIO_SOURCES), // cómo se creó
-
+   createdAt: utcDate,
+   updatedAt: utcDate,
+   source: z.enum(PORTFOLIO_SOURCES), // cómo se creó
    instagram: instagramSnapshotSchema.nullable(),
    generated: generatedContentSchema.nullable(),
    manual: manualDataSchema,
@@ -602,7 +690,8 @@ doc.instagram?.username), {
  });
 export type Portfolio = z.output<typeof portfolioSchema>;
 
-// ── Entradas de la API ──────────────────────────────────────────────
+// ── Entradas de la API
+// ──────────────────────────────────────────────
 /** Crear a mano (fallback "prefiero llenarlo manual", RF-01; también el prefill del import de
 Canva). */
 export const createPortfolioInputSchema = z.object({
@@ -614,10 +703,9 @@ export const createPortfolioInputSchema = z.object({
   bio: z
    .string()
    .trim()
-   .max(LIMITS.bio, { error: `La bio admite hasta ${LIMITS.bio} caracteres.` })
-   .default(""),
+    .max(LIMITS.bio, { error: `La bio admite hasta ${LIMITS.bio} caracteres.` })
+    .default(""),
   photo: storedImageSchema.nullable().default(null),
-
   /** E2 del dueño: lo que sigue al separador del nombre de IG; va bajo el nombre en el
 hero. */
   tagline: z.string().trim().max(LIMITS.tagline).default(""),
@@ -635,6 +723,9 @@ la v1
    * (Belleza, Lifestyle, Viajes), como siempre en los portafolios hechos a mano.
    */
   niches: nichesSchema.optional(),
+  /** Canva v2: el diseño de su Canva (se guarda en `manual.canva`). Ausente = su plantilla
+de siempre. */
+  canva: canvaDataSchema.nullable().optional(),
   design: designSchema.default(DEFAULT_DESIGN),
   pieces: piecesInputSchema,
 });
@@ -666,7 +757,6 @@ los
 sale
  * del nombre (igual en el navegador y aquí), y las piezas apuntan a esos slugs.
  */
-
 export const confirmImportInputSchema = z.object({
   draftId: z.uuid({ error: "La importación no es válida. Vuelve a importar el perfil." }),
   niches: z
@@ -715,7 +805,6 @@ ignora).
       whatsapp: contactSchema.shape.whatsapp,
       email: contactSchema.shape.email,
       // 16/10 (obs. Fer): link nuevo que la creadora pegó en la revisión (no solo el de su IG).
-
       website: contactSchema.shape.website,
     })
     .optional(),

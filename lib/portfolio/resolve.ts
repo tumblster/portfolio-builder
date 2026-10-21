@@ -6,6 +6,7 @@ import { creatorMetrics, type CreatorMetric } from "./metrics";
 import { resolveNiches, type NicheDef } from "./niches";
 import type {
   BrandPartner,
+  CanvaData,
   Contact,
   EngagementRate,
   InstagramPost,
@@ -68,6 +69,11 @@ export type ResolvedPortfolio = {
   brandPartners?: BrandPartner[];
   /** Ronda 6 · 13.20: sus case studies, con su publicación. Ausente = ninguno. */
   caseStudies?: ResolvedCaseStudy[];
+  /**
+   * Importador de Canva v2: el diseño clonado de su Canva, si el portafolio lo
+   * trae. Opcional en el tipo (como `gender`); ausente/null = su plantilla.
+   */
+  canva?: CanvaData | null;
   pieces: ResolvedPiece[];
 };
 
@@ -125,6 +131,9 @@ export function resolvePortfolio(doc: Portfolio): ResolvedPortfolio {
     brandPartners: manual.brandPartners ?? [],
     // 13.20: cada caso con su publicación; uno cuya publicación ya no está, no se muestra.
     caseStudies: resolveCaseStudies(manual.caseStudies ?? [], ig),
+    // Canva v2: el diseño clonado pasa tal cual; la página pública lo detecta y
+    // dibuja la variante clonada en vez de la plantilla.
+    canva: manual.canva ?? null,
     pieces,
   };
 }

@@ -1,7 +1,8 @@
-import { MAX_PORTFOLIO_NICHES, nicheFromLabel, type NicheDef } from "@/lib/portfolio/niches";
+import { MAX_PORTFOLIO_NICHES, nicheFromLabel, type NicheDef } from
+"@/lib/portfolio/niches";
 import type { ResolvedPortfolio } from "@/lib/portfolio/resolve";
 import type { CreatorMetric } from "@/lib/portfolio/metrics";
-import type { EngagementRate, StoredImage } from "@/lib/portfolio/schema";
+import type { CanvaData, EngagementRate, StoredImage } from "@/lib/portfolio/schema";
 
 export type DraftPiece = {
   id: string;
@@ -26,19 +27,18 @@ externo. */
 
 /** Ronda 6 · 13.6: una forma de colaborar que sugirió la IA (la creadora la revisa antes de
 publicarla). */
-
 export type SuggestedService = { title: string; description: string };
 
 /*
  * Contrato entre POST /api/import (y POST /api/import/canva) y la pantalla de importación.
  * La respuesta es un stream NDJSON: un evento JSON por línea.
  * {"type":"step","step":"scrape"} … un evento por paso
- * {"type":"done", …}             portafolio creado
- * {"type":"manual", …}            perfil privado, con menos de 3 posts, o import de Canva
+ * {"type":"done", …}           portafolio creado
+ * {"type":"manual", …}          perfil privado, con menos de 3 posts, o import de Canva
 (prefill)
- * {"type":"error", …}           algo falló
- * {"type":"ping"}             latido, se ignora
- */
+* {"type":"error", …}          algo falló
+* {"type":"ping"}            latido, se ignora
+*/
 
 export const IMPORT_STEPS = ["scrape", "images", "ai"] as const;
 export type ImportStep = (typeof IMPORT_STEPS)[number];
@@ -71,10 +71,16 @@ en nicho). */
   /** Canva v1: de dónde salió el prefill, para soporte (el portafolio queda registrado como
 manual). */
   origin?: { source: "canva"; url: string };
+  /**
+   * Canva v2: el diseño de su Canva (tema) y lo que solo vive en la variante clonada: logos
+(con su pieza, por link
+   * de video), capturas de métricas, tarifario y fotos de apoyo. Ausente o null = se usan
+nuestras plantillas.
+   */
+  canva?: CanvaData | null;
 };
 
 /**
-
  * Canva v1: los nichos que salen de los `nicheLabel` de un prefill. El portafolio admite hasta
 MAX_NICHES: se quedan
  * los sectores con más piezas (en empate, el que aparece primero) y se devuelven en el
@@ -123,7 +129,6 @@ export type DraftPreview = {
   name: string;
   /** Lo que sigue al separador del nombre de IG; va bajo el nombre en el hero (E2 del
 dueño). */
-
   tagline: string;
   /** El sitio web pineado en su IG (si tiene): se pregunta con checkbox antes de generar (E2
 del dueño). */
@@ -172,7 +177,6 @@ links: "smtp" (salió),
 (no se mandó en esta
    * petición, p. ej. un reintento que devolvió el mismo portafolio). Ausente o null en clientes
 sin onboarding.
-
    */
   owner?: { email: string; mail: "smtp" | "mock" | "failed" | null } | null;
 };

@@ -19,11 +19,12 @@ import {
   createPortfolioInputSchema,
   parseVideoLink,
   updatePortfolioInputSchema,
+  type CanvaData,
   type EngagementRate,
   type ManualData,
   type Service,
-
   type StoredImage,
+  type WithCanva,
 } from "@/lib/portfolio/schema";
 import { NO_METRICS, type PieceMetrics, type ProfileStat } from "@/lib/portfolio/stats";
 
@@ -48,10 +49,14 @@ borra sin querer).
 portafolio y deja cada pieza en
  * su nicho; al crear se envían esos nichos. Sin `nicheLabel` (Instagram) todo sigue como
 siempre.
+ * Canva v2: el diseño de su Canva (`canva`) atraviesa el formulario sin editarse: viaja al
+crear, se conserva al
+ * guardar (si no, guardar lo borraba) y la vista previa lo usa para mostrar la variante
+clonada.
  */
 
-export const CONTACT_KEYS = ["email", "whatsapp", "instagram", "tiktok", "youtube",
-"website"] as const;
+export const CONTACT_KEYS = ["email", "whatsapp", "telegram", "instagram", "tiktok",
+"youtube", "website"] as const;
 export type ContactKey = (typeof CONTACT_KEYS)[number];
 export type ContactDraft = Record<ContactKey, string>;
 
@@ -74,16 +79,16 @@ export type PieceDraft = {
 export type ServiceDraft = { key: string; title: string; description: string };
 
 export type FormState = {
-  name: string;
-  /** E2 del dueño: lo que sigue al separador del nombre de IG; va bajo el nombre en el
+ name: string;
+ /** E2 del dueño: lo que sigue al separador del nombre de IG; va bajo el nombre en el
 hero. */
-  tagline: string;
-  bio: string;
-  valueProp: string;
-  photo: StoredImage | null;
-  /** Foto del banner del hero (ajuste 7). */
-  cover: StoredImage | null;
-  contact: ContactDraft;
+ tagline: string;
+ bio: string;
+ valueProp: string;
+ photo: StoredImage | null;
+ /** Foto del banner del hero (ajuste 7). */
+ cover: StoredImage | null;
+ contact: ContactDraft;
   /** Nichos disponibles para las piezas (no se editan en M1). */
   niches: NicheDef[];
   services: ServiceDraft[];
@@ -94,6 +99,8 @@ hero. */
   brandPartners: BrandPartnerDraft[];
   /** Ronda 6 · 13.20: case studies sobre sus publicaciones importadas. */
   caseStudies: CaseStudyDraft[];
+  /** Canva v2: el diseño de su Canva (no se edita aquí). null = su plantilla de siempre. */
+  canva: CanvaData | null;
 };
 
 /**
@@ -119,7 +126,6 @@ export type Baseline = {
   extras: PreviewExtras;
   /** Ronda 6 · 13.20: sus publicaciones importadas, para marcar case studies. Ausente =
 ninguna. */
-
   imported?: ImportedPost[];
   /** Ronda 6 · 13.19 (a): @menciones de sus contenidos, candidatas a Brand partners. */
   mentions?: string[];
@@ -134,8 +140,15 @@ http por la red local. */
 export const newPieceKey = () => `nueva-${(sequence +=
 1)}-${Math.random().toString(36).slice(2, 8)}`;
 
-const emptyContact = (): ContactDraft => ({ email: "", whatsapp: "", instagram: "", tiktok: "",
-youtube: "", website: "" });
+const emptyContact = (): ContactDraft => ({
+  email: "",
+  whatsapp: "",
+  telegram: "",
+  instagram: "",
+  tiktok: "",
+  youtube: "",
+  website: "",
+});
 
 export function emptyPiece(key: string = newPieceKey()): PieceDraft {
   return { key, title: "", niche: null, image: null, imageSource: null, videoUrl: "", postLink: null };
@@ -161,17 +174,18 @@ export function emptyForm(): FormState {
     design: DEFAULT_DESIGN,
     brandPartners: [],
     caseStudies: [],
+    canva: null,
   };
 }
 
 /**
  * Datos que dejó la importación (perfil privado o con pocas publicaciones, o un sitio de
 Canva).
-
  * Canva v1: los `nicheLabel` de las piezas se convierten en los nichos del portafolio (hasta
 MAX_NICHES, ver
  * prefillNiches) y cada pieza queda en el suyo; las de un sector que no entró quedan en
 "Todo".
+ * Canva v2: el diseño de su Canva (`prefill.canva`) queda en el formulario tal cual.
  */
 export function formFromPrefill(prefill: ManualPrefill): FormState {
   const niches = prefillNiches(prefill.pieces);
@@ -211,12 +225,12 @@ export function formFromPrefill(prefill: ManualPrefill): FormState {
 recommendedPalette(prefill.photo) },
     brandPartners: [],
     caseStudies: [],
+    canva: prefill.canva ?? null,
   };
 }
 
 /** Un portafolio guardado, tal como se muestra (ya resuelto). Determinista: sirve en el
 servidor. */
-
 export function formFromPortfolio(resolved: ResolvedPortfolio): FormState {
   return {
     name: resolved.name,
@@ -244,6 +258,8 @@ export function formFromPortfolio(resolved: ResolvedPortfolio): FormState {
     design: resolved.design,
     brandPartners: partnerDraftsFrom(resolved.brandPartners ?? []),
     caseStudies: caseDraftsFrom(resolved.caseStudies ?? []),
+    // Canva v2: lo trae el portafolio resuelto si resolve.ts lo pasa (ver resolvePortfolio).
+    canva: (resolved as WithCanva<ResolvedPortfolio>).canva ?? null,
   };
 }
 
@@ -264,7 +280,6 @@ importado; si quedó
 cambia por estar pre-llenado).
  */
 export const effectiveVideoUrl = (piece: Pick<PieceDraft, "videoUrl" | "postLink">) => {
-
   const url = piece.videoUrl.trim();
   return url && url !== piece.postLink?.url ? url : null;
 };
@@ -296,9 +311,11 @@ export function toCreatePayload(form: FormState) {
     valueProp: form.valueProp,
     contact: form.contact,
     services: form.services.map(serviceInput),
-    // Canva v1: los nichos propios (sus sectores) viajan al crear; los de la v1 no (como siempre).
-    ...(isLegacyNiches(form.niches) ? {} : { niches: form.niches.map(({ slug, label }) => ({ slug,
-label })) }),
+    // Canva v1: los nichos propios (sus sectores) viajan al crear; los de la v1 no (como
+// siempre).
+    ...(isLegacyNiches(form.niches) ? {} : { niches: form.niches.map(({ slug, label }) => ({ slug, label })) }),
+    // Canva v2: el diseño de su Canva viaja al crear (se guarda en manual.canva).
+    ...(form.canva ? { canva: form.canva } : {}),
     pieces: form.pieces.map(pieceInput),
     design: form.design,
   };
@@ -309,10 +326,8 @@ const sameImage = (a: StoredImage | null, b: StoredImage | null) => (a?.url ?? n
 
 const servicesKey = (services: ServiceDraft[]) =>
  JSON.stringify(services.map((service) => [service.title.trim(), service.description.trim()]));
-
 export function toUpdatePayload(form: FormState, baseline: Baseline) {
  const text = (key: "name" | "tagline" | "bio" | "valueProp") =>
-
   form[key].trim() !== baseline.form[key].trim() ? form[key] : baseline.manual[key];
 
  const contact: Partial<ContactDraft> = {};
@@ -344,27 +359,31 @@ form.photo,
     // Los nichos no se editan en M1: se conservan tal como estaban guardados.
     ...(baseline.manual.niches !== undefined ? { niches: baseline.manual.niches } : {}),
     ...(services !== undefined ? { services } : {}),
-    // Ronda 6 · 13.11: el género del onboarding no se edita aquí: se conserva (si no, guardar lo borraba).
+    // Ronda 6 · 13.11: el género del onboarding no se edita aquí: se conserva (si no, guardar
+// lo borraba).
     ...(baseline.manual.gender !== undefined ? { gender: baseline.manual.gender } : {}),
-    // Ronda 6 · 13.19 / 13.20: lo que muestra el formulario es lo guardado; se envía siempre que exista.
+    // Ronda 6 · 13.19 / 13.20: lo que muestra el formulario es lo guardado; se envía siempre
+// que exista.
     ...(form.brandPartners.length > 0 || baseline.manual.brandPartners !== undefined
       ? { brandPartners: partnersPayload(form.brandPartners) }
       : {}),
     ...(form.caseStudies.length > 0 || baseline.manual.caseStudies !== undefined
       ? { caseStudies: caseStudiesPayload(form.caseStudies) }
       : {}),
+    // Canva v2: el diseño de su Canva no se edita aquí: se conserva (si no, guardar lo
+// borraba).
+    ...(baseline.manual.canva !== undefined ? { canva: baseline.manual.canva } : {}),
   };
   const design = form.design;
   const designChanged =
     design.template !== baseline.form.design.template || design.palette !==
 baseline.form.design.palette;
   return {
-
-      revision: baseline.revision,
-      manual,
-      pieces: form.pieces.map(pieceInput),
-      ...(designChanged ? { design } : {}),
-    };
+    revision: baseline.revision,
+    manual,
+    pieces: form.pieces.map(pieceInput),
+    ...(designChanged ? { design } : {}),
+  };
 }
 
 type Issue = { path: string; message: string };
@@ -399,14 +418,15 @@ issue.path.map(String).join("."), message: issue.message })));
   return errors;
 }
 
-/** Lo que muestra la vista previa: la misma forma que la página pública. */
+/** Lo que muestra la vista previa: la misma forma que la página pública (Canva v2: con su
+diseño, si lo tiene). */
 export function toPreview(form: FormState, extras: PreviewExtras = NO_EXTRAS):
-ResolvedPortfolio {
-  const contact: ResolvedPortfolio["contact"] = {};
-  for (const key of CONTACT_KEYS) {
-    const parsed = contactSchema.shape[key].safeParse(form.contact[key]);
-    if (parsed.success && parsed.data) contact[key] = parsed.data;
-  }
+WithCanva<ResolvedPortfolio> {
+ const contact: Record<string, string> = {};
+ for (const key of CONTACT_KEYS) {
+   const parsed = contactSchema.shape[key].safeParse(form.contact[key]);
+   if (parsed.success && parsed.data) contact[key] = parsed.data;
+ }
 
     return {
       slug: "vista-previa",
@@ -417,7 +437,7 @@ ResolvedPortfolio {
       cover: form.cover,
       archivedAt: null,
       valueProp: form.valueProp.trim(),
-      contact,
+      contact: contact as ResolvedPortfolio["contact"],
       niches: form.niches,
       services: form.services
         .filter((service) => service.title.trim())
@@ -440,5 +460,6 @@ ResolvedPortfolio {
           metrics: extras.metrics[piece.key] ?? NO_METRICS,
         };
       }),
+      canva: form.canva,
     };
 }

@@ -1,0 +1,24 @@
+/* Canva v2 · R6: capturas de analytics de su Canva, como tarjetas dentro del Media kit. */
+
+.mk-shots {
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 16px;
+}
+
+.mk-shot {
+  margin: 0;
+  overflow: hidden;
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, currentColor 14%, transparent);
+  background: color-mix(in srgb, currentColor 4%, transparent);
+}
+
+.mk-shot__img {
+  display: block;
+  width: 100%;
+  height: auto;
+}

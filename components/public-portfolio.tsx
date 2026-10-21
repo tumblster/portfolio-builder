@@ -1,4 +1,5 @@
 import { BioTemplate } from "@/components/portfolio/bio-template";
+import { CanvaTemplate } from "@/components/portfolio/canva-template";
 import { CreatorTemplate } from "@/components/portfolio/creator-template";
 import { EditorialTemplate } from "@/components/portfolio/editorial-template";
 import { MinimalTemplate } from "@/components/portfolio/minimal-template";
@@ -10,6 +11,7 @@ import { contactLinks } from "@/lib/portfolio/contact-links";
 import { nichesWithPieces } from "@/lib/portfolio/niches";
 import type { TemplateId } from "@/lib/portfolio/design";
 import type { ResolvedPortfolio } from "@/lib/portfolio/resolve";
+import type { WithCanva } from "@/lib/portfolio/schema";
 import { publicPath } from "@/lib/portfolio/slug";
 
 /*
@@ -18,23 +20,35 @@ import { publicPath } from "@/lib/portfolio/slug";
  * decide cuál se dibuja. Cambiarla no toca ningún dato: solo cambia la piel.
  *
  * Todas las piezas llegan siempre; el nicho activo solo decide cuáles se ven:
- *  - página: sale de la URL, y las píldoras la cambian sin recargar;
- *  - vista previa: lo maneja el editor (`niche` + `onNicheChange`).
+ * - página: sale de la URL, y las píldoras la cambian sin recargar;
+ * - vista previa: lo maneja el editor (`niche` + `onNicheChange`).
  *
  * Ronda 30/09 · 7.3 (nombres de 13.23 · 4): la página tiene dos vistas con un control arriba
  * (components/portfolio/portfolio-views.tsx):
- *  - CONTENIDO (por defecto): la plantilla de siempre, sin las cifras del perfil ni el ER (ajuste 10: las vistas de
- *    cada pieza sí se muestran) y sin el selector de nichos (ese queda para la vista previa del studio);
- *  - MEDIA KIT: components/portfolio/media-kit.tsx, con las 3 métricas. Link directo: /p/<slug>#media-kit.
- * Ronda 6: el header recibe el género (13.8, textos de WhatsApp) y pinta el badge "Hecho con Supercreador" (13.17).
- */
+ * - CONTENIDO (por defecto): la plantilla de siempre, sin las cifras del perfil ni el ER
+(ajuste 10: las vistas de
+ * cada pieza sí se muestran) y sin el selector de nichos (ese queda para la vista previa
+del studio);
+ * - MEDIA KIT: components/portfolio/media-kit.tsx, con las 3 métricas. Link directo:
+/p/<slug>#media-kit.
+ * Ronda 6: el header recibe el género (13.8, textos de WhatsApp) y pinta el badge "Hecho
+con Supercreador" (13.17).
+ *
+ * Importador de Canva v2: si el portafolio trae el diseño de su Canva (`canva`),
+CONTENIDO se dibuja con la variante
+ * clonada (components/portfolio/canva-template.tsx) en vez de su plantilla; el Media kit
+suma sus capturas de
+ * métricas. Sin `canva`, todo exactamente como antes.
+*/
 
-/** "Contenido" no lleva las cifras del perfil ni el ER (viven en el Media Kit); las vistas de cada pieza sí. */
+/** "Contenido" no lleva las cifras del perfil ni el ER (viven en el Media Kit); las vistas de
+cada pieza sí. */
 function withoutMetrics(portfolio: ResolvedPortfolio): ResolvedPortfolio {
   return { ...portfolio, stats: [], engagementRate: null };
 }
 
-const TEMPLATE_COMPONENTS: Record<TemplateId, (props: TemplateProps) => React.ReactNode> = {
+const TEMPLATE_COMPONENTS: Record<TemplateId, (props: TemplateProps) =>
+React.ReactNode> = {
   creator: CreatorTemplate,
   bio: BioTemplate,
   minimal: MinimalTemplate,
@@ -43,7 +57,7 @@ const TEMPLATE_COMPONENTS: Record<TemplateId, (props: TemplateProps) => React.Re
 
 type PublicPortfolioProps =
   | { portfolio: ResolvedPortfolio; variant?: "page" }
-  | {
+  |{
       portfolio: ResolvedPortfolio;
       variant: "preview";
       /** Nicho que se está mirando en la vista previa; null = Todo. */
@@ -55,37 +69,40 @@ type PublicPortfolioProps =
 
 export function PublicPortfolio(props: PublicPortfolioProps) {
   const { portfolio } = props;
-  const Template = TEMPLATE_COMPONENTS[portfolio.design.template] ?? CreatorTemplate;
+  const canva = (portfolio as WithCanva<ResolvedPortfolio>).canva ?? null;
+  const Template = TEMPLATE_COMPONENTS[portfolio.design.template] ??
+CreatorTemplate;
   const filter: NicheFilter =
     props.variant === "preview"
       ? { mode: "controlled", value: props.niche, onChange: props.onNicheChange }
       : { mode: "route", basePath: publicPath(portfolio.slug) };
-  const about = (
-    <Template
-      portfolio={withoutMetrics(portfolio)}
-      variant={props.variant ?? "page"}
-      filter={filter}
-      coverEdit={props.variant === "preview" ? props.coverEdit : undefined}
-    />
-  );
+  const templateProps: TemplateProps = {
+    portfolio: withoutMetrics(portfolio),
+    variant: props.variant ?? "page",
+    filter,
+    coverEdit: props.variant === "preview" ? props.coverEdit : undefined,
+  };
+  const about = canva ? <CanvaTemplate {...templateProps} canva={canva} /> : <Template
+{...templateProps} />;
   if (props.variant === "preview") return about;
   const palette = resolvePalette(portfolio.design.palette, portfolio.photo);
   return (
     <PortfolioViews
-      style={paletteStyle(palette) as React.CSSProperties}
-      about={about}
-      kit={<MediaKit portfolio={portfolio} />}
-      nav={{
-        basePath: publicPath(portfolio.slug),
-        name: portfolio.name,
-        photoUrl: portfolio.photo?.url ?? null,
-        niches: nichesWithPieces(portfolio.niches, portfolio.pieces).map(({ slug, label }) => ({ slug, label })),
-        contactId: contactLinks(portfolio.contact).length > 0 ? "pf-page-contacto" : null,
-        // 12.6: "Hablemos" abre WhatsApp con el número que el creador puso en el editor.
-        whatsapp: portfolio.contact.whatsapp?.replace(/\D/g, "") || null,
-        // 13.8: los textos de WhatsApp según el género que eligió; sin dato, en neutro.
-        gender: portfolio.gender ?? null,
-      }}
+     style={paletteStyle(palette) as React.CSSProperties}
+     about={about}
+     kit={<MediaKit portfolio={portfolio} metricsImages={canva?.metricsImages ?? []} />}
+     nav={{
+       basePath: publicPath(portfolio.slug),
+       name: portfolio.name,
+       photoUrl: portfolio.photo?.url ?? null,
+       niches: nichesWithPieces(portfolio.niches, portfolio.pieces).map(({ slug, label }) => ({
+slug, label })),
+       contactId: contactLinks(portfolio.contact).length > 0 ? "pf-page-contacto" : null,
+       // 12.6: "Hablemos" abre WhatsApp con el número que el creador puso en el editor.
+       whatsapp: portfolio.contact.whatsapp?.replace(/\D/g, "") || null,
+       // 13.8: los textos de WhatsApp según el género que eligió; sin dato, en neutro.
+       gender: portfolio.gender ?? null,
+     }}
     />
   );
 }

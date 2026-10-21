@@ -28,6 +28,9 @@ export async function POST(request: NextRequest) {
           contact: input.contact,
           services: input.services,
           niches: input.niches,
+          // Canva v2: el diseño clonado viaja con el manual (sin esto la página
+          // pública cae a la plantilla de siempre).
+          canva: input.canva ?? null,
         },
         pieces: toStoredPieces(input.pieces),
         design: input.design,
