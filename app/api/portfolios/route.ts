@@ -27,6 +27,7 @@ export async function POST(request: NextRequest) {
           valueProp: input.valueProp,
           contact: input.contact,
           services: input.services,
+          niches: input.niches,
         },
         pieces: toStoredPieces(input.pieces),
         design: input.design,

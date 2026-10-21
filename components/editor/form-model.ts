@@ -1,5 +1,5 @@
 import type { CreatorMetric } from "@/lib/portfolio/metrics";
-import type { ManualPrefill } from "@/lib/import/events";
+import { prefillNiches, type ManualPrefill } from "@/lib/import/events";
 import { recommendedPalette } from "@/components/design/design-pickers";
 import type { ImportedPost } from "@/lib/portfolio/case-studies";
 import { DEFAULT_DESIGN, type Design } from "@/lib/portfolio/design";
@@ -11,7 +11,7 @@ import {
   type BrandPartnerDraft,
   type CaseStudyDraft,
 } from "@/lib/portfolio/media-kit-drafts";
-import { LEGACY_NICHES, type NicheDef } from "@/lib/portfolio/niches";
+import { LEGACY_NICHES, nicheFromLabel, type NicheDef } from "@/lib/portfolio/niches";
 import type { PieceLink, ResolvedPortfolio } from "@/lib/portfolio/resolve";
 import {
   LIMITS,
@@ -22,6 +22,7 @@ import {
   type EngagementRate,
   type ManualData,
   type Service,
+
   type StoredImage,
 } from "@/lib/portfolio/schema";
 import { NO_METRICS, type PieceMetrics, type ProfileStat } from "@/lib/portfolio/stats";
@@ -30,18 +31,27 @@ import { NO_METRICS, type PieceMetrics, type ProfileStat } from "@/lib/portfolio
  * Modelo del formulario (crear y editar). Funciones puras: sin React ni red.
  *
  * Al editar, solo lo que la persona cambió de verdad se guarda como dato manual.
- * Lo que no tocó sigue heredando de la IA o de Instagram (regla manual → IA → Instagram),
+ * Lo que no tocó sigue heredando de la IA o de Instagram (regla manual → IA →
+Instagram),
  * así que abrir y guardar sin cambios no "congela" nada.
  *
  * v2: los nichos son propios de cada portafolio (los de la IA, o Belleza/Lifestyle/Viajes en
  * los creados a mano y en los de la v1). En M1 no se editan: el formulario los usa para el
  * selector de cada pieza y los conserva tal cual al guardar. Los servicios sí se editan.
- * Ronda 6 · 13.11: el género (del onboarding) tampoco se edita aquí: se conserva tal cual al guardar.
- * Ronda 6 · 13.19 / 13.20: Brand partners y case studies del Media kit se editan aquí (solo existen como dato manual,
- * así que se envían siempre que haya alguno o ya estuvieran guardados: guardar nunca los borra sin querer).
+ * Ronda 6 · 13.11: el género (del onboarding) tampoco se edita aquí: se conserva tal cual al
+guardar.
+ * Ronda 6 · 13.19 / 13.20: Brand partners y case studies del Media kit se editan aquí (solo
+existen como dato manual,
+ * así que se envían siempre que haya alguno o ya estuvieran guardados: guardar nunca los
+borra sin querer).
+ * Canva v1: un prefill con `nicheLabel` (los sectores de su Canva) arma los nichos del
+portafolio y deja cada pieza en
+ * su nicho; al crear se envían esos nichos. Sin `nicheLabel` (Instagram) todo sigue como
+siempre.
  */
 
-export const CONTACT_KEYS = ["email", "whatsapp", "instagram", "tiktok", "youtube", "website"] as const;
+export const CONTACT_KEYS = ["email", "whatsapp", "instagram", "tiktok", "youtube",
+"website"] as const;
 export type ContactKey = (typeof CONTACT_KEYS)[number];
 export type ContactDraft = Record<ContactKey, string>;
 
@@ -65,7 +75,8 @@ export type ServiceDraft = { key: string; title: string; description: string };
 
 export type FormState = {
   name: string;
-  /** E2 del dueño: lo que sigue al separador del nombre de IG; va bajo el nombre en el hero. */
+  /** E2 del dueño: lo que sigue al separador del nombre de IG; va bajo el nombre en el
+hero. */
   tagline: string;
   bio: string;
   valueProp: string;
@@ -96,7 +107,8 @@ export type PreviewExtras = {
   /** Seguidores, Interacciones promedio y ER (ronda 30/09 · 7.2). */
   creatorMetrics: CreatorMetric[];
 };
-export const NO_EXTRAS: PreviewExtras = { stats: [], metrics: {}, engagementRate: null, creatorMetrics: [] };
+export const NO_EXTRAS: PreviewExtras = { stats: [], metrics: {}, engagementRate: null,
+creatorMetrics: [] };
 
 /** Lo que estaba guardado al abrir (o al último guardado): para saber qué cambió. */
 export type Baseline = {
@@ -105,7 +117,9 @@ export type Baseline = {
   form: FormState;
   manual: ManualData;
   extras: PreviewExtras;
-  /** Ronda 6 · 13.20: sus publicaciones importadas, para marcar case studies. Ausente = ninguna. */
+  /** Ronda 6 · 13.20: sus publicaciones importadas, para marcar case studies. Ausente =
+ninguna. */
+
   imported?: ImportedPost[];
   /** Ronda 6 · 13.19 (a): @menciones de sus contenidos, candidatas a Brand partners. */
   mentions?: string[];
@@ -115,16 +129,20 @@ export type Baseline = {
 export type FieldErrors = Record<string, string>;
 
 let sequence = 0;
-/** Solo se llama en el navegador (piezas nuevas). No usa crypto.randomUUID: no existe en http por la red local. */
-export const newPieceKey = () => `nueva-${(sequence += 1)}-${Math.random().toString(36).slice(2, 8)}`;
+/** Solo se llama en el navegador (piezas nuevas). No usa crypto.randomUUID: no existe en
+http por la red local. */
+export const newPieceKey = () => `nueva-${(sequence +=
+1)}-${Math.random().toString(36).slice(2, 8)}`;
 
-const emptyContact = (): ContactDraft => ({ email: "", whatsapp: "", instagram: "", tiktok: "", youtube: "", website: "" });
+const emptyContact = (): ContactDraft => ({ email: "", whatsapp: "", instagram: "", tiktok: "",
+youtube: "", website: "" });
 
 export function emptyPiece(key: string = newPieceKey()): PieceDraft {
   return { key, title: "", niche: null, image: null, imageSource: null, videoUrl: "", postLink: null };
 }
 
-export function serviceDraft(service: Partial<Service> = {}, key: string = newPieceKey()): ServiceDraft {
+export function serviceDraft(service: Partial<Service> = {}, key: string = newPieceKey()):
+ServiceDraft {
   return { key, title: service.title ?? "", description: service.description ?? "" };
 }
 
@@ -146,11 +164,27 @@ export function emptyForm(): FormState {
   };
 }
 
-/** Datos que dejó la importación (perfil privado o con pocas publicaciones). */
+/**
+ * Datos que dejó la importación (perfil privado o con pocas publicaciones, o un sitio de
+Canva).
+
+ * Canva v1: los `nicheLabel` de las piezas se convierten en los nichos del portafolio (hasta
+MAX_NICHES, ver
+ * prefillNiches) y cada pieza queda en el suyo; las de un sector que no entró quedan en
+"Todo".
+ */
 export function formFromPrefill(prefill: ManualPrefill): FormState {
+  const niches = prefillNiches(prefill.pieces);
+  const available = new Set(niches.map((niche) => niche.slug));
+  const nicheOf = (label: string | undefined) => {
+    if (!label) return null;
+    const slug = nicheFromLabel(label)?.slug ?? null;
+    return slug && available.has(slug) ? slug : null;
+  };
   const pieces: PieceDraft[] = prefill.pieces.map((piece) => ({
     ...emptyPiece(),
     title: piece.title,
+    niche: nicheOf(piece.nicheLabel),
     image: piece.image,
     imageSource: "saved",
     videoUrl: piece.videoUrl ?? "",
@@ -163,17 +197,26 @@ export function formFromPrefill(prefill: ManualPrefill): FormState {
     valueProp: "",
     photo: prefill.photo,
     cover: null,
-    contact: { ...emptyContact(), instagram: prefill.contact.instagram, website: prefill.contact.website ?? "" },
-    niches: LEGACY_NICHES.map((niche) => ({ ...niche })),
+    contact: {
+      ...emptyContact(),
+      instagram: prefill.contact.instagram,
+      website: prefill.contact.website ?? "",
+      email: prefill.contact.email ?? "",
+      tiktok: prefill.contact.tiktok ?? "",
+    },
+    niches: niches.length > 0 ? niches : LEGACY_NICHES.map((niche) => ({ ...niche })),
     services: [],
     pieces,
-    design: { template: DEFAULT_DESIGN.template, palette: recommendedPalette(prefill.photo) },
+    design: { template: DEFAULT_DESIGN.template, palette:
+recommendedPalette(prefill.photo) },
     brandPartners: [],
     caseStudies: [],
   };
 }
 
-/** Un portafolio guardado, tal como se muestra (ya resuelto). Determinista: sirve en el servidor. */
+/** Un portafolio guardado, tal como se muestra (ya resuelto). Determinista: sirve en el
+servidor. */
+
 export function formFromPortfolio(resolved: ResolvedPortfolio): FormState {
   return {
     name: resolved.name,
@@ -185,7 +228,8 @@ export function formFromPortfolio(resolved: ResolvedPortfolio): FormState {
     contact: { ...emptyContact(), ...resolved.contact },
     niches: resolved.niches.map((niche) => ({ ...niche })),
     // Claves deterministas (servidor y navegador iguales): el índice basta para los guardados.
-    services: resolved.services.map((service, index) => serviceDraft(service, `servicio-${index}`)),
+    services: resolved.services.map((service, index) => serviceDraft(service,
+`servicio-${index}`)),
     pieces: resolved.pieces.map((piece) => ({
       key: piece.id,
       id: piece.id,
@@ -214,10 +258,13 @@ export function extrasFromPortfolio(resolved: ResolvedPortfolio): PreviewExtras 
 }
 
 /**
- * El link de video que de verdad cuenta (spec 11.11): el campo viene pre-llenado con el post importado; si quedó
- * igual a ese link y la pieza no era un video, no se guarda como video (lo guardado no cambia por estar pre-llenado).
+ * El link de video que de verdad cuenta (spec 11.11): el campo viene pre-llenado con el post
+importado; si quedó
+ * igual a ese link y la pieza no era un video, no se guarda como video (lo guardado no
+cambia por estar pre-llenado).
  */
 export const effectiveVideoUrl = (piece: Pick<PieceDraft, "videoUrl" | "postLink">) => {
+
   const url = piece.videoUrl.trim();
   return url && url !== piece.postLink?.url ? url : null;
 };
@@ -230,7 +277,15 @@ const pieceInput = (piece: PieceDraft) => ({
   videoUrl: effectiveVideoUrl(piece),
 });
 
-const serviceInput = (service: ServiceDraft): Service => ({ title: service.title, description: service.description });
+const serviceInput = (service: ServiceDraft): Service => ({ title: service.title, description:
+service.description });
+
+/** ¿Son los nichos de la v1 (Belleza, Lifestyle, Viajes)? Entonces no hace falta enviarlos al
+crear. */
+const isLegacyNiches = (niches: NicheDef[]) =>
+  niches.length === LEGACY_NICHES.length &&
+  niches.every((niche, index) => niche.slug === LEGACY_NICHES[index].slug &&
+niche.label === LEGACY_NICHES[index].label);
 
 export function toCreatePayload(form: FormState) {
   return {
@@ -241,38 +296,45 @@ export function toCreatePayload(form: FormState) {
     valueProp: form.valueProp,
     contact: form.contact,
     services: form.services.map(serviceInput),
+    // Canva v1: los nichos propios (sus sectores) viajan al crear; los de la v1 no (como siempre).
+    ...(isLegacyNiches(form.niches) ? {} : { niches: form.niches.map(({ slug, label }) => ({ slug,
+label })) }),
     pieces: form.pieces.map(pieceInput),
     design: form.design,
   };
 }
 
-const sameImage = (a: StoredImage | null, b: StoredImage | null) => (a?.url ?? null) === (b?.url ?? null);
+const sameImage = (a: StoredImage | null, b: StoredImage | null) => (a?.url ?? null) ===
+(b?.url ?? null);
 
 const servicesKey = (services: ServiceDraft[]) =>
-  JSON.stringify(services.map((service) => [service.title.trim(), service.description.trim()]));
+ JSON.stringify(services.map((service) => [service.title.trim(), service.description.trim()]));
 
 export function toUpdatePayload(form: FormState, baseline: Baseline) {
-  const text = (key: "name" | "tagline" | "bio" | "valueProp") =>
-    form[key].trim() !== baseline.form[key].trim() ? form[key] : baseline.manual[key];
+ const text = (key: "name" | "tagline" | "bio" | "valueProp") =>
 
-  const contact: Partial<ContactDraft> = {};
-  for (const key of CONTACT_KEYS) {
-    const value =
-      form.contact[key].trim() !== baseline.form.contact[key].trim() ? form.contact[key] : baseline.manual.contact?.[key];
-    if (value !== undefined) contact[key] = value;
-  }
+  form[key].trim() !== baseline.form[key].trim() ? form[key] : baseline.manual[key];
 
-  const services =
-    servicesKey(form.services) !== servicesKey(baseline.form.services)
-      ? form.services.map(serviceInput)
-      : baseline.manual.services;
+ const contact: Partial<ContactDraft> = {};
+ for (const key of CONTACT_KEYS) {
+   const value =
+     form.contact[key].trim() !== baseline.form.contact[key].trim() ? form.contact[key] :
+baseline.manual.contact?.[key];
+   if (value !== undefined) contact[key] = value;
+ }
+
+ const services =
+  servicesKey(form.services) !== servicesKey(baseline.form.services)
+   ? form.services.map(serviceInput)
+   : baseline.manual.services;
 
   const manual: ManualData = {
     name: text("name"),
     tagline: text("tagline"),
     bio: text("bio"),
     valueProp: text("valueProp"),
-    photo: sameImage(form.photo, baseline.form.photo) ? baseline.manual.photo : form.photo,
+    photo: sameImage(form.photo, baseline.form.photo) ? baseline.manual.photo :
+form.photo,
     ...(sameImage(form.cover, baseline.form.cover)
       ? baseline.manual.cover !== undefined
         ? { cover: baseline.manual.cover }
@@ -294,13 +356,15 @@ export function toUpdatePayload(form: FormState, baseline: Baseline) {
   };
   const design = form.design;
   const designChanged =
-    design.template !== baseline.form.design.template || design.palette !== baseline.form.design.palette;
+    design.template !== baseline.form.design.template || design.palette !==
+baseline.form.design.palette;
   return {
-    revision: baseline.revision,
-    manual,
-    pieces: form.pieces.map(pieceInput),
-    ...(designChanged ? { design } : {}),
-  };
+
+      revision: baseline.revision,
+      manual,
+      pieces: form.pieces.map(pieceInput),
+      ...(designChanged ? { design } : {}),
+    };
 }
 
 type Issue = { path: string; message: string };
@@ -326,7 +390,8 @@ export function validateForm(form: FormState, baseline: Baseline | null): FieldE
     : createPortfolioInputSchema.safeParse(toCreatePayload(form));
   const errors = result.success
     ? {}
-    : issuesToErrors(result.error.issues.map((issue) => ({ path: issue.path.map(String).join("."), message: issue.message })));
+    : issuesToErrors(result.error.issues.map((issue) => ({ path:
+issue.path.map(String).join("."), message: issue.message })));
   form.pieces.forEach((piece, index) => {
     const key = `pieces.${index}.image`;
     if (!piece.image && !piece.videoUrl.trim() && !errors[key]) errors[key] = "Agrega una imagen o un link de video.";
@@ -335,43 +400,45 @@ export function validateForm(form: FormState, baseline: Baseline | null): FieldE
 }
 
 /** Lo que muestra la vista previa: la misma forma que la página pública. */
-export function toPreview(form: FormState, extras: PreviewExtras = NO_EXTRAS): ResolvedPortfolio {
+export function toPreview(form: FormState, extras: PreviewExtras = NO_EXTRAS):
+ResolvedPortfolio {
   const contact: ResolvedPortfolio["contact"] = {};
   for (const key of CONTACT_KEYS) {
     const parsed = contactSchema.shape[key].safeParse(form.contact[key]);
     if (parsed.success && parsed.data) contact[key] = parsed.data;
   }
-  return {
-    slug: "vista-previa",
-    name: form.name.trim() || "Tu nombre",
-    tagline: form.tagline.trim(),
-    bio: form.bio.trim(),
-    photo: form.photo,
-    cover: form.cover,
-    archivedAt: null,
-    valueProp: form.valueProp.trim(),
-    contact,
-    niches: form.niches,
-    services: form.services
-      .filter((service) => service.title.trim())
-      .map((service) => ({ title: service.title.trim(), description: service.description.trim() })),
-    stats: extras.stats,
-    engagementRate: extras.engagementRate,
-    metrics: extras.creatorMetrics,
-    design: form.design,
-    pieces: form.pieces.map((piece, index) => {
-      const url = effectiveVideoUrl(piece);
-      const video = url ? parseVideoLink(url) : null;
-      return {
-        id: piece.key,
-        origin: "manual",
-        title: piece.title.trim() || `Pieza ${index + 1}`,
-        niche: piece.niche,
-        image: piece.image,
-        video,
-        link: video ?? piece.postLink,
-        metrics: extras.metrics[piece.key] ?? NO_METRICS,
-      };
-    }),
-  };
+
+    return {
+      slug: "vista-previa",
+      name: form.name.trim() || "Tu nombre",
+      tagline: form.tagline.trim(),
+      bio: form.bio.trim(),
+      photo: form.photo,
+      cover: form.cover,
+      archivedAt: null,
+      valueProp: form.valueProp.trim(),
+      contact,
+      niches: form.niches,
+      services: form.services
+        .filter((service) => service.title.trim())
+        .map((service) => ({ title: service.title.trim(), description: service.description.trim() })),
+      stats: extras.stats,
+      engagementRate: extras.engagementRate,
+      metrics: extras.creatorMetrics,
+      design: form.design,
+      pieces: form.pieces.map((piece, index) => {
+        const url = effectiveVideoUrl(piece);
+        const video = url ? parseVideoLink(url) : null;
+        return {
+          id: piece.key,
+          origin: "manual",
+          title: piece.title.trim() || `Pieza ${index + 1}`,
+          niche: piece.niche,
+          image: piece.image,
+          video,
+          link: video ?? piece.postLink,
+          metrics: extras.metrics[piece.key] ?? NO_METRICS,
+        };
+      }),
+    };
 }

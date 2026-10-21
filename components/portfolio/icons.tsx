@@ -83,11 +83,13 @@ export const PLATFORM_LABEL: Record<VideoLink["platform"], string> = {
   instagram: "Instagram",
   tiktok: "TikTok",
   youtube: "YouTube",
+  canva: "Canva",
 };
 
 export function PlatformIcon({ platform, ...props }: IconProps & { platform: VideoLink["platform"] }) {
   if (platform === "tiktok") return <TikTokIcon {...props} />;
   if (platform === "youtube") return <YouTubeIcon {...props} />;
+  if (platform === "canva") return <PlayIcon {...props} />;
   return <InstagramIcon {...props} />;
 }
 

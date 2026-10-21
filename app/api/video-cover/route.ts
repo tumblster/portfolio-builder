@@ -7,7 +7,7 @@ import { fetchVideoCover } from "@/lib/video-cover";
 
 const bodySchema = z.object({ url: z.string({ error: "Falta el link del video." }).max(500) });
 
-const PLATFORM = { tiktok: "TikTok", youtube: "YouTube", instagram: "Instagram" } as const;
+const PLATFORM = { tiktok: "TikTok", youtube: "YouTube", instagram: "Instagram", canva: "Canva" } as const;
 
 /** Instagram vía Apify tarda típico 20-60 s. */
 export const maxDuration = 120;
@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
   try {
     const { url } = bodySchema.parse(await readJsonBody(request));
     const video = parseVideoLink(url);
-    if (!video) throw new InvalidInputError("Pega un link de video de TikTok, Instagram o YouTube.");
+    if (!video) throw new InvalidInputError("Pega un link de video de TikTok, Instagram, YouTube o Canva.");
     const image = await fetchVideoCover(video);
     if (!image) {
       throw new HttpError(
