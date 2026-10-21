@@ -56,6 +56,26 @@ true });
   return total > 0 && white / total >= BORDER_WHITE_RATIO;
 }
 
+/**
+ * Un logo tiene contenido visible: si la imagen es prácticamente un fondo
+ * vacío (una textura, un papel en blanco), no es un logo aunque su borde sea
+ * blanco. Tinta = píxeles cuyo canal mínimo baja de 235; un logo real supera
+ * el 4 % y una textura vacía mide 0 %.
+ */
+export async function hasVisibleContent(input: Buffer): Promise<boolean> {
+  const { data, info } = await sharp(input)
+    .resize(128, 128, { fit: "inside" })
+    .removeAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  let ink = 0;
+  const pixels = info.width * info.height;
+  for (let i = 0; i < data.length; i += info.channels) {
+    if (Math.min(data[i], data[i + 1], data[i + 2]) < 235) ink += 1;
+  }
+  return pixels > 0 && ink / pixels >= 0.01;
+}
+
 /** El logo sin su fondo blanco, como PNG con transparencia. */
 export async function removeWhiteBackground(input: Buffer): Promise<Buffer> {
   const { data, info } = await sharp(input).ensureAlpha().raw().toBuffer({ resolveWithObject:

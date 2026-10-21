@@ -841,15 +841,22 @@ function isSectorLabel(text: string, name: string): boolean {
 return false;
   const words = text.split(" ");
   if (words.length > 3) return false;
-  if (name && fold(text) === fold(name)) return false;
+  if (name) {
+    const folded = fold(text);
+    // Ni su nombre completo ni UNA palabra de su nombre ("MARIA" en su portada
+    // no es un sector): en presentaciones el nombre se repite en cada lámina.
+    if (folded === fold(name)) return false;
+    if (fold(name).split(" ").filter(Boolean).includes(folded)) return false;
+  }
   return isAllCaps(text) || words.every((word) => isAllCaps(word) ||
 /^\p{Lu}\p{Ll}*$/u.test(word));
 }
 
 // v2: secciones que NO son sectores ("¿Por qué yo?", "METRICAS", "CONTACTO").
-type SectionKind = "bio" | "metrics" | "contact";
+type SectionKind = "bio" | "metrics" | "contact" | "brands";
 const SECTION_PATTERNS: readonly [SectionKind, RegExp][] = [
-  ["bio", /^(?:por que (?:yo|elegirme|trabajar conmigo)|sobre mi|quien soy|acerca de mi|conoceme)\b/],
+  ["brands", /^(?:brands|marcas)\b/],
+  ["bio", /^(?:por que (?:yo|elegirme|trabajar conmigo)|sobre mi|quien soy|acerca de mi|conoceme|about(?: me)?|me)\b/],
   ["metrics", /^(?:mis )?(?:metricas|estadisticas|resultados|numeros|analiticas)\b/],
   ["contact", /^(?:contacto|contactame|contratame|hablemos|trabajemos(?: juntos)?|trabaja conmigo)\b/],
 ];

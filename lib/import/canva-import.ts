@@ -17,7 +17,8 @@ import {
 import { ImportError, isTimeoutError } from "./errors";
 import { prefillNiches, type ImportStep, type ManualPrefill } from "./events";
 import { saveImage } from "@/lib/media";
-import { isWhiteBoxedLogo, removeWhiteBackground } from "./remove-bg";
+import { visionSaysLogo } from "./logo-vision";
+import { hasVisibleContent, isWhiteBoxedLogo, removeWhiteBackground } from "./remove-bg";
 
 /*
  * Importador de Canva: link público de un sitio de Canva → formulario manual prellenado.
@@ -52,7 +53,7 @@ const BROWSER_UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36";
 
 const FORMAT_MESSAGE =
- "No pudimos leer el contenido de tu sitio de Canva: su formato cambió o no es un sitio publicado. Intenta de nuevo más tarde o llena tu portafolio a mano.";
+ "No pudimos leer el contenido de tu sitio de Canva: su formato cambió o no es un sitio publicado. Llena tu portafolio a mano o contáctanos desde el formulario de soporte y lo revisamos contigo.";
 
 export type CanvaImportOutcome = { kind: "manual"; reason: "canva_import"; message:
 string; prefill: ManualPrefill };
@@ -91,7 +92,11 @@ Revisa que tus videos estén publicados en el sitio, o llena tu portafolio a man
  const candidates = theme ? portfolio.logoCandidates : [];
  const verdicts = await mapWithConcurrency(candidates, LOGO_CONCURRENCY,
 (candidate) => inspectLogo(candidate.asset.url));
- const logos = candidates.filter((_, index) => verdicts[index]);
+ // Auditoría de la franja por CONTENIDO (no por forma): inspectLogo ya decidió
+ // si cada candidato confirmado ES un logo; los que pasaron el test de píxeles
+ // pero no son logos (capturas, fondos) se cuentan para avisar en la revisión.
+ const discardedShots = verdicts.filter((verdict) => verdict.discarded).length;
+ const logos = candidates.filter((_, index) => verdicts[index].logo);
  const logoUrls = new Set(logos.map((candidate) => candidate.asset.url));
  // Un logo nunca es la portada de respaldo de un video.
  const plan = logoUrls.size > 0 ? planPieces(portfolio.sectors, logoUrls) : firstPlan;
@@ -250,6 +255,25 @@ siteUrl);
 quedaron junto a los del sector anterior. Revisa el nicho de cada pieza.`,
    );
  }
+ {
+   const totalPieces = portfolio.sectors.reduce((sum, sector) => sum + sector.videos.length, 0);
+   const labeledSectors = portfolio.sectors.filter((sector) => sector.label).length;
+   if (totalPieces >= 4 && labeledSectors === 0) {
+     warnings.push(
+       "No pudimos separar tus videos por sector: quedaron todos juntos. Puedes asignar el nicho a cada pieza en el editor.",
+     );
+   }
+ }
+ if (discardedShots > 0) {
+   warnings.push(
+     `Descartamos ${discardedShots} ${discardedShots === 1 ? "imagen" : "imágenes"} de la franja de marcas porque no ${discardedShots === 1 ? "era un logo" : "eran logos"}.`,
+   );
+ }
+ if (textureBg) {
+   warnings.push(
+     "La imagen principal de tu Canva era una textura de fondo: la reemplazamos por otra foto de tu sitio y usamos su color como fondo.",
+   );
+ }
  if (usedPhotoAsCover > 0) {
    warnings.push(
      `${usedPhotoAsCover} ${usedPhotoAsCover === 1 ? "video usa" : "videos usan"} tu foto
@@ -346,7 +370,8 @@ async function fetchCanvaPage(siteUrl: string): Promise<{ html: string; url: str
      throw new ImportError(
        "unavailable",
        `Canva no nos dejó leer tu sitio (error ${response.status}). Revisa que esté publicado y
-sea público, o intenta en unos minutos.`,
+sea público. Si sigue fallando, contáctanos desde el formulario de soporte y lo revisamos
+contigo.`,
      );
    }
    if (Number(response.headers.get("content-length") ?? 0) > MAX_HTML_CHARS) {
@@ -433,24 +458,41 @@ async function copyLogoTransparent(url: string): Promise<StoredImage | null> {
   }
 }
 
-/** v2 · R5: ¿la imagen es un logo con caja blanca? Ante cualquier error, no (nunca rompe el
-import). */
-async function inspectLogo(url: string): Promise<boolean> {
+type LogoVerdict = {
+  /** Confirmado como logo: entra a la franja. */
+  logo: boolean;
+  /** Pasó el test de píxeles pero NO es un logo (captura, fondo vacío): se avisa. */
+  discarded: boolean;
+};
+
+/**
+ * v2 · R5 + auditoría: ¿la imagen ES un logo? Primero píxeles (caja blanca y
+ * contenido visible); después, contenido con visión (logo-vision.ts), porque
+ * una captura de estadísticas es idéntica a un logo en píxeles. La forma y el
+ * tamaño NO descartan: un logo alto y angosto es un logo. Ante cualquier
+ * error, no es logo y no se avisa (nunca rompe el import).
+ */
+async function inspectLogo(url: string): Promise<LogoVerdict> {
   try {
-    if (!isCanvaSiteHost(new URL(url).hostname)) return false;
+    if (!isCanvaSiteHost(new URL(url).hostname)) return { logo: false, discarded: false };
     const response = await fetch(url, {
       cache: "no-store",
       headers: { "User-Agent": BROWSER_UA },
       signal: AbortSignal.timeout(LOGO_TIMEOUT_MS),
     });
-    if (!response.ok || !isCanvaSiteHost(new URL(response.url || url).hostname)) return false;
-    if (Number(response.headers.get("content-length") ?? 0) > MAX_LOGO_BYTES) return false;
+    if (!response.ok || !isCanvaSiteHost(new URL(response.url || url).hostname))
+      return { logo: false, discarded: false };
+    if (Number(response.headers.get("content-length") ?? 0) > MAX_LOGO_BYTES)
+      return { logo: false, discarded: false };
     const bytes = Buffer.from(await response.arrayBuffer());
-    if (bytes.length === 0 || bytes.length > MAX_LOGO_BYTES) return false;
-    return await isWhiteBoxedLogo(bytes);
+    if (bytes.length === 0 || bytes.length > MAX_LOGO_BYTES) return { logo: false, discarded: false };
+    if (!(await isWhiteBoxedLogo(bytes))) return { logo: false, discarded: false };
+    if (!(await hasVisibleContent(bytes))) return { logo: false, discarded: true };
+    if ((await visionSaysLogo(bytes)) === false) return { logo: false, discarded: true };
+    return { logo: true, discarded: false };
   } catch (error) {
     console.warn("[import/canva] no se pudo revisar un posible logo:", url, error);
-    return false;
+    return { logo: false, discarded: false };
   }
 }
 

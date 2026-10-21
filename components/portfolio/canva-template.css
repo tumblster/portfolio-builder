@@ -269,7 +269,40 @@
   font-family: var(--cv-font-headings, serif);
   font-size: clamp(1.9rem, 4vw, 2.7rem);
   font-weight: 500;
-  margin-bottom: 30px;
+  /* A6: las fuentes script dibujan fuera de su caja; sin aire invaden la fila. */
+  line-height: 1.3;
+  padding-bottom: 0.14em;
+  margin-bottom: 26px;
+}
+
+/* A1: el video nativo llena la pantalla del teléfono y corre ahí dentro. */
+.cv-phone__screenwrap {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.cv-phone__video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: #000;
+}
+
+.cv-phone__playbtn {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 52px;
+  height: 52px;
+  border: none;
+  border-radius: 999px;
+  background: rgb(0 0 0 / 0.45);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
 }
 
 .cv-group__title[data-cv-italic] {

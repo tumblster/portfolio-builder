@@ -19,7 +19,8 @@ import { ImportReview } from "./import-review";
 import { OnboardingStep, useOnboarding } from "./import/onboarding-step";
 import { PrefillSummary } from "./prefill-summary";
 import { ReadyDialog } from "./ready-dialog";
-import { errorText, fieldLabel, pillButton, primaryButton, textInput } from "./brand-ui";
+import { SUPPORT_FORM_URL } from "@/lib/site";
+import { errorText, fieldLabel, pillButton, primaryButton, textInput, textLink } from "./brand-ui";
 
 /*
  * Flujo principal: pegar el perfil de Instagram → portafolio con link.
@@ -394,6 +395,12 @@ w-full`}>
 
            <p className="mt-2 text-sm text-muted">Puedes intentarlo de nuevo con el mismo
 link o llenarlo a mano.</p>
+           <p className="mt-3 text-sm">
+             <a href={SUPPORT_FORM_URL} target="_blank" rel="noopener noreferrer" className={textLink}>
+               Ir al formulario de soporte <span aria-hidden="true">→</span>
+               <span className="sr-only"> (se abre en una pestaña nueva)</span>
+             </a>
+           </p>
           </div>
         ):(
           <Steps state={state} steps={runningConfig.steps} labels={runningConfig.stepLabels}

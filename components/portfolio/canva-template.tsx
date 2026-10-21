@@ -3,7 +3,9 @@ import type { CSSProperties } from "react";
 import type { CanvaData, StoredImage } from "@/lib/portfolio/schema";
 import { fontPlan } from "@/lib/portfolio/font-map";
 import type { ResolvedPiece } from "@/lib/portfolio/resolve";
+import { nativeVideoFor } from "@/lib/portfolio/embed";
 import { SectorButton } from "./canva-sector-button";
+import { CanvaPhoneVideo } from "./canva-phone-video";
 import { NicheScope } from "./niche-filter";
 import { PlatformIcon, PlayIcon } from "./icons";
 import { VideoFacade } from "./video-facade";
@@ -240,9 +242,6 @@ export function CanvaTemplate({ portfolio, variant, filter, coverEdit, canva }: 
               </figure>
             )}
           </div>
-          {ungrouped.length > 0 && (
-            <PhoneGrid pieces={ungrouped} canva={canva} filterableSlugs={filterableSlugs} Heading={H3} />
-          )}
           {filterable.map((niche) => {
             const group = pieces.filter((piece) => piece.niche === niche.slug);
             if (group.length === 0) return null;
@@ -251,10 +250,16 @@ export function CanvaTemplate({ portfolio, variant, filter, coverEdit, canva }: 
                 <H3 className="cv-group__title" data-cv-italic={plan.headingsItalic ? "" : undefined}>
                   {niche.label}
                 </H3>
-                <PhoneGrid pieces={group} canva={canva} filterableSlugs={filterableSlugs} Heading={H3} />
+                <PhoneGrid pieces={group} canva={canva} filterableSlugs={filterableSlugs} Heading={H3} groupLabel={niche.label} />
               </div>
             );
           })}
+          {/* A4: lo que no tiene sector CIERRA la sección, no la abre. */}
+          {ungrouped.length > 0 && (
+            <div className="cv-group">
+              <PhoneGrid pieces={ungrouped} canva={canva} filterableSlugs={filterableSlugs} Heading={H3} groupLabel={null} />
+            </div>
+          )}
         </section>
 
         {/* ── Bio con su foto de apoyo ──────────────────────────────────── */}
@@ -361,57 +366,83 @@ export function CanvaTemplate({ portfolio, variant, filter, coverEdit, canva }: 
   );
 }
 
+/** A3: los títulos derivados del import ("Video", "Video 3", el nombre del
+ * sector o "Sector 2") son andamiaje de datos, no copy: nunca se publican. */
+function isDerivedTitle(title: string, groupLabel: string | null): boolean {
+  const text = title.trim();
+  if (/^video( \d+)?$/i.test(text)) return true;
+  if (groupLabel) {
+    if (text === groupLabel) return true;
+    if (text.startsWith(`${groupLabel} `) && /^\d+$/.test(text.slice(groupLabel.length + 1))) return true;
+  }
+  return false;
+}
+
 /** Grilla de teléfonos; cada pieza conserva su data-pf-show para el filtro. */
 function PhoneGrid({
   pieces,
   canva,
   filterableSlugs,
   Heading,
+  groupLabel,
 }: {
   pieces: ResolvedPiece[];
   canva: CanvaData;
   filterableSlugs: readonly string[];
   Heading: "h3" | "h4";
+  groupLabel: string | null;
 }) {
   return (
     <ul className="cv-phones">
-      {pieces.map((piece) => (
-        <li key={piece.id} className="cv-piece" data-pf-piece={piece.id} data-pf-show={pieceShow(piece, filterableSlugs)}>
-          <PhoneCard piece={piece} logo={piece.video ? canva.pieceLogos[piece.video.url] ?? null : null} />
-          <Heading className="cv-piece__title">{piece.title}</Heading>
-          {pieceMeta(piece).meta && <p className="cv-piece__meta">{pieceMeta(piece).meta}</p>}
-        </li>
-      ))}
+      {pieces.map((piece) => {
+        const meta = piece.video?.platform === "canva" ? null : pieceMeta(piece).meta;
+        return (
+          <li key={piece.id} className="cv-piece" data-pf-piece={piece.id} data-pf-show={pieceShow(piece, filterableSlugs)}>
+            <PhoneCard piece={piece} logo={piece.video ? canva.pieceLogos[piece.video.url] ?? null : null} />
+            {!isDerivedTitle(piece.title, groupLabel) && <Heading className="cv-piece__title">{piece.title}</Heading>}
+            {meta && <p className="cv-piece__meta">{meta}</p>}
+          </li>
+        );
+      })}
     </ul>
   );
 }
 
-/** El teléfono: marco negro, la portada (o la fachada) adentro y el logo encima. */
+/** El teléfono: marco negro, el contenido adentro y el logo encima. Con video
+ * nativo de Canva (A1), el video mismo es la pantalla: frame real y play ahí
+ * dentro, sin póster collage, sin display y sin badge ni salida a Canva. */
 function PhoneCard({ piece, logo }: { piece: ResolvedPiece; logo: StoredImage | null }) {
   const { platform } = pieceMeta(piece);
+  const native = piece.video ? nativeVideoFor(piece.video) : null;
   return (
     <div className="cv-phone">
       <span className="cv-phone__notch" aria-hidden="true" />
-      <PieceLink piece={piece} className="cv-phone__screen">
-        {piece.image ? (
-          <Image src={piece.image.url} alt="" fill sizes="(min-width: 768px) 240px, 62vw" loading="lazy" />
-        ) : piece.video ? (
-          <VideoFacade video={piece.video} />
-        ) : (
-          <span className="cv-phone__placeholder">{platform ? `Video de ${platform}` : ""}</span>
-        )}
-        {piece.video && piece.image && (
-          <span className="cv-phone__play" aria-hidden="true">
-            <PlayIcon size={22} />
-          </span>
-        )}
-        {piece.link && (
-          <span className="cv-phone__badge">
-            <PlatformIcon platform={piece.link.platform} size={13} />
-            {platform}
-          </span>
-        )}
-      </PieceLink>
+      {native ? (
+        <div className="cv-phone__screen">
+          <CanvaPhoneVideo src={native.src} title={piece.title} poster={piece.image?.url ?? null} />
+        </div>
+      ) : (
+        <PieceLink piece={piece} className="cv-phone__screen">
+          {piece.image ? (
+            <Image src={piece.image.url} alt="" fill sizes="(min-width: 768px) 240px, 62vw" loading="lazy" />
+          ) : piece.video ? (
+            <VideoFacade video={piece.video} />
+          ) : (
+            <span className="cv-phone__placeholder">{platform ? `Video de ${platform}` : ""}</span>
+          )}
+          {piece.video && piece.image && (
+            <span className="cv-phone__play" aria-hidden="true">
+              <PlayIcon size={22} />
+            </span>
+          )}
+          {piece.link && (
+            <span className="cv-phone__badge">
+              <PlatformIcon platform={piece.link.platform} size={13} />
+              {platform}
+            </span>
+          )}
+        </PieceLink>
+      )}
       {logo && (
         <span className="cv-phone__logo">
           <Image src={logo.url} alt="" width={logo.width ?? 160} height={logo.height ?? 160} />
