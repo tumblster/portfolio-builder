@@ -1,4 +1,5 @@
-import { LIMITS, type InstagramPost, type InstagramSnapshot, type StoredImage } from "@/lib/portfolio/schema";
+import { LIMITS, type InstagramPost, type InstagramSnapshot, type StoredImage } from
+"@/lib/portfolio/schema";
 import type { ApifyPost, ApifyProfile } from "./apify";
 import { instagramProfileUrl } from "./username";
 
@@ -8,7 +9,8 @@ import { instagramProfileUrl } from "./username";
  */
 
 const nonNegative = (value: number | null | undefined) =>
-  typeof value === "number" && Number.isFinite(value) && value >= 0 ? Math.round(value) : null;
+ typeof value === "number" && Number.isFinite(value) && value >= 0 ? Math.round(value) :
+null;
 
 const toIsoDate = (value: string | null | undefined) => {
   if (!value) return null;
@@ -28,7 +30,8 @@ export const httpUrlOrNull = (value: string | null | undefined) => {
 };
 
 function postType(post: ApifyPost): InstagramPost["type"] {
-  if (post.type === "Video" || post.productType === "clips" || post.productType === "igtv") return "video";
+  if (post.type === "Video" || post.productType === "clips" || post.productType === "igtv")
+return "video";
   if (post.type === "Sidecar") return "carousel";
   return "image";
 }
@@ -40,7 +43,8 @@ function postUrl(post: ApifyPost): string | null {
   return post.shortCode ? `https://www.instagram.com/p/${post.shortCode}/` : null;
 }
 
-export function toInstagramPost(post: ApifyPost, image: StoredImage | null): InstagramPost | null {
+export function toInstagramPost(post: ApifyPost, image: StoredImage | null): InstagramPost |
+null {
   const url = postUrl(post);
   if (!url) return null;
   return {
@@ -49,7 +53,8 @@ export function toInstagramPost(post: ApifyPost, image: StoredImage | null): Ins
     url,
     type: postType(post),
     caption: (post.caption ?? "").slice(0, 2200),
-    hashtags: [...new Set((post.hashtags ?? []).map((tag) => tag.trim().slice(0, 100)).filter(Boolean))].slice(0, 60),
+    hashtags: [...new Set((post.hashtags ?? []).map((tag) => tag.trim().slice(0,
+100)).filter(Boolean))].slice(0, 60),
     takenAt: toIsoDate(post.timestamp),
     likesCount: nonNegative(post.likesCount), // -1 (likes ocultos) → null
     commentsCount: nonNegative(post.commentsCount),
@@ -78,38 +83,54 @@ export function toSnapshot(
     followsCount: nonNegative(profile.followsCount),
     postsCount: nonNegative(profile.postsCount),
     isVerified: Boolean(profile.verified),
-    isBusinessAccount: Boolean(profile.isBusinessAccount),
-    businessCategory: category && category !== "None" ? category : null,
-    profilePhoto,
-    posts: posts.slice(0, LIMITS.instagramPosts),
-  };
+
+      isBusinessAccount: Boolean(profile.isBusinessAccount),
+      businessCategory: category && category !== "None" ? category : null,
+      profilePhoto,
+      posts: posts.slice(0, LIMITS.instagramPosts),
+    };
 }
 
-const interaction = (post: InstagramPost) => (post.likesCount ?? 0) + (post.commentsCount ?? 0);
+const interaction = (post: InstagramPost) => (post.likesCount ?? 0) + (post.commentsCount
+?? 0);
 
-/** Los posts con más interacción (likes + comentarios) que tengan imagen. En empate, el más reciente. */
-export function pickTopPosts(posts: InstagramPost[], count: number = LIMITS.maxPieces): InstagramPost[] {
+/**
+ * Los posts con más interacción (likes + comentarios) que tengan imagen. En empate, el
+más reciente.
+ *
+ * Canva v1: LIMITS.maxPieces subió a 30 (el tope del portafolio), pero la selección inicial
+del import de Instagram
+ * sigue en LIMITS.importSelectPieces (6). Como instagram-import.ts la pide con
+LIMITS.maxPieces, el tope se aplica
+ * aquí: Instagram sigue curando 6, sin cambio de comportamiento.
+ */
+export function pickTopPosts(posts: InstagramPost[], count: number =
+LIMITS.importSelectPieces): InstagramPost[] {
+  const limit = Math.min(count, LIMITS.importSelectPieces);
   return posts
     .map((post, order) => ({ post, order }))
     .filter(({ post }) => post.image !== null)
     .sort((a, b) => interaction(b.post) - interaction(a.post) || a.order - b.order)
-    .slice(0, count)
+    .slice(0, limit)
     .map(({ post }) => post);
 }
 
 // ── Títulos de respaldo (si la IA no responde) ──────────────────────
 export const EMOJI = /[\p{Extended_Pictographic}\u{1F1E6}-\u{1F1FF}\u{1F3FB}-\u{1F3FF}\uFE0F\u200D\u20E3]/gu;
-const FALLBACK_TITLE: Record<InstagramPost["type"], string> = { video: "Reel", carousel: "Carrusel", image: "Foto" };
+const FALLBACK_TITLE: Record<InstagramPost["type"], string> = { video: "Reel", carousel:
+"Carrusel", image: "Foto" };
 
 /** Corta en el último espacio antes del límite y agrega "…". */
 export function truncateWords(text: string, max: number): string {
   if (text.length <= max) return text;
   const cut = text.slice(0, max);
   const lastSpace = cut.lastIndexOf(" ");
-  return `${(lastSpace > max * 0.5 ? cut.slice(0, lastSpace) : cut).replace(/[\s,;:.\-–—]+$/, "")}…`;
+  return `${(lastSpace > max * 0.5 ? cut.slice(0, lastSpace) : cut).replace(/[\s,;:.\-–—]+$/,
+"")}…`;
 }
 
 /** Primera frase del texto del post, sin links, hashtags, menciones ni emojis. */
+
 export function titleFromCaption(caption: string, type: InstagramPost["type"]): string {
   const firstPhrase =
     caption
@@ -117,9 +138,11 @@ export function titleFromCaption(caption: string, type: InstagramPost["type"]): 
       .replace(/[#@][\p{L}\p{N}_.]+/gu, " ")
       .replace(EMOJI, " ")
       .split(/\n|(?<=[.!?…])\s/)
-      .map((part) => part.replace(/\s+/g, " ").replace(/^[\s\-–—•·|:;,.]+|[\s\-–—•·|:;,.]+$/g, "").trim())
+      .map((part) => part.replace(/\s+/g, " ").replace(/^[\s\-–—•·|:;,.]+|[\s\-–—•·|:;,.]+$/g,
+"").trim())
       .find((part) => part.length >= 3) ?? "";
   if (!firstPhrase) return FALLBACK_TITLE[type];
   // Mayúscula en la primera letra (también si empieza con ¡ o ¿).
-  return truncateWords(firstPhrase, 48).replace(/\p{L}/u, (letter) => letter.toLocaleUpperCase("es"));
+  return truncateWords(firstPhrase, 48).replace(/\p{L}/u, (letter) =>
+letter.toLocaleUpperCase("es"));
 }

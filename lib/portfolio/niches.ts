@@ -14,6 +14,12 @@ import { slugify } from "@/lib/text/slugify";
 export type NicheDef = { slug: string; label: string };
 
 export const MAX_NICHES = 3;
+/**
+ * Tope de nichos que un portafolio puede GUARDAR (esquema). Es mayor que MAX_NICHES:
+ * ese sigue siendo el tope de los nichos que sugiere la IA y de la revisión de Instagram,
+ * pero un portafolio importado (p. ej. los sectores de un Canva) puede traer más.
+ */
+export const MAX_PORTFOLIO_NICHES = 12;
 export const NICHE_LABEL_MAX = 24;
 export const NICHE_SLUG_MAX = 32;
 export const NICHE_SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;

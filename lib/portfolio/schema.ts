@@ -1,6 +1,7 @@
 import { z } from "zod";
 import {
   MAX_NICHES,
+  MAX_PORTFOLIO_NICHES,
   NICHE_LABEL_MAX,
   NICHE_SLUG_MAX,
   NICHE_SLUG_PATTERN,
@@ -15,24 +16,34 @@ import { slugSchema } from "./slug";
  * Modelo de datos de un portafolio. Se guarda un JSON por portafolio.
  *
  * Guarda tres fuentes por separado, sin mezclarlas:
- *   instagram  → lo que se scrapeó del perfil con Apify. No se edita.
- *   generated  → lo que redactó la IA con Groq: propuesta de valor y, por cada
- *                post elegido, un título y un nicho sugeridos. No se edita.
- *   manual     → lo que se escribe a mano. Siempre gana.
+ * instagram → lo que se scrapeó del perfil con Apify. No se edita.
+ * generated → lo que redactó la IA con Groq: propuesta de valor y, por cada
+ *           post elegido, un título y un nicho sugeridos. No se edita.
+ * manual → lo que se escribe a mano. Siempre gana.
  *
  * La página pública muestra: manual → si no hay, IA → si no hay, Instagram
  * (ver resolvePortfolio en resolve.ts). Así, regenerar con IA o volver a
  * scrapear nunca borra una corrección hecha a mano.
  *
- * `pieces` es la selección final que se muestra (3 a 6, en orden). Cada pieza
+ * `pieces` es la selección final que se muestra (3 a 30, en orden). Cada pieza
  * recuerda si vino de Instagram o se agregó a mano, y puede llevar un nicho.
  *
  * v2: cada portafolio tiene sus propios nichos (hasta 3, detectados por la IA) y sus
- * servicios ("formas de colaborar"). Ambos siguen la misma regla manual → IA. Los JSON de la
+ * servicios ("formas de colaborar"). Ambos siguen la misma regla manual → IA. Los JSON
+de la
  * v1 (schemaVersion 1) se leen igual y se guardan como v2 en su siguiente edición.
  *
- * Ronda 6 · 13.19 / 13.20: `manual` suma los Brand partners y los case studies del Media kit. Solo existen como dato
+ * Ronda 6 · 13.19 / 13.20: `manual` suma los Brand partners y los case studies del Media
+kit. Solo existen como dato
  * manual: los confirma o los escribe la creadora; la IA nunca los propone por su cuenta.
+ *
+ * Importador de Canva v1: el tope de piezas sube de 6 a 30 (un portafolio de Canva trae
+decenas de videos por sector).
+
+ * La selección inicial del import de Instagram sigue en 6 (LIMITS.importSelectPieces). Los
+MP4 de un sitio de Canva
+ * son una plataforma de video más ("canva"): quedan enlazados (hotlink) y se reproducen
+con <video> nativo.
  *
  * Este archivo no depende del servidor: el formulario también lo puede usar.
  */
@@ -41,13 +52,18 @@ export const SCHEMA_VERSION = 2;
 
 export const LIMITS = {
   name: 80,
-  /** Lo que va después del separador en el nombre de IG ("Daniela Gadea | Marca Personal para profesionales"). */
+  /** Lo que va después del separador en el nombre de IG ("Daniela Gadea | Marca Personal
+para profesionales"). */
   tagline: 60,
   bio: 220,
   valueProp: 160,
   pieceTitle: 80,
   minPieces: 3,
-  maxPieces: 6,
+  /** Canva v1: tope duro de piezas del portafolio (antes 6). */
+  maxPieces: 30,
+  /** Canva v1: cuántas piezas elige de entrada el import de Instagram (el comportamiento
+de siempre). */
+  importSelectPieces: 6,
   instagramPosts: 12,
   serviceTitle: 40,
   serviceDescription: 120,
@@ -63,7 +79,7 @@ export const LIMITS = {
 const utcDate = z.iso.datetime(); // ISO 8601 en UTC, p. ej. 2026-09-28T15:04:05.000Z
 
 // ── Nichos (propios de cada portafolio) ─────────────────────────────
-export { LEGACY_NICHES, MAX_NICHES, type NicheDef } from "./niches";
+export { LEGACY_NICHES, MAX_NICHES, MAX_PORTFOLIO_NICHES, type NicheDef } from "./niches";
 
 /** Slug de un nicho, tal como va en la URL: /p/<slug>/<nicho>. */
 export const nicheSlugSchema = z
@@ -72,18 +88,20 @@ export const nicheSlugSchema = z
   .regex(NICHE_SLUG_PATTERN, { error: "Nicho inválido." });
 
 export const nicheDefSchema = z.object({
+
   slug: nicheSlugSchema.refine((slug) => !RESERVED_NICHE_SLUGS.includes(slug), {
     error: '"todo" está reservado para la versión general.',
   }),
-  label: z.string().trim().min(1, { error: "El nicho necesita un nombre." }).max(NICHE_LABEL_MAX),
+  label: z.string().trim().min(1, { error: "El nicho necesita un nombre."
+}).max(NICHE_LABEL_MAX),
 });
 
 export const nichesSchema = z
-  .array(nicheDefSchema)
-  .max(MAX_NICHES, { error: `Hasta ${MAX_NICHES} nichos por portafolio.` })
-  .refine((niches) => new Set(niches.map((niche) => niche.slug)).size === niches.length, {
-    error: "Hay dos nichos con el mismo link.",
-  });
+ .array(nicheDefSchema)
+ .max(MAX_PORTFOLIO_NICHES, { error: `Hasta ${MAX_PORTFOLIO_NICHES} nichos por portafolio.` })
+ .refine((niches) => new Set(niches.map((niche) => niche.slug)).size === niches.length, {
+   error: "Hay dos nichos con el mismo link.",
+ });
 
 // ── Servicios ("formas de colaborar") ───────────────────────────────
 export const serviceSchema = z.object({
@@ -91,18 +109,21 @@ export const serviceSchema = z.object({
     .string({ error: "Ponle un nombre al servicio." })
     .trim()
     .min(1, { error: "Ponle un nombre al servicio." })
-    .max(LIMITS.serviceTitle, { error: `El nombre admite hasta ${LIMITS.serviceTitle} caracteres.` }),
+    .max(LIMITS.serviceTitle, { error: `El nombre admite hasta ${LIMITS.serviceTitle}
+caracteres.` }),
   description: z
     .string()
     .trim()
-    .max(LIMITS.serviceDescription, { error: `La descripción admite hasta ${LIMITS.serviceDescription} caracteres.` })
+    .max(LIMITS.serviceDescription, { error: `La descripción admite hasta
+${LIMITS.serviceDescription} caracteres.` })
     .default(""),
 });
 export type Service = z.output<typeof serviceSchema>;
 
 export const servicesSchema = z
-  .array(serviceSchema)
-  .max(LIMITS.maxServices, { error: `Puedes mostrar hasta ${LIMITS.maxServices} servicios.` });
+ .array(serviceSchema)
+ .max(LIMITS.maxServices, { error: `Puedes mostrar hasta ${LIMITS.maxServices}
+servicios.` });
 
 // ── Imágenes ────────────────────────────────────────────────────────
 /** Nombre que el servidor le da a cada imagen guardada: <uuid>.webp */
@@ -115,26 +136,38 @@ export const MEDIA_FILE_PATTERN =
  */
 export const storedImageSchema = z.object({
   url: z.string().refine(
-    (url) => url.startsWith("/media/") && MEDIA_FILE_PATTERN.test(url.slice("/media/".length)),
+
+    (url) => url.startsWith("/media/") &&
+MEDIA_FILE_PATTERN.test(url.slice("/media/".length)),
     { error: "La imagen tiene que subirse primero (POST /api/media)." },
   ),
   width: z.number().int().positive().optional(),
   height: z.number().int().positive().optional(),
   alt: z.string().trim().max(200).optional(),
-  /** v2 · M2: color dominante (#rrggbb), para la paleta "de su foto". Ausente en imágenes anteriores. */
+  /** v2 · M2: color dominante (#rrggbb), para la paleta "de su foto". Ausente en imágenes
+anteriores. */
   swatch: z.string().regex(/^#[0-9a-f]{6}$/i).optional(),
 });
 export type StoredImage = z.infer<typeof storedImageSchema>;
 
-// ── Videos (RF-02: TikTok, Instagram, YouTube) ─────────────────────
-export const VIDEO_PLATFORMS = ["tiktok", "instagram", "youtube"] as const;
+// ── Videos (RF-02: TikTok, Instagram, YouTube; Canva v1: MP4 de un sitio de Canva) ──
+export const VIDEO_PLATFORMS = ["tiktok", "instagram", "youtube", "canva"] as const;
 export const videoLinkSchema = z.object({
   platform: z.enum(VIDEO_PLATFORMS),
   url: z.url({ protocol: /^https$/ }),
 });
 export type VideoLink = z.infer<typeof videoLinkSchema>;
 
-/** Reconoce un link de video de TikTok, Instagram (post o reel) o YouTube. Si no lo es, devuelve null. */
+/** Hosts de Canva que pueden servir un MP4 (sitios publicados y su CDN). */
+const isCanvaVideoHost = (host: string) =>
+  host === "canva.site" || host.endsWith(".canva.site") || host === "canva.com" ||
+host.endsWith(".canva.com");
+
+/**
+ * Reconoce un link de video de TikTok, Instagram (post o reel), YouTube o un MP4 de un
+sitio de Canva.
+ * Si no lo es, devuelve null.
+ */
 export function parseVideoLink(raw: string): VideoLink | null {
   let url: URL;
   try {
@@ -147,33 +180,39 @@ export function parseVideoLink(raw: string): VideoLink | null {
   const host = url.hostname.toLowerCase().replace(/^(www|m)\./, "");
   const path = url.pathname;
 
-  if ((host === "tiktok.com" || host.endsWith(".tiktok.com")) && path.length > 1) {
-    return { platform: "tiktok", url: url.toString() };
-  }
-  if (host === "instagram.com" && /^\/(p|reel|reels|tv)\/[\w-]+/.test(path)) {
-    return { platform: "instagram", url: url.toString() };
-  }
-  const isYouTubeVideo =
-    (host === "youtu.be" && path.length > 1) ||
-    ((host === "youtube.com" || host.endsWith(".youtube.com")) &&
-      (url.searchParams.has("v") || /^\/(shorts|live|embed)\/[\w-]+/.test(path)));
-  if (isYouTubeVideo) return { platform: "youtube", url: url.toString() };
+ // Canva v1: el video vive en el sitio de la creadora (hotlink). Solo archivos .mp4.
+ if (isCanvaVideoHost(host) && /\.mp4$/i.test(path)) {
+   return { platform: "canva", url: url.toString() };
+ }
+ if ((host === "tiktok.com" || host.endsWith(".tiktok.com")) && path.length > 1) {
 
-  return null;
+     return { platform: "tiktok", url: url.toString() };
+    }
+    if (host === "instagram.com" && /^\/(p|reel|reels|tv)\/[\w-]+/.test(path)) {
+      return { platform: "instagram", url: url.toString() };
+    }
+    const isYouTubeVideo =
+      (host === "youtu.be" && path.length > 1) ||
+      ((host === "youtube.com" || host.endsWith(".youtube.com")) &&
+        (url.searchParams.has("v") || /^\/(shorts|live|embed)\/[\w-]+/.test(path)));
+    if (isYouTubeVideo) return { platform: "youtube", url: url.toString() };
+
+    return null;
 }
 
 // ── Contacto y redes ────────────────────────────────────────────────
 // Texto vacío ("") = "no mostrar", aunque Instagram tenga ese dato.
 
 /** Campo opcional que se normaliza y luego se valida; "" siempre es válido. */
-function contactField(normalize: (value: string) => string, isValid: (value: string) => boolean, error: string) {
+function contactField(normalize: (value: string) => string, isValid: (value: string) => boolean,
+error: string) {
   return z
-    .string()
-    .trim()
-    .max(300)
-    .transform(normalize)
-    .refine((value) => value === "" || isValid(value), { error })
-    .optional();
+   .string()
+   .trim()
+   .max(300)
+   .transform(normalize)
+   .refine((value) => value === "" || isValid(value), { error })
+   .optional();
 }
 
 /** Acepta "@usuario", "usuario" o el link del perfil, y guarda solo "usuario". */
@@ -185,15 +224,16 @@ function handleFrom(hostPattern: RegExp) {
 }
 
 const withProtocol = (value: string) =>
-  value === "" || /^https?:\/\//i.test(value) ? value : `https://${value}`;
+ value === "" || /^https?:\/\//i.test(value) ? value : `https://${value}`;
 
 const isHttpUrl = (value: string) => {
-  try {
-    const url = new URL(value);
-    return (url.protocol === "https:" || url.protocol === "http:") && url.hostname.includes(".");
-  } catch {
-    return false;
-  }
+ try {
+   const url = new URL(value);
+   return (url.protocol === "https:" || url.protocol === "http:") && url.hostname.includes(".");
+ } catch {
+   return false;
+ }
+
 };
 
 export const contactSchema = z.object({
@@ -230,18 +270,19 @@ export type Contact = z.infer<typeof contactSchema>;
 export const PIECE_ORIGINS = ["instagram", "manual"] as const;
 
 export const pieceSchema = z
-  .object({
-    id: z.string().min(1).max(64),
-    origin: z.enum(PIECE_ORIGINS),
-    title: z.string().trim().min(1).max(LIMITS.pieceTitle),
-    niche: nicheSlugSchema.nullable(), // nicho de la pieza (uno de los del portafolio); null = solo en "Todo"
-    image: storedImageSchema.nullable(), // foto, o portada si es video
-    video: videoLinkSchema.nullable(),
-    sourcePostId: z.string().max(64).optional(), // id del post de Instagram, si vino de ahí
-  })
-  .refine((piece) => piece.image !== null || piece.video !== null, {
-    error: "Cada pieza necesita una imagen o un link de video.",
-  });
+ .object({
+   id: z.string().min(1).max(64),
+   origin: z.enum(PIECE_ORIGINS),
+   title: z.string().trim().min(1).max(LIMITS.pieceTitle),
+   niche: nicheSlugSchema.nullable(), // nicho de la pieza (uno de los del portafolio); null = solo en "Todo"
+   image: storedImageSchema.nullable(), // foto, o portada si es video
+   video: videoLinkSchema.nullable(),
+   sourcePostId: z.string().max(64).optional(), // id del post de Instagram, si vino de ahí
+ })
+ .refine((piece) => piece.image !== null || piece.video !== null, {
+
+   error: "Cada pieza necesita una imagen o un link de video.",
+ });
 export type Piece = z.infer<typeof pieceSchema>;
 
 /** Pieza tal como llega del formulario. `id` solo viene al editar una que ya existía. */
@@ -252,7 +293,8 @@ export const pieceInputSchema = z
       .string({ error: "Ponle un título a la pieza." })
       .trim()
       .min(1, { error: "Ponle un título a la pieza." })
-      .max(LIMITS.pieceTitle, { error: `El título admite hasta ${LIMITS.pieceTitle} caracteres.` }),
+      .max(LIMITS.pieceTitle, { error: `El título admite hasta ${LIMITS.pieceTitle} caracteres.`
+}),
     niche: nicheSlugSchema.nullable().default(null),
     image: storedImageSchema.nullable().default(null),
     videoUrl: z.string().trim().max(500).nullable().default(null),
@@ -268,7 +310,8 @@ export const pieceInputSchema = z
       return z.NEVER;
     }
     if (!piece.image && !video) {
-      ctx.addIssue({ code: "custom", message: "Agrega una imagen o un link de video.", path: ["image"] });
+      ctx.addIssue({ code: "custom", message: "Agrega una imagen o un link de video.", path:
+["image"] });
       return z.NEVER;
     }
     return { id: piece.id, title: piece.title, niche: piece.niche, image: piece.image, video };
@@ -276,16 +319,17 @@ export const pieceInputSchema = z
 export type PieceInput = z.output<typeof pieceInputSchema>;
 
 const piecesInputSchema = z
-  .array(pieceInputSchema)
-  .min(LIMITS.minPieces, { error: `Agrega al menos ${LIMITS.minPieces} piezas.` })
-  .max(LIMITS.maxPieces, { error: `Puedes mostrar hasta ${LIMITS.maxPieces} piezas.` });
+ .array(pieceInputSchema)
+ .min(LIMITS.minPieces, { error: `Agrega al menos ${LIMITS.minPieces} piezas.` })
+ .max(LIMITS.maxPieces, { error: `Puedes mostrar hasta ${LIMITS.maxPieces} piezas.` });
 
 // ── Datos scrapeados de Instagram (Apify · apify/instagram-scraper) ─
 const count = z.number().int().nonnegative().nullable(); // null = Instagram no lo muestra
 
 export const instagramPostSchema = z.object({
-  id: z.string(),
-  shortCode: z.string(),
+ id: z.string(),
+ shortCode: z.string(),
+
   url: z.url(),
   type: z.enum(["image", "video", "carousel"]),
   caption: z.string().max(2200),
@@ -327,29 +371,36 @@ export const generatedPieceSchema = z.object({
 export type GeneratedPiece = z.infer<typeof generatedPieceSchema>;
 
 export const generatedContentSchema = z.object({
-  provider: z.literal("groq"),
-  model: z.string().min(1).max(100),
-  generatedAt: utcDate,
-  valueProp: z.string().trim().min(1).max(LIMITS.valueProp),
-  /** Sugerencias de la IA por post. Se copian a `pieces`, que es lo que se edita. */
-  pieces: z.array(generatedPieceSchema).max(LIMITS.instagramPosts).default([]),
-  /** v2: nichos detectados en el contenido. Ausente en portafolios de la v1. */
+ provider: z.literal("groq"),
+ model: z.string().min(1).max(100),
+ generatedAt: utcDate,
+ valueProp: z.string().trim().min(1).max(LIMITS.valueProp),
+ /** Sugerencias de la IA por post. Se copian a `pieces`, que es lo que se edita. */
+ pieces: z.array(generatedPieceSchema).max(LIMITS.instagramPosts).default([]),
+ /** v2: nichos detectados en el contenido. Ausente en portafolios de la v1. */
+
   niches: nichesSchema.optional(),
   /** v2: formas de colaborar sugeridas. Ausente en portafolios de la v1. */
   services: servicesSchema.optional(),
-  /** 15/10 (obs. Fer, ronda 3): nombre bien escrito por la IA ("Andrés Bilbao" aunque el perfil diga "andresbilbao"). */
+  /** 15/10 (obs. Fer, ronda 3): nombre bien escrito por la IA ("Andrés Bilbao" aunque el perfil
+diga "andresbilbao"). */
   displayName: z.string().trim().min(1).max(60).nullish(),
 });
 export type GeneratedContent = z.infer<typeof generatedContentSchema>;
 
 // ── Brand partners y case studies del Media kit (ronda 6 · 13.19 / 13.20) ──
 /*
- * Brand partners: solo las marcas que la creadora confirmó. Una @mención en sus captions es una pista, no una prueba
- * de colaboración: `source` recuerda si salió de ahí ("detected") o la escribió ella ("manual"). El logo es una copia
- * en NUESTRO almacenamiento (foto de perfil de la marca vía Apify, o la que subió); sin logo se muestra la inicial.
+ * Brand partners: solo las marcas que la creadora confirmó. Una @mención en sus
+captions es una pista, no una prueba
+ * de colaboración: `source` recuerda si salió de ahí ("detected") o la escribió ella ("manual").
+El logo es una copia
+ * en NUESTRO almacenamiento (foto de perfil de la marca vía Apify, o la que subió); sin
+logo se muestra la inicial.
  *
- * Case studies: apuntan a una publicación importada de su Instagram (`postId`) y arrancan con sus cifras reales. Si
- * esa publicación ya no está en la captura, el caso simplemente no se muestra (resolve.ts): nunca invalida el
+ * Case studies: apuntan a una publicación importada de su Instagram (`postId`) y arrancan
+con sus cifras reales. Si
+ * esa publicación ya no está en la captura, el caso simplemente no se muestra (resolve.ts):
+nunca invalida el
  * portafolio guardado.
  */
 export const BRAND_SOURCES = ["detected", "manual"] as const;
@@ -366,7 +417,8 @@ export const brandPartnerSchema = z.object({
     .string({ error: "Escribe el nombre de la marca." })
     .trim()
     .min(1, { error: "Escribe el nombre de la marca." })
-    .max(LIMITS.brandName, { error: `El nombre admite hasta ${LIMITS.brandName} caracteres.` }),
+    .max(LIMITS.brandName, { error: `El nombre admite hasta ${LIMITS.brandName}
+caracteres.` }),
   instagram: brandHandleSchema,
   logo: storedImageSchema.nullable().default(null),
   source: z.enum(BRAND_SOURCES).default("manual"),
@@ -374,11 +426,14 @@ export const brandPartnerSchema = z.object({
 export type BrandPartner = z.output<typeof brandPartnerSchema>;
 
 export const brandPartnersSchema = z
-  .array(brandPartnerSchema)
-  .max(LIMITS.maxBrandPartners, { error: `Puedes mostrar hasta ${LIMITS.maxBrandPartners} marcas.` })
-  .refine((partners) => new Set(partners.map((partner) => partner.instagram)).size === partners.length, {
-    error: "Esa marca ya está en la lista.",
-  });
+
+ .array(brandPartnerSchema)
+ .max(LIMITS.maxBrandPartners, { error: `Puedes mostrar hasta
+${LIMITS.maxBrandPartners} marcas.` })
+ .refine((partners) => new Set(partners.map((partner) => partner.instagram)).size ===
+partners.length, {
+   error: "Esa marca ya está en la lista.",
+ });
 
 /** Una cifra de un case study: null = no mostrarla. */
 const caseMetric = z
@@ -396,11 +451,13 @@ export const caseStudySchema = z.object({
     .string({ error: "Escribe la marca." })
     .trim()
     .min(1, { error: "Escribe la marca." })
-    .max(LIMITS.brandName, { error: `La marca admite hasta ${LIMITS.brandName} caracteres.` }),
+    .max(LIMITS.brandName, { error: `La marca admite hasta ${LIMITS.brandName}
+caracteres.` }),
   campaign: z
     .string()
     .trim()
-    .max(LIMITS.campaignName, { error: `La campaña admite hasta ${LIMITS.campaignName} caracteres.` })
+    .max(LIMITS.campaignName, { error: `La campaña admite hasta
+${LIMITS.campaignName} caracteres.` })
     .default(""),
   /** Miniatura propia; null = la de la publicación. */
   image: storedImageSchema.nullable().default(null),
@@ -409,14 +466,16 @@ export const caseStudySchema = z.object({
 export type CaseStudy = z.output<typeof caseStudySchema>;
 
 export const caseStudiesSchema = z
-  .array(caseStudySchema)
-  .max(LIMITS.maxCaseStudies, { error: `Puedes mostrar hasta ${LIMITS.maxCaseStudies} casos de estudio.` })
-  .refine((cases) => new Set(cases.map((item) => item.postId)).size === cases.length, {
-    error: "Esa publicación ya es un caso de estudio.",
-  });
+ .array(caseStudySchema)
+ .max(LIMITS.maxCaseStudies, { error: `Puedes mostrar hasta ${LIMITS.maxCaseStudies}
+casos de estudio.` })
+ .refine((cases) => new Set(cases.map((item) => item.postId)).size === cases.length, {
+   error: "Esa publicación ya es un caso de estudio.",
+ });
 
 // ── Datos escritos a mano (siempre ganan) ───────────────────────────
 export const manualDataSchema = z.object({
+
   name: z
     .string()
     .trim()
@@ -429,14 +488,17 @@ export const manualDataSchema = z.object({
     .max(LIMITS.bio, { error: `La bio admite hasta ${LIMITS.bio} caracteres.` })
     .optional(),
   photo: storedImageSchema.nullable().optional(), // null = sin foto
-  /** Lo que sigue al separador del nombre de IG; va bajo el nombre en el hero (E2 del dueño). */
+  /** Lo que sigue al separador del nombre de IG; va bajo el nombre en el hero (E2 del
+dueño). */
   tagline: z.string().trim().max(LIMITS.tagline).optional(),
-  /** Foto del banner del hero (ajuste 7). Ausente o null = el banner usa la foto de perfil o la primera pieza. */
+  /** Foto del banner del hero (ajuste 7). Ausente o null = el banner usa la foto de perfil o la
+primera pieza. */
   cover: storedImageSchema.nullable().optional(),
   valueProp: z
     .string()
     .trim()
-    .max(LIMITS.valueProp, { error: `La propuesta de valor admite hasta ${LIMITS.valueProp} caracteres.` })
+    .max(LIMITS.valueProp, { error: `La propuesta de valor admite hasta ${LIMITS.valueProp}
+caracteres.` })
     .optional(),
   contact: contactSchema.optional(),
   /** Reemplaza los nichos de la IA (editor, M3). */
@@ -444,29 +506,36 @@ export const manualDataSchema = z.object({
   /** Reemplaza los servicios de la IA. [] = no mostrar el bloque. */
   services: servicesSchema.optional(),
   /**
-   * Ronda 6 · 13.11: el género que eligió la creadora (Hombre / Mujer / Otro / Prefiero no decirlo). Solo adapta los
-   * textos de WhatsApp (13.8, lib/portfolio/gender.ts). Nunca se infiere; ausente = textos en neutro.
+   * Ronda 6 · 13.11: el género que eligió la creadora (Hombre / Mujer / Otro / Prefiero no
+decirlo). Solo adapta los
+   * textos de WhatsApp (13.8, lib/portfolio/gender.ts). Nunca se infiere; ausente = textos en
+neutro.
    */
   gender: z
     .enum(GENDERS, { error: "Elige una de las opciones: Hombre, Mujer, Otro o Prefiero no decirlo." })
     .optional(),
-  /** Ronda 6 · 13.19: Brand partners confirmados por la creadora. Ausente o [] = sin la sección en el Media kit. */
+  /** Ronda 6 · 13.19: Brand partners confirmados por la creadora. Ausente o [] = sin la
+sección en el Media kit. */
   brandPartners: brandPartnersSchema.optional(),
-  /** Ronda 6 · 13.20: case studies sobre sus publicaciones importadas. Ausente o [] = sin la sección. */
+  /** Ronda 6 · 13.20: case studies sobre sus publicaciones importadas. Ausente o [] = sin la
+sección. */
   caseStudies: caseStudiesSchema.optional(),
 });
 export type ManualData = z.infer<typeof manualDataSchema>;
 
 // ── Diseño e indicadores (v2 · M2) ─────────────────────────────────
-/** Plantilla y paleta del portafolio: se eligen antes de generarlo y se cambian cuando se quiera. */
+/** Plantilla y paleta del portafolio: se eligen antes de generarlo y se cambian cuando se
+quiera. */
 export const designSchema = z.object({
   template: z.enum(TEMPLATES, { error: "Elige una de las 4 plantillas." }),
   palette: z.enum(PALETTE_IDS, { error: "Elige una de las paletas." }),
 });
 
 /**
- * Engagement Rate con la base de su cálculo (lib/portfolio/engagement.ts). Es un dato reutilizable
- * del modelo: se muestra en el portafolio y mañana junto al nombre de cada creadora en un pool.
+ * Engagement Rate con la base de su cálculo (lib/portfolio/engagement.ts). Es un dato
+reutilizable
+ * del modelo: se muestra en el portafolio y mañana junto al nombre de cada creadora en un
+pool.
  */
 export const engagementRateSchema = z.object({
   /** Fracción: 0,048 = 4,8 %. */
@@ -491,67 +560,81 @@ export const insightsSchema = z.object({
 export const PORTFOLIO_SOURCES = ["instagram", "manual"] as const;
 
 export const portfolioSchema = z
-  .object({
-    // Se aceptan JSON de la v1; al guardarse de nuevo quedan como v2 (los campos nuevos son opcionales).
-    schemaVersion: z.literal([1, SCHEMA_VERSION]).transform((): typeof SCHEMA_VERSION => SCHEMA_VERSION),
-    slug: slugSchema,
-    revision: z.number().int().positive(), // sube en cada guardado; evita pisar cambios ajenos
-    createdAt: utcDate,
-    updatedAt: utcDate,
-    source: z.enum(PORTFOLIO_SOURCES), // cómo se creó
-    instagram: instagramSnapshotSchema.nullable(),
-    generated: generatedContentSchema.nullable(),
-    manual: manualDataSchema,
-    pieces: z.array(pieceSchema).min(LIMITS.minPieces).max(LIMITS.maxPieces),
-    /** v2 · M2. Ausente (portafolios anteriores) = Creator + Crema y acero, como en el M1. */
-    design: designSchema.optional(),
-    /** v2 · M2. Ausente = se calcula al leer, desde la captura de Instagram. */
-    insights: insightsSchema.optional(),
-    /** Spec 11.9: archivado por inactividad (soft-delete). null/ausente = publicado. Se reactiva con 1 clic. */
-    archivedAt: utcDate.nullable().optional(),
-  })
-  .refine((doc) => Boolean(doc.manual.name || doc.instagram?.fullName || doc.instagram?.username), {
-    error: "El portafolio necesita un nombre.",
-    path: ["manual", "name"],
-  })
-  .superRefine((doc, ctx) => {
-    // Cada pieza solo puede usar un nicho que el portafolio tenga.
-    const available = new Set(resolveNiches(doc).map((niche) => niche.slug));
-    doc.pieces.forEach((piece, index) => {
-      if (piece.niche !== null && !available.has(piece.niche)) {
-        ctx.addIssue({
-          code: "custom",
-          message: "Este portafolio no tiene ese nicho. Elige uno de la lista.",
-          path: ["pieces", index, "niche"],
-        });
-      }
-    });
-  });
+ .object({
+  // Se aceptan JSON de la v1; al guardarse de nuevo quedan como v2 (los campos nuevos son opcionales).
+  schemaVersion: z.literal([1, SCHEMA_VERSION]).transform((): typeof
+SCHEMA_VERSION => SCHEMA_VERSION),
+  slug: slugSchema,
+  revision: z.number().int().positive(), // sube en cada guardado; evita pisar cambios ajenos
+  createdAt: utcDate,
+  updatedAt: utcDate,
+  source: z.enum(PORTFOLIO_SOURCES), // cómo se creó
+
+   instagram: instagramSnapshotSchema.nullable(),
+   generated: generatedContentSchema.nullable(),
+   manual: manualDataSchema,
+   pieces: z.array(pieceSchema).min(LIMITS.minPieces).max(LIMITS.maxPieces),
+   /** v2 · M2. Ausente (portafolios anteriores) = Creator + Crema y acero, como en el M1. */
+   design: designSchema.optional(),
+   /** v2 · M2. Ausente = se calcula al leer, desde la captura de Instagram. */
+   insights: insightsSchema.optional(),
+   /** Spec 11.9: archivado por inactividad (soft-delete). null/ausente = publicado. Se reactiva
+con 1 clic. */
+   archivedAt: utcDate.nullable().optional(),
+ })
+ .refine((doc) => Boolean(doc.manual.name || doc.instagram?.fullName ||
+doc.instagram?.username), {
+   error: "El portafolio necesita un nombre.",
+   path: ["manual", "name"],
+ })
+ .superRefine((doc, ctx) => {
+   // Cada pieza solo puede usar un nicho que el portafolio tenga.
+   const available = new Set(resolveNiches(doc).map((niche) => niche.slug));
+   doc.pieces.forEach((piece, index) => {
+     if (piece.niche !== null && !available.has(piece.niche)) {
+       ctx.addIssue({
+         code: "custom",
+         message: "Este portafolio no tiene ese nicho. Elige uno de la lista.",
+         path: ["pieces", index, "niche"],
+       });
+     }
+   });
+ });
 export type Portfolio = z.output<typeof portfolioSchema>;
 
 // ── Entradas de la API ──────────────────────────────────────────────
-/** Crear a mano (fallback "prefiero llenarlo manual", RF-01). */
+/** Crear a mano (fallback "prefiero llenarlo manual", RF-01; también el prefill del import de
+Canva). */
 export const createPortfolioInputSchema = z.object({
   name: z
-    .string({ error: "Escribe el nombre de tu clienta." })
-    .trim()
-    .min(1, { error: "Escribe el nombre de tu clienta." })
-    .max(LIMITS.name, { error: `El nombre admite hasta ${LIMITS.name} caracteres.` }),
+   .string({ error: "Escribe tu nombre." })
+   .trim()
+   .min(1, { error: "Escribe tu nombre." })
+   .max(LIMITS.name, { error: `El nombre admite hasta ${LIMITS.name} caracteres.` }),
   bio: z
-    .string()
-    .trim()
-    .max(LIMITS.bio, { error: `La bio admite hasta ${LIMITS.bio} caracteres.` })
-    .default(""),
+   .string()
+   .trim()
+   .max(LIMITS.bio, { error: `La bio admite hasta ${LIMITS.bio} caracteres.` })
+   .default(""),
   photo: storedImageSchema.nullable().default(null),
-  /** E2 del dueño: lo que sigue al separador del nombre de IG; va bajo el nombre en el hero. */
+
+  /** E2 del dueño: lo que sigue al separador del nombre de IG; va bajo el nombre en el
+hero. */
   tagline: z.string().trim().max(LIMITS.tagline).default(""),
   valueProp: z
     .string()
     .trim()
-    .max(LIMITS.valueProp, { error: `La propuesta de valor admite hasta ${LIMITS.valueProp} caracteres.` })
+    .max(LIMITS.valueProp, { error: `La propuesta de valor admite hasta ${LIMITS.valueProp}
+caracteres.` })
     .default(""),
   contact: contactSchema.default({}),
   services: servicesSchema.default([]),
+  /**
+   * Canva v1: los nichos propios que salieron de los sectores de su Canva. Ausente = los de
+la v1
+   * (Belleza, Lifestyle, Viajes), como siempre en los portafolios hechos a mano.
+   */
+  niches: nichesSchema.optional(),
   design: designSchema.default(DEFAULT_DESIGN),
   pieces: piecesInputSchema,
 });
@@ -563,22 +646,27 @@ export type CreatePortfolioInput = z.output<typeof createPortfolioInputSchema>;
  */
 export const updatePortfolioInputSchema = z
   .object({
-    revision: z.number({ error: "Falta la revisión (revision) que estás editando." }).int().positive(),
+    revision: z.number({ error: "Falta la revisión (revision) que estás editando."
+}).int().positive(),
     manual: manualDataSchema.optional(),
     pieces: piecesInputSchema.optional(),
     /** Cambiar plantilla o paleta: no toca ningún otro dato. */
     design: designSchema.optional(),
   })
-  .refine((input) => input.manual !== undefined || input.pieces !== undefined || input.design !== undefined, {
+  .refine((input) => input.manual !== undefined || input.pieces !== undefined || input.design
+!== undefined, {
     error: "No hay cambios para guardar.",
   });
 export type UpdatePortfolioInput = z.output<typeof updatePortfolioInputSchema>;
 
 /**
- * Generar el portafolio de una importación (v2 · M2), después de que el creador confirmó los
- * nichos y eligió plantilla y paleta. Los nichos se mandan por nombre: el slug de cada link sale
+ * Generar el portafolio de una importación (v2 · M2), después de que el creador confirmó
+los
+ * nichos y eligió plantilla y paleta. Los nichos se mandan por nombre: el slug de cada link
+sale
  * del nombre (igual en el navegador y aquí), y las piezas apuntan a esos slugs.
  */
+
 export const confirmImportInputSchema = z.object({
   draftId: z.uuid({ error: "La importación no es válida. Vuelve a importar el perfil." }),
   niches: z
@@ -588,14 +676,17 @@ export const confirmImportInputSchema = z.object({
           .string()
           .trim()
           .min(1, { error: "Escribe el nombre del nicho." })
-          .max(NICHE_LABEL_MAX, { error: `El nombre del nicho admite hasta ${NICHE_LABEL_MAX} caracteres.` }),
+          .max(NICHE_LABEL_MAX, { error: `El nombre del nicho admite hasta
+${NICHE_LABEL_MAX} caracteres.` }),
       }),
     )
     .max(MAX_NICHES, { error: `Puedes tener hasta ${MAX_NICHES} nichos.` }),
-  /** Nicho de cada pieza, por id de pieza del borrador; null = solo en "Todo". (Clientes anteriores a la ronda 30/09.) */
+  /** Nicho de cada pieza, por id de pieza del borrador; null = solo en "Todo". (Clientes
+anteriores a la ronda 30/09.) */
   pieceNiches: z.record(z.string().max(100), nicheSlugSchema.nullable()).optional(),
   /**
-   * Ronda 30/09 · 7.1: las piezas elegidas, en el orden de los chips (ids del borrador o de "De tu perfil"), cada una
+   * Ronda 30/09 · 7.1: las piezas elegidas, en el orden de los chips (ids del borrador o de
+"De tu perfil"), cada una
    * con su nicho. Si viene, manda sobre pieceNiches.
    */
   selection: z
@@ -604,26 +695,33 @@ export const confirmImportInputSchema = z.object({
     .optional(),
   /** Reintentar a propósito un borrador que quedó fallido (7.4 b). */
   retry: z.boolean().optional(),
-  /** Spec 11.12: las tarjetas de servicio del creador (obligatorias desde esta ronda: mínimo 1). */
+  /** Spec 11.12: las tarjetas de servicio del creador (obligatorias desde esta ronda: mínimo
+1). */
   services: servicesSchema.optional(),
-  /** Ronda 6 · 13.19: los Brand partners que la creadora confirmó en la revisión (opcional). */
+  /** Ronda 6 · 13.19: los Brand partners que la creadora confirmó en la revisión (opcional).
+*/
   brandPartners: brandPartnersSchema.optional(),
-  /** E2 del dueño: true = agrega al portafolio el sitio web pineado en su IG (opt-in con checkbox). */
+  /** E2 del dueño: true = agrega al portafolio el sitio web pineado en su IG (opt-in con
+checkbox). */
   website: z.boolean().optional(),
   /**
-   * 15/10 (obs. Fer): contacto opcional pedido en el paso Servicios (WhatsApp + correo). Solo viaja lo que
-   * la creadora llenó; los validadores son los mismos del esquema de contacto (vacío = se ignora).
+   * 15/10 (obs. Fer): contacto opcional pedido en el paso Servicios (WhatsApp + correo).
+Solo viaja lo que
+   * la creadora llenó; los validadores son los mismos del esquema de contacto (vacío = se
+ignora).
    */
   contact: z
     .object({
       whatsapp: contactSchema.shape.whatsapp,
       email: contactSchema.shape.email,
       // 16/10 (obs. Fer): link nuevo que la creadora pegó en la revisión (no solo el de su IG).
+
       website: contactSchema.shape.website,
     })
     .optional(),
   /**
-   * 15/10 (obs. Fer, ronda 3): foto del banner elegida antes de generar (plantillas Creator/Bio).
+   * 15/10 (obs. Fer, ronda 3): foto del banner elegida antes de generar (plantillas
+Creator/Bio).
    * Si no viene, el hero sale sin banner (layout "solo").
    */
   cover: storedImageSchema.nullable().optional(),

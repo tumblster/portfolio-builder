@@ -211,7 +211,8 @@ function toPreview(draft: StoredDraft): DraftPreview {
       .map((piece) => ({ id: piece.id, title: piece.title, image: piece.image, niche: piece.niche, isVideo: piece.video !== null, kind: kindOf(piece), postUrl: urlOf(piece), video: piece.video })),
     engagementRate,
     metrics: creatorMetrics(snapshot, engagementRate),
-    pieceLimits: { min: LIMITS.minPieces, max: LIMITS.maxPieces },
+    // Canva v1: el selector de Instagram sigue curando 6 (LIMITS.maxPieces subió a 30 para el portafolio).
+    pieceLimits: { min: LIMITS.minPieces, max: LIMITS.importSelectPieces },
     // Ronda 6 · 13.6: sugerencias de servicios (de sus captions y las marcas que menciona) y esas @marcas como contexto.
     suggestedServices: (generated?.services ?? [])
       .slice(0, LIMITS.maxServices)
