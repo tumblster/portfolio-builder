@@ -14,7 +14,7 @@ export function Completeness({ form }: { form: FormState }) {
   ];
   const percent = Math.round((100 * checks.filter((check) => check.done).length) / checks.length);
   return (
-    <section aria-labelledby="completitud" className="mb-8 rounded-card border border-line bg-paper p-4 sm:p-5" data-completeness={percent}>
+    <section aria-labelledby="completitud" className="sticky top-3 z-20 mb-8 rounded-card border border-line bg-paper p-4 shadow-sm sm:p-5" data-completeness={percent}>
       <h2 id="completitud" className="text-base font-semibold">
         Tu portafolio está al {percent} %
       </h2>

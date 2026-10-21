@@ -516,10 +516,26 @@ function fontIdOf(literal: string): string | null {
   return /\d/.test(id) || id.replace(/[^A-Z]/g, "").length >= 3 ? id : null;
 }
 
+/** Los recursos de fuente del documento: {"A":"<id>","B":0,"C":"<nombre>","D":[variantes]}.
+ * Es la tabla EXACTA id → nombre; tolera comillas escapadas (el documento viaja
+ * en dos serializaciones). */
+const FONT_RESOURCE =
+  /\\?"A\\?"\s*:\s*\\?"([A-Za-z0-9_-]{8,16})\\?"\s*,\s*\\?"B\\?"\s*:\s*\d+\s*,\s*\\?"C\\?"\s*:\s*\\?"([A-Za-z][A-Za-z0-9 ]{1,40})\\?"/g;
+
 /** La tabla de fuentes del documento: nombres (CSS, claves de familia, nombres
 conocidos) e ids → nombre. */
 function buildFontIndex(html: string, source: string): FontIndex {
   const names = new Map<string, string>();
+  const tableIds = new Map<string, string>();
+  // Semilla exacta: la tabla de recursos manda sobre cualquier heurística
+  // (sin esto, fuentes fuera de la lista conocida — Perandory, Hagrid — no
+  // resuelven y el tema sale sin tipografía).
+  for (const match of source.matchAll(FONT_RESOURCE)) {
+    const name = match[2].trim().replace(/\s+/g, " ");
+    if (!FONT_NAME.test(name) || NOT_A_FAMILY.test(name)) continue;
+    tableIds.set(match[1], name);
+    if (!names.has(name.toLowerCase())) names.set(name.toLowerCase(), name);
+  }
   const add = (raw: string) => {
    const name = raw.replace(/["']/g, "").trim().replace(/\s+/g, " ");
    const lower = name.toLowerCase();
@@ -533,7 +549,7 @@ function buildFontIndex(html: string, source: string): FontIndex {
       if (KNOWN_FONTS.has(match[1].toLowerCase())) add(match[1]);
     }
 
-    const ids = new Map<string, string>();
+    const ids = new Map<string, string>(tableIds);
     for (const name of new Set(names.values())) {
       let from = 0;
       for (let hits = 0; hits < 20; hits += 1) {

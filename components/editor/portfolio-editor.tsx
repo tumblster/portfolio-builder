@@ -22,6 +22,7 @@ import { PublicPortfolio } from "../public-portfolio";
 import { CaseStudiesField } from "./case-studies-field";
 import { Completeness } from "./completeness";
 import { CoverEditButton } from "./cover-edit-button";
+import { publicPath } from "@/lib/portfolio/slug";
 import { errorText, fieldLabel, pillButton, primaryButton, textInput } from "../ui";
 import {
   CONTACT_KEYS,
@@ -119,6 +120,128 @@ const PUBLIC_NOTICE = "Será visible públicamente en tu portafolio. Ten cuidado
 const PUBLIC_NOTICE_KEYS: ReadonlySet<ContactKey> = new Set(["whatsapp",
 "telegram"]);
 
+/** Códigos de país del WhatsApp: Perú por defecto (sin código, wa.me no abre). */
+const WA_COUNTRIES = [
+  { code: "51", label: "Perú" },
+  { code: "52", label: "México" },
+  { code: "57", label: "Colombia" },
+  { code: "56", label: "Chile" },
+  { code: "54", label: "Argentina" },
+  { code: "593", label: "Ecuador" },
+  { code: "591", label: "Bolivia" },
+  { code: "595", label: "Paraguay" },
+  { code: "598", label: "Uruguay" },
+  { code: "58", label: "Venezuela" },
+  { code: "55", label: "Brasil" },
+  { code: "502", label: "Guatemala" },
+  { code: "503", label: "El Salvador" },
+  { code: "504", label: "Honduras" },
+  { code: "506", label: "Costa Rica" },
+  { code: "507", label: "Panamá" },
+  { code: "34", label: "España" },
+  { code: "1", label: "EE. UU." },
+] as const;
+
+function splitWhatsApp(value: string): { code: string; number: string } {
+  const digits = value.replace(/\D/g, "");
+  if (!digits) return { code: "51", number: "" };
+  const byLength = [...WA_COUNTRIES].sort((a, b) => b.code.length - a.code.length);
+  for (const country of byLength) {
+    if (digits.startsWith(country.code) && digits.length > country.code.length) {
+      return { code: country.code, number: digits.slice(country.code.length) };
+    }
+  }
+  return { code: "51", number: digits };
+}
+
+/** WhatsApp con selector de prefijo: el valor guardado siempre lleva el código. */
+function WhatsAppField({
+  id,
+  value,
+  onChange,
+  describedBy,
+  invalid,
+}: {
+  id: string;
+  value: string;
+  onChange: (next: string) => void;
+  describedBy?: string;
+  invalid?: boolean;
+}) {
+  const { code, number } = splitWhatsApp(value);
+  const join = (nextCode: string, nextNumber: string) =>
+    onChange(nextNumber ? `+${nextCode} ${nextNumber}` : "");
+  return (
+    <div className="flex gap-2">
+      <div className="w-[8.75rem] shrink-0">
+        <select
+          aria-label="Código de país"
+          className={textInput}
+          value={code}
+          onChange={(event) => join(event.target.value, number)}
+        >
+          {WA_COUNTRIES.map((country) => (
+            <option key={country.code} value={country.code}>
+              {country.label} +{country.code}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="min-w-0 flex-1">
+        <input
+          id={id}
+          type="tel"
+          inputMode="tel"
+          value={number}
+          onChange={(event) => join(code, event.target.value.replace(/[^\d\s]/g, ""))}
+          placeholder="987 654 321"
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
+          aria-invalid={invalid}
+          aria-describedby={describedBy}
+          className={textInput}
+        />
+      </div>
+    </div>
+  );
+}
+
+/** Al guardar cambios: la salida clara (ver el portafolio), no solo un texto. */
+function SavedDialog({ slug, onClose }: { slug: string; onClose: () => void }) {
+  const [copied, setCopied] = useState(false);
+  const path = publicPath(slug);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(`${window.location.origin}${path}`);
+      setCopied(true);
+    } catch {
+      // Sin portapapeles: el botón de ver sigue ahí.
+    }
+  };
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/45 p-4" role="dialog" aria-modal="true" aria-labelledby="guardado-titulo">
+      <div className="w-full max-w-md rounded-card border border-line bg-paper p-6 shadow-xl">
+        <h2 id="guardado-titulo" className="title-2">
+          Cambios guardados
+        </h2>
+        <p className="mt-2 text-sm text-muted">Tu portafolio ya muestra lo nuevo. Compártelo o sigue editando.</p>
+        <div className="mt-5 grid gap-2">
+          <a href={path} target="_blank" rel="noopener noreferrer" className={`${primaryButton} w-full text-center`}>
+            Ver mi portafolio
+          </a>
+          <button type="button" onClick={copy} className={`${pillButton} w-full`}>
+            {copied ? "Link copiado" : "Copiar link"}
+          </button>
+          <button type="button" onClick={onClose} className="mt-1 text-sm font-semibold text-muted">
+            Seguir editando
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 type SaveStatus = { kind: "idle" } | { kind: "saving" } | { kind: "saved" } | { kind: "error";
 message: string };
 
@@ -137,6 +260,7 @@ null }) {
  const [submitted, setSubmitted] = useState(false);
  const [serverErrors, setServerErrors] = useState<FieldErrors>({});
  const [status, setStatus] = useState<SaveStatus>({ kind: "idle" });
+ const [savedOpen, setSavedOpen] = useState(false);
  const [pending, setPending] = useState(0);
  const [tab, setTab] = useState<"form" | "preview">("form");
  const [previewNiche, setPreviewNiche] = useState<string | null>(null);
@@ -313,6 +437,7 @@ baseline) }
         extras: extrasFromPortfolio(data.resolved),
       });
       setStatus({ kind: "saved" });
+      setSavedOpen(true);
  }
 
  const saveLabel =
@@ -591,6 +716,9 @@ partner.name.trim()).filter(Boolean)}
           </h2>
           <p className="-mt-3 text-sm text-muted">Todo opcional. Aparece en el portafolio lo
 que llenes.</p>
+          <p className="text-xs text-muted" data-contact-notice="section">
+            {PUBLIC_NOTICE}
+          </p>
           <div className="grid gap-5 sm:grid-cols-2">
             {CONTACT_KEYS.map((key) => {
              const field = CONTACT_FIELDS[key];
@@ -601,6 +729,15 @@ que llenes.</p>
 null].filter(Boolean).join(" ") || undefined;
              return (
                <Field key={key} id={`campo-${key}`} label={field.label} error={error}>
+                {key === "whatsapp" ? (
+                  <WhatsAppField
+                    id={`campo-${key}`}
+                    value={form.contact[key]}
+                    onChange={(next) => editContact(key, next)}
+                    describedBy={describedBy}
+                    invalid={error ? true : undefined}
+                  />
+                ) : (
                 <input
                  id={`campo-${key}`}
                  type={field.type ?? "text"}
@@ -615,6 +752,7 @@ null].filter(Boolean).join(" ") || undefined;
                aria-describedby={describedBy}
                className={textInput}
              />
+                )}
              {noticeId && (
                <p id={noticeId} className="mt-2 text-xs text-muted"
 data-contact-notice={key}>
@@ -632,35 +770,40 @@ data-testid="editor-design">
         <h2 id="seccion-diseno" className="title-2">
           Diseño
         </h2>
-        <p className="mt-2 text-sm text-muted">
-          Plantilla y paleta: cambian cómo se ve, nunca los datos. La vista previa se actualiza
-al instante.
-        </p>
+        {!form.canva && (
+          <p className="mt-2 text-sm text-muted">
+            Plantilla y paleta: cambian cómo se ve, nunca los datos. La vista previa se actualiza
+            al instante.
+          </p>
+        )}
         {form.canva && (
           <p className="mt-3 text-sm text-muted" data-editor-canva-design>
            Tu portafolio usa el diseño de tu Canva: sus colores, sus letras y el orden de sus
-secciones. La plantilla
-           y la paleta de abajo no cambian esa vista.
+           secciones. Por eso acá no eliges plantilla ni paleta: el clon manda.
           </p>
         )}
-        <p className={`${fieldLabel} mt-5`}>Plantilla</p>
-        <div className="mt-2">
-          <TemplatePicker
-           value={form.design.template}
-           onChange={(template) => setDesign({ template })}
-           palette={resolvePalette(form.design.palette, form.photo)}
-           name="editor-plantilla"
-          />
-        </div>
-        <p className={`${fieldLabel} mt-6`}>Paleta</p>
-        <div className="mt-2">
-          <PalettePicker
-           value={form.design.palette}
-           onChange={(palette) => setDesign({ palette })}
-           photo={form.photo}
-           name="editor-paleta"
-        />
-       </div>
+        {!form.canva && (
+          <>
+            <p className={`${fieldLabel} mt-5`}>Plantilla</p>
+            <div className="mt-2">
+              <TemplatePicker
+               value={form.design.template}
+               onChange={(template) => setDesign({ template })}
+               palette={resolvePalette(form.design.palette, form.photo)}
+               name="editor-plantilla"
+              />
+            </div>
+            <p className={`${fieldLabel} mt-6`}>Paleta</p>
+            <div className="mt-2">
+              <PalettePicker
+               value={form.design.palette}
+               onChange={(palette) => setDesign({ palette })}
+               photo={form.photo}
+               name="editor-paleta"
+              />
+            </div>
+          </>
+        )}
       </section>
 
       <div
@@ -685,6 +828,8 @@ portafolio ya los muestra.</p>}
         </button>
       </div>
      </form>
+
+     {savedOpen && baseline && <SavedDialog slug={baseline.slug} onClose={() => setSavedOpen(false)} />}
 
      <aside
        id="panel-preview"

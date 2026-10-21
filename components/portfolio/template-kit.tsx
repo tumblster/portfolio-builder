@@ -12,7 +12,7 @@ import type { ProfileStatKind } from "@/lib/portfolio/stats";
 import { ContactIcon, PLATFORM_LABEL } from "./icons";
 import { NicheScope } from "./niche-filter";
 import { InlineReel } from "@/components/reel/inline-reel";
-import { carouselEmbedFor, embedFor } from "@/lib/portfolio/embed";
+import { carouselEmbedFor, embedFor, nativeVideoFor } from "@/lib/portfolio/embed";
 import "./portfolio-ctas.css";
 
 /*
@@ -232,6 +232,15 @@ export function PieceLink({ piece, className, children }: { piece: ResolvedPiece
   if (piece.video && embedFor(piece.video)) {
     return (
       <InlineReel link={piece.video} title={piece.title} className={className}>
+        {children}
+      </InlineReel>
+    );
+  }
+  // Canva: el MP4 se reproduce DENTRO de la página (video nativo), no en una
+  // pestaña nueva. Sin esto, la pieza caía al link externo.
+  if (piece.video && nativeVideoFor(piece.video)) {
+    return (
+      <InlineReel link={piece.video} title={piece.title} className={className} poster={piece.image?.url ?? null}>
         {children}
       </InlineReel>
     );

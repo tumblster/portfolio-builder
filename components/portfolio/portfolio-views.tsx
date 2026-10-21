@@ -67,6 +67,11 @@ export type PortfolioNav = {
   niches: { slug: string; label: string }[];
   /** Id de la sección de contacto de la plantilla, o null si no hay contacto. */
   contactId: string | null;
+  /**
+   * Canva v2: los sectores van en un menú junto a la foto (pedido del dueño
+   * para la variante clonada). Sin esto, la barra queda como siempre.
+   */
+  nicheMenu?: boolean;
   /** WhatsApp del creador, solo dígitos con código de país (12.6), o null. */
   whatsapp: string | null;
   /** 13.8: el género que eligió (adapta los textos de WhatsApp); null = neutro. */
@@ -78,6 +83,7 @@ export function PortfolioViews({ about, kit, style, nav }: { about: ReactNode; k
   const pathname = usePathname();
   const activeNiche = pathname.startsWith(`${nav.basePath}/`) ? pathname.slice(nav.basePath.length + 1).split("/")[0] : null;
   const [views, setViews] = useState<number | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
   const slug = nav.basePath.split("/").filter(Boolean).pop() ?? "";
   const firstName = nav.name.trim().split(/\s+/)[0] ?? nav.name;
 
@@ -150,6 +156,38 @@ export function PortfolioViews({ about, kit, style, nav }: { about: ReactNode; k
               <span aria-hidden="true">{nav.name.trim().charAt(0).toUpperCase() || "·"}</span>
             )}
           </a>
+          {nav.nicheMenu && nav.niches.length > 0 && (
+            <div className="pf-bar__menu">
+              <button
+                type="button"
+                className="pf-bar__menu-btn"
+                aria-expanded={menuOpen}
+                aria-haspopup="true"
+                aria-label="Ver por sector"
+                onClick={() => setMenuOpen((open) => !open)}
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="M4 7h16M4 12h16M4 17h16" />
+                </svg>
+              </button>
+              {menuOpen && (
+                <nav className="pf-bar__menu-panel" aria-label="Sectores del portafolio">
+                  <a href={nav.basePath} aria-current={activeNiche === null ? "page" : undefined}>
+                    Todo el contenido
+                  </a>
+                  {nav.niches.map((niche) => (
+                    <a
+                      key={niche.slug}
+                      href={`${nav.basePath}/${niche.slug}`}
+                      aria-current={activeNiche === niche.slug ? "page" : undefined}
+                    >
+                      {niche.label}
+                    </a>
+                  ))}
+                </nav>
+              )}
+            </div>
+          )}
           {views !== null && views > 0 && (
             <span className="pf-bar__views" data-pf-views={views} aria-label={`${views} ${views === 1 ? "vista" : "vistas"}`}>
               <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">

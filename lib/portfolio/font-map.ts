@@ -80,6 +80,11 @@ const EQUIVALENTS: readonly { canva: string; google: string }[] = [
   { canva: "Be Vietnam", google: "Be Vietnam Pro" },
   { canva: "Canva Sans", google: "DM Sans" },
   { canva: "Glacial Indifference", google: "Questrial" },
+  // Del fixture de María (presentación beige): Perandory es una serif display
+  // condensada; Hagrid, una sans display pesada; Anastasia Script, caligrafía.
+  { canva: "Perandory", google: "Playfair Display" },
+  { canva: "Hagrid", google: "League Spartan" },
+  { canva: "Anastasia Script", google: "Great Vibes" },
 ];
 const BY_NAME = new Map(GOOGLE_FONTS.map((font) => [font.family.toLowerCase(),
 font]));

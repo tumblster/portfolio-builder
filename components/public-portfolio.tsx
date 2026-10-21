@@ -97,6 +97,8 @@ CreatorTemplate;
        photoUrl: portfolio.photo?.url ?? null,
        niches: nichesWithPieces(portfolio.niches, portfolio.pieces).map(({ slug, label }) => ({
 slug, label })),
+       // Canva v2: en la variante clonada, los sectores viven en el menú de la barra.
+       nicheMenu: canva !== null,
        contactId: contactLinks(portfolio.contact).length > 0 ? "pf-page-contacto" : null,
        // 12.6: "Hablemos" abre WhatsApp con el número que el creador puso en el editor.
        whatsapp: portfolio.contact.whatsapp?.replace(/\D/g, "") || null,

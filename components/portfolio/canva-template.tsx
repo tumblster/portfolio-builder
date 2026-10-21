@@ -39,6 +39,36 @@ import "./canva-template.css";
 
 type CanvaTemplateProps = TemplateProps & { canva: CanvaData };
 
+/** Luminancia relativa y contraste (WCAG) para la guardia de accesibilidad. */
+function luminance(hex: string): number {
+  const raw = hex.replace("#", "");
+  const channel = (at: number) => {
+    const value = parseInt(raw.slice(at, at + 2), 16) / 255;
+    return value <= 0.03928 ? value / 12.92 : Math.pow((value + 0.055) / 1.055, 2.4);
+  };
+  return 0.2126 * channel(0) + 0.7152 * channel(2) + 0.0722 * channel(4);
+}
+
+function contrastRatio(a: string, b: string): number {
+  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+/**
+ * La tinta de una banda: la de su Canva si contrasta; si no, blanco o casi
+ * negro (lo que contraste más). Es la ÚNICA intervención sobre su diseño:
+ * reglas de accesibilidad, sin tocar colores de fondo ni la estética.
+ */
+function readablePair(band: string, ink: string | null): { ink: string; onInk: string } {
+  const base = ink ?? "#191919";
+  if (contrastRatio(base, band) >= 3.2) return { ink: base, onInk: band };
+  const white = "#FFFFFF";
+  const black = "#111111";
+  const best = contrastRatio(white, band) >= contrastRatio(black, band) ? white : black;
+  const onInk = contrastRatio(band, best) >= 3.2 ? band : best === white ? black : white;
+  return { ink: best, onInk };
+}
+
 /** Reglas del filtro por nicho + fondo de la página, como las de TemplateFrame. */
 function canvaRules(views: readonly string[], background: string | null): string {
   const filter = views
@@ -66,8 +96,15 @@ export function CanvaTemplate({ portfolio, variant, filter, coverEdit, canva }: 
     bandIndex += 1;
     return color;
   };
-  const bandStyle = (color: string | null): CSSProperties =>
-    color ? { backgroundColor: color } : {};
+  const bandStyle = (color: string | null): CSSProperties => {
+    if (!color) return {};
+    const pair = readablePair(color, theme.inkColor);
+    return {
+      backgroundColor: color,
+      "--cv-ink": pair.ink,
+      "--cv-on-ink": pair.onInk,
+    } as CSSProperties;
+  };
 
   const heroBg = theme.heroBg ?? bands[0] ?? null;
   // El hero ya consumió la primera banda: el resto de secciones sigue el orden.
@@ -147,62 +184,62 @@ export function CanvaTemplate({ portfolio, variant, filter, coverEdit, canva }: 
           </div>
         </section>
 
-        {/* ── Franja de marcas (logos sin fondo) ─────────────────────────── */}
+        {/* ── Franja de marcas: carrusel infinito de logos sin fondo ────── */}
         {showStrip && (
           <section className="cv-strip" style={bandStyle(nextBand())} aria-label="Marcas con las que ha trabajado">
             <p className="cv-strip__label">Marcas con las que ha trabajado</p>
-            <ul className="cv-strip__row">
-              {canva.logos.map((logo, index) => (
-                <li key={`${logo.url}-${index}`} className="cv-strip__item">
-                  <Image
-                    src={logo.url}
-                    alt=""
-                    width={logo.width ?? 240}
-                    height={logo.height ?? 240}
-                    className="cv-strip__logo"
-                  />
-                </li>
-              ))}
-            </ul>
-          </section>
-        )}
-
-        {/* ── Selector de sectores ──────────────────────────────────────── */}
-        {filterable.length > 0 && (
-          <section className="cv-selector" style={bandStyle(nextBand())} aria-labelledby={id("sectores")}>
-            <div className="cv-selector__inner">
-              <div className="cv-selector__copy">
-                {canva.headings.sectors && (
-                  <H2 id={id("sectores")} className="cv-selector__title">
-                    {canva.headings.sectors}
-                  </H2>
-                )}
-                <div className="cv-selector__buttons">
-                  <SectorButton filter={filter} slug={null} label="Todo" />
-                  {filterable.map((niche) => (
-                    <SectorButton key={niche.slug} filter={filter} slug={niche.slug} label={niche.label} />
-                  ))}
-                </div>
-              </div>
-              {canva.selectorPhoto && (
-                <figure className="cv-selector__photo">
-                  <Image
-                    src={canva.selectorPhoto.url}
-                    alt=""
-                    fill
-                    sizes="(min-width: 1024px) 380px, 80vw"
-                  />
-                </figure>
-              )}
+            <div className="cv-strip__viewport">
+              <ul className="cv-strip__track">
+                {[...canva.logos, ...canva.logos].map((logo, index) => (
+                  <li
+                    key={`${logo.url}-${index}`}
+                    className="cv-strip__item"
+                    aria-hidden={index >= canva.logos.length || undefined}
+                  >
+                    <Image
+                      src={logo.url}
+                      alt=""
+                      width={logo.width ?? 240}
+                      height={logo.height ?? 240}
+                      className="cv-strip__logo"
+                    />
+                  </li>
+                ))}
+              </ul>
             </div>
           </section>
         )}
 
         {/* ── Piezas por sector, en mockups de teléfono ─────────────────── */}
         <section className="cv-work" style={bandStyle(nextBand())} aria-labelledby={id("trabajo")}>
-          <H2 id={id("trabajo")} className="cv-visually-hidden">
-            Contenido
-          </H2>
+          <div className="cv-work__head">
+            <div className="cv-work__head-copy">
+              {canva.headings.sectors ? (
+                <H2 id={id("trabajo")} className="cv-work__title">
+                  {canva.headings.sectors}
+                </H2>
+              ) : (
+                <H2 id={id("trabajo")} className="cv-visually-hidden">
+                  Contenido
+                </H2>
+              )}
+              {/* En la página, los sectores viven en el menú de la barra; en la
+                  vista previa del editor, los botones quedan acá. */}
+              {variant === "preview" && filterable.length > 0 && (
+                <div className="cv-selector__buttons">
+                  <SectorButton filter={filter} slug={null} label="Todo" />
+                  {filterable.map((niche) => (
+                    <SectorButton key={niche.slug} filter={filter} slug={niche.slug} label={niche.label} />
+                  ))}
+                </div>
+              )}
+            </div>
+            {canva.selectorPhoto && (
+              <figure className="cv-work__photo">
+                <Image src={canva.selectorPhoto.url} alt="" fill sizes="(min-width: 1024px) 300px, 70vw" />
+              </figure>
+            )}
+          </div>
           {ungrouped.length > 0 && (
             <PhoneGrid pieces={ungrouped} canva={canva} filterableSlugs={filterableSlugs} Heading={H3} />
           )}

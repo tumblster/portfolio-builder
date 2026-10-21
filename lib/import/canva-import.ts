@@ -1,4 +1,5 @@
 import "server-only";
+import sharp from "sharp";
 import { mapWithConcurrency } from "@/lib/instagram/images";
 import { truncateWords } from "@/lib/instagram/snapshot";
 import { LIMITS, canvaDataSchema, type CanvaData, type StoredImage } from
@@ -123,7 +124,46 @@ copyRemoteImage(url, CANVA_IMAGE_HOSTS));
      return image ? [[url, image] as const] : [];
    }),
  );
- const photo = heroUrl ? (stored.get(heroUrl) ?? null) : null;
+ let photo = heroUrl ? (stored.get(heroUrl) ?? null) : null;
+ let textureBg: string | null = null;
+ // Auditoría del hero: si la "foto" elegida es casi uniforme (la textura de
+ // fondo de una presentación, un papel, un color plano), no es una foto de la
+ // creadora: se busca la primera foto real entre las demás del sitio. Y la
+ // textura misma ES su fondo: su color promedio manda como fondo del hero.
+ if (heroUrl && photo && (await isUniformImage(heroUrl))) {
+   textureBg = await averageColor(heroUrl);
+   const noHero = new Set([
+     heroUrl,
+     ...logoUrlsConfirmed,
+     ...(portfolio.metricsPhotos ?? []).map((asset) => asset.url),
+     portfolio.rateCard?.url ?? "",
+   ]);
+   // Una foto de hero de verdad: JPG (los PNG chicos de Canva son íconos o
+   // gráficos), área grande, sin panoramas extremos; en el orden del sitio.
+   const photoLike = (asset: { url: string; width: number | null; height: number | null }) => {
+     if (!/\.jpe?g(?:[?#]|$)/i.test(asset.url)) return false;
+     const width = asset.width ?? 0;
+     const height = asset.height ?? 0;
+     if (width * height < 480_000) return false;
+     return width / Math.max(1, height) <= 2.2;
+   };
+   const assets = [
+     portfolio.supportPhoto,
+     portfolio.selectorPhoto,
+     ...portfolio.sectors.flatMap((sector) => sector.photos),
+   ].filter(
+     (asset): asset is NonNullable<typeof asset> =>
+       asset != null && asset.url !== "" && !noHero.has(asset.url) && photoLike(asset),
+   );
+   for (const candidateUrl of [...new Set(assets.map((asset) => asset.url))]) {
+     if (await isUniformImage(candidateUrl)) continue;
+     const image = stored.get(candidateUrl) ?? (await copyRemoteImage(candidateUrl, CANVA_IMAGE_HOSTS));
+     if (image) {
+       photo = image;
+       break;
+     }
+   }
+ }
 
  let usedPhotoAsCover = 0;
  let withoutCover = 0;
@@ -179,7 +219,9 @@ null);
      }
    }
    const parsed = canvaDataSchema.safeParse({
-     theme,
+     theme: textureBg
+       ? { ...theme, heroBg: textureBg, bands: [textureBg, ...theme.bands.slice(1)] }
+       : theme,
      logos: logoImages.slice(0, LIMITS.maxCanvaLogos),
      pieceLogos,
      metricsImages: portfolio.metricsPhotos
@@ -321,6 +363,50 @@ FORMAT_MESSAGE);
     }
     console.error("[import/canva] no se pudo descargar el sitio:", error);
     throw new ImportError("unavailable", "No pudimos abrir tu sitio de Canva. Revisa el link e intenta de nuevo.");
+  }
+}
+
+/** Auditoría de imagen: ¿es casi uniforme (textura, papel, color plano)? Se mide
+ * la desviación de una versión 64px en gris. Ante cualquier error, false (se
+ * conserva la foto elegida). */
+async function isUniformImage(url: string): Promise<boolean> {
+  try {
+    if (!isCanvaSiteHost(new URL(url).hostname)) return false;
+    const response = await fetch(url, {
+      cache: "no-store",
+      headers: { "User-Agent": BROWSER_UA },
+      signal: AbortSignal.timeout(LOGO_TIMEOUT_MS),
+    });
+    if (!response.ok || !isCanvaSiteHost(new URL(response.url || url).hostname)) return false;
+    if (Number(response.headers.get("content-length") ?? 0) > MAX_LOGO_BYTES) return false;
+    const bytes = Buffer.from(await response.arrayBuffer());
+    if (bytes.length === 0 || bytes.length > MAX_LOGO_BYTES) return false;
+    const stats = await sharp(bytes).resize(64, 64, { fit: "inside" }).greyscale().stats();
+    return (stats.channels[0]?.stdev ?? 99) < 7;
+  } catch {
+    return false;
+  }
+}
+
+/** Color promedio de una imagen (para rescatar el fondo real de una textura). */
+async function averageColor(url: string): Promise<string | null> {
+  try {
+    if (!isCanvaSiteHost(new URL(url).hostname)) return null;
+    const response = await fetch(url, {
+      cache: "no-store",
+      headers: { "User-Agent": BROWSER_UA },
+      signal: AbortSignal.timeout(LOGO_TIMEOUT_MS),
+    });
+    if (!response.ok || !isCanvaSiteHost(new URL(response.url || url).hostname)) return null;
+    const bytes = Buffer.from(await response.arrayBuffer());
+    if (bytes.length === 0 || bytes.length > MAX_LOGO_BYTES) return null;
+    const stats = await sharp(bytes).resize(32, 32, { fit: "cover" }).stats();
+    const [r, g, b] = stats.channels;
+    if (!r || !g || !b) return null;
+    const hex = (value: number) => Math.round(value).toString(16).padStart(2, "0");
+    return `#${hex(r.mean)}${hex(g.mean)}${hex(b.mean)}`.toUpperCase();
+  } catch {
+    return null;
   }
 }
 
