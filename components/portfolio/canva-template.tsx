@@ -1,12 +1,13 @@
 import Image from "next/image";  
 import type { CSSProperties } from "react";  
-import type { CanvaData, StoredImage } from "@/lib/portfolio/schema";  
+import type { CanvaData, StoredImage, VideoLink } from "@/lib/portfolio/schema";  
 import { fontPlan } from "@/lib/portfolio/font-map";  
 import type { ResolvedPiece } from "@/lib/portfolio/resolve";  
 import { nativeVideoFor } from "@/lib/portfolio/embed";  
-import { CanvaMetricsSlider } from "./canva-metrics-slider";  
-import { CanvaPhoneVideo } from "./canva-phone-video";  
+import { CanvaBackdropVideo } from "./canva-backdrop-video";  
+import { CanvaImageSlider } from "./canva-image-slider";  
 import { CanvaSectorMenu } from "./canva-sector-button";  
+import { CanvaVideoCard } from "./canva-video-card";  
 import { NicheScope } from "./niche-filter";  
 import { PlatformIcon, PlayIcon } from "./icons";  
 import { VideoFacade } from "./video-facade";  
@@ -27,19 +28,15 @@ import "./canva-template.css";
 /*  
  * Importador de Canva v2 · la variante CLONADA de la página pública.  
  *  
- * Si el portafolio trae el diseño de su Canva (manual.canva), el Contenido se  
- * dibuja con SU estética: bandas de fondo con sus colores, el hero espejo (foto  
- * del lado que ella la puso, sin marco si así lo hizo) y sus fuentes (font-map  
- * las resuelve a Google Fonts). Nada de la paleta ni de los elementos de las  
- * plantillas del sitio.  
+ * Si el portafolio trae el diseño de su Canva (manual.canva), el Contenido se dibuja con SU LENGUAJE: bandas o  
+ * textura de fondo, su tinta, sus fuentes y su tratamiento de titulares, marcos de línea fina y aire, cuando el  
+ * parser los midió. La ESTRUCTURA es del producto (la composición libre lámina por lámina no se clona).  
  *  
- * Ronda 13: el ORDEN de las secciones es fijo (estructura editorial del  
- * producto) y ya no depende de cómo venían sus bandas:  
- *   Hero → Franja de marcas → Videos por sector → Resultados → Bio →  
+ * Orden canónico (auditoría contra el manual, 22/10), saltando lo que no tenga datos:  
+ *   Hero → Franja de marcas → Videos → Métricas → Testimonios → Razón ("¿Por qué yo?") → Fotos →  
  *   Formas de colaborar → Tarifas → Contacto (cierre).  
- * Las que no tienen datos se saltan. Los colores de banda se asignan en ese  
- * orden. Los sectores se eligen desde el botón flotante "Ver categorías"  
- * (canva-sector-button.tsx); ya no hay título del selector ni menú en la barra.  
+ * El trabajo va pegado a la franja; la prueba (franja + métricas + testimonios) va junta tras el trabajo; la  
+ * autoridad (Razón) después; las tarifas antes del cierre.  
  *  
  * El filtro por nicho funciona como en las demás plantillas: NicheScope marca  
  * data-pf-filter y cada pieza dice en qué vistas sale (data-pf-show); las  
@@ -47,6 +44,22 @@ import "./canva-template.css";
  */
 
 type CanvaTemplateProps = TemplateProps & { canva: CanvaData };
+
+/** Un grupo destaca su primera pieza solo si llena dos filas completas (sin huecos en ningún ancho). */  
+const FEATURE_MIN_PIECES = 5;  
+const CARD_SIZES = "(min-width: 1024px) 282px, (min-width: 861px) 31vw, 46vw";  
+const FEATURED_SIZES = "(min-width: 1024px) 588px, (min-width: 861px) 62vw, 92vw";  
+/**  
+ * A1 · hero: la foto llena el área (recorte) solo si es vertical o casi cuadrada y tan grande como el área en  
+ * pantalla; si no, el área adopta la proporción de la foto (cero recorte, cero agrandado).  
+ */  
+const HERO_COVER_MAX_RATIO = 1.1;  
+const HERO_COVER_MIN_WIDTH = 720;  
+const HERO_COVER_MIN_HEIGHT = 780;  
+/** En celular, una foto muy alta se recorta a 4/5 como mucho (con el encuadre seguro para personas). */  
+const HERO_MOBILE_MIN_RATIO = 0.8;  
+/** Fotos: hasta 6 en grilla editorial; más, en slider. */  
+const GALLERY_GRID_MAX = 6;
 
 /** Luminancia relativa y contraste (WCAG) para la guardia de accesibilidad. */  
 function luminance(hex: string): number {  
@@ -81,7 +94,7 @@ function readablePair(band: string, ink: string | null): { ink: string; onInk: s
 /** Reglas del filtro por nicho + fondo de la página, como las de TemplateFrame. */  
 function canvaRules(views: readonly string[], background: string | null): string {  
   const filter = views  
-    .map((view) => `.pf[data-pf-filter="$view"][data-pf-show]:not([data-pf-show~="${view}"]){display:none}`)  
+    .map((view) => `.pf[data-pf-filter="${view}"][data-pf-show]:not([data-pf-show~="${view}"]){display:none}`)  
     .join("");  
   return background  
     ? `${filter}html:root:has([data-site="portfolio"]){background-color:${background}}`  
@@ -99,11 +112,24 @@ export function CanvaTemplate({ portfolio, variant, filter, coverEdit, canva }: 
 
   // Ids nuevos colgados del id de la sección de videos (view.id solo conoce sus  
   // propias claves): siguen siendo únicos entre la página y la vista previa.  
-  const scopedId = (key: string) => `$id("trabajo")-${key}`;  
+  const scopedId = (key: string) => `${id("trabajo")}-${key}`;  
   const videosTarget = scopedId("videos");  
   const sectorTarget = (slug: string) => scopedId(`sector-${slug}`);
 
-  // Bandas en orden; si una sección no tiene banda propia, repite la última.  
+  // C2 · rasgos de lenguaje medidos por el parser (cada uno opcional y combinable).  
+  const texture = theme.texture ?? null;  
+  const textureBase = texture?.swatch ?? null;  
+  const traits = [  
+    theme.frames === "line" ? "cv-frames" : null,  
+    theme.headingsUpper ? "cv-upper" : null,  
+    theme.airy ? "cv-airy" : null,  
+    texture ? "cv-textured" : null,  
+  ]  
+    .filter(Boolean)  
+    .join(" ");
+
+  // Bandas en orden; si una sección no tiene banda propia, repite la última. Con textura, la textura es el fondo de  
+  // todas las secciones y su color promedio es la base del contraste.  
   const bands = theme.bands.length > 0 ? theme.bands : theme.heroBg ? [theme.heroBg] : [];  
   let bandIndex = 0;  
   const nextBand = (): string | null => {  
@@ -113,10 +139,15 @@ export function CanvaTemplate({ portfolio, variant, filter, coverEdit, canva }: 
     return color;  
   };  
   const bandStyle = (color: string | null): CSSProperties => {  
-    if (!color) return {};  
-    const pair = readablePair(color, theme.inkColor);  
+    const base = textureBase ?? color;  
+    if (!base) return {};  
+    const pair = readablePair(base, theme.inkColor);  
     return {  
-      backgroundColor: color,  
+      backgroundColor: base,  
+      ...(texture  
+        ? { backgroundImage: `url("${texture.url}")`, backgroundSize: "cover", backgroundPosition: "center" }  
+        : {}),  
+      "--cv-band": base,  
       "--cv-ink": pair.ink,  
       "--cv-on-ink": pair.onInk,  
     } as CSSProperties;  
@@ -137,7 +168,43 @@ export function CanvaTemplate({ portfolio, variant, filter, coverEdit, canva }: 
   const ungrouped = pieces.filter((piece) => !piece.niche || !filterableSlugs.includes(piece.niche));  
   const showStrip = canva.logos.length >= 2;  
   // Con un solo sector no hay nada que elegir.  
-  const showSectorMenu = groups.length >= 2;
+  const showSectorMenu = groups.length >= 2;  
+  // Razón: toda su galería; los portafolios anteriores a la ronda 14 caen a su foto de apoyo.  
+  const bioGallery: StoredImage[] =  
+    canva.bioPhotos && canva.bioPhotos.length > 0 ? canva.bioPhotos : canva.supportPhoto ? [canva.supportPhoto] : [];  
+  const gallery = canva.galleryPhotos ?? [];  
+  const testimonials = canva.testimonialImages ?? [];  
+  const rates = canva.rates ?? [];  
+  const closingLink: VideoLink | null = canva.closingVideo ? { platform: "canva", url: canva.closingVideo.url } : null;  
+  const closing = closingLink ? nativeVideoFor(closingLink) : null;
+
+  // A1 · hero: encuadre seguro y sin agrandar la foto por encima de su resolución.  
+  const photo = portfolio.photo;  
+  const photoWidth = photo?.width ?? null;  
+  const photoHeight = photo?.height ?? null;  
+  const photoRatio = photoWidth && photoHeight ? photoWidth / photoHeight : null;  
+  const heroFit: "cover" | "ratio" =  
+    photoRatio === null ||  
+    (photoRatio <= HERO_COVER_MAX_RATIO &&  
+      (photoWidth ?? 0) >= HERO_COVER_MIN_WIDTH &&  
+      (photoHeight ?? 0) >= HERO_COVER_MIN_HEIGHT)  
+      ? "cover"  
+      : "ratio";  
+  const heroMediaStyle =  
+    photoRatio !== null && photoWidth !== null  
+      ? ({  
+          "--cv-photo-ratio": String(photoRatio),  
+          "--cv-photo-ratio-m": String(Math.max(photoRatio, HERO_MOBILE_MIN_RATIO)),  
+          "--cv-photo-max": `${photoWidth}px`,  
+        } as CSSProperties)  
+      : undefined;  
+  const heroMediaClass = [  
+    "cv-hero__media",  
+    theme.heroFramed ? "cv-hero__media--framed" : null,  
+    heroFit === "ratio" ? "cv-hero__media--ratio" : null,  
+  ]  
+    .filter(Boolean)  
+    .join(" ");
 
   const scopeStyle = {  
     "--cv-ink": theme.inkColor ?? "#191919",  
@@ -151,7 +218,7 @@ export function CanvaTemplate({ portfolio, variant, filter, coverEdit, canva }: 
     <NicheScope  
       {...filter}  
       nicheSlugs={filterableSlugs}  
-      className="pf pf--canva"  
+      className={traits ? `pf pf--canva ${traits}` : "pf pf--canva"}  
       template="canva"  
       variant={variant}  
       style={scopeStyle}  
@@ -161,28 +228,26 @@ export function CanvaTemplate({ portfolio, variant, filter, coverEdit, canva }: 
       ))}  
       <style  
         dangerouslySetInnerHTML={{  
-          __html: canvaRules(["todo", ...filterableSlugs], variant === "page" ? heroBg : null),  
+          __html: canvaRules(["todo", ...filterableSlugs], variant === "page" ? (textureBase ?? heroBg) : null),  
         }}  
       />
 
       <Root>  
-        {/* ── 1 · Hero espejo: foto del lado de su Canva, título enfrente ── */}  
+        {/* ── Hero espejo: foto del lado de su Canva, título enfrente ─────── */}  
         <section  
           className="cv-hero"  
           style={bandStyle(heroBg)}  
           data-photo-side={theme.heroSide}  
           aria-labelledby={id("nombre")}  
         >  
-          <div className="cv-hero__inner">  
-            <figure  
-              className={theme.heroFramed ? "cv-hero__media cv-hero__media--framed" : "cv-hero__media"}  
-            >  
-              {portfolio.photo ? (  
+          <div className={heroFit === "ratio" ? "cv-hero__inner cv-hero__inner--ratio" : "cv-hero__inner"}>  
+            <figure className={heroMediaClass} style={heroMediaStyle}>  
+              {photo ? (  
                 <Image  
-                  src={portfolio.photo.url}  
+                  src={photo.url}  
                   alt={`Foto de ${name}`}  
                   fill  
-                  sizes="(min-width: 1024px) 560px, 88vw"  
+                  sizes="(min-width: 861px) 52vw, 100vw"  
                   preload={view.isPage}  
                 />  
               ) : null}  
@@ -205,7 +270,7 @@ export function CanvaTemplate({ portfolio, variant, filter, coverEdit, canva }: 
           </div>  
         </section>
 
-        {/* ── 2 · Franja de marcas: carrusel infinito, cada logo en su caja óptica ── */}  
+        {/* ── Franja de marcas: carrusel infinito, cada logo en su caja óptica ── */}  
         {showStrip && (  
           <section className="cv-strip" style={bandStyle(nextBand())} aria-label="Marcas con las que ha trabajado">  
             <p className="cv-strip__label">Marcas con las que ha trabajado</p>  
@@ -231,7 +296,7 @@ export function CanvaTemplate({ portfolio, variant, filter, coverEdit, canva }: 
           </section>  
         )}
 
-        {/* ── 3 · Videos por sector, en mockups de teléfono ─────────────── */}  
+        {/* ── Videos por sector, en tarjetas ────────────────────────────── */}  
         <section  
           id={videosTarget}  
           className="cv-work"  
@@ -252,24 +317,26 @@ export function CanvaTemplate({ portfolio, variant, filter, coverEdit, canva }: 
                 <H3 className="cv-group__title" data-cv-italic={italic}>  
                   {niche.label}  
                 </H3>  
-                <PhoneGrid  
+                <CardGrid  
                   pieces={group}  
                   canva={canva}  
                   filterableSlugs={filterableSlugs}  
                   Heading={H3}  
                   groupLabel={niche.label}  
+                  featureFirst={group.length >= FEATURE_MIN_PIECES}  
                 />  
               </div>  
             ))}  
             {/* A4: lo que no tiene sector CIERRA la sección, no la abre. */}  
             {ungrouped.length > 0 && (  
               <div className="cv-group">  
-                <PhoneGrid  
+                <CardGrid  
                   pieces={ungrouped}  
                   canva={canva}  
                   filterableSlugs={filterableSlugs}  
                   Heading={H3}  
                   groupLabel={null}  
+                  featureFirst={false}  
                 />  
               </div>  
             )}  
@@ -287,20 +354,43 @@ export function CanvaTemplate({ portfolio, variant, filter, coverEdit, canva }: 
           )}  
         </section>
 
-        {/* ── 4 · Resultados: todas sus capturas de métricas en slider ──── */}  
+        {/* ── Métricas: todas sus capturas de analítica en slider ───────── */}  
         {canva.metricsImages.length > 0 && (  
-          <section className="cv-metrics" style={bandStyle(nextBand())} aria-labelledby={scopedId("resultados")}>  
-            <H2 id={scopedId("resultados")} className="cv-section-title" data-cv-italic={italic}>  
-              Resultados  
+          <section className="cv-metrics" style={bandStyle(nextBand())} aria-labelledby={scopedId("metricas")}>  
+            <H2 id={scopedId("metricas")} className="cv-section-title" data-cv-italic={italic}>  
+              Métricas  
             </H2>  
-            <CanvaMetricsSlider images={canva.metricsImages} name={name} />  
+            <CanvaImageSlider images={canva.metricsImages} label={`Métricas de ${name}`} fit="contain" />  
           </section>  
         )}
 
-        {/* ── 5 · Bio con su foto de apoyo ──────────────────────────────── */}  
+        {/* ── Testimonios: cada captura completa, sin recorte ──────────── */}  
+        {testimonials.length > 0 && (  
+          <section className="cv-testimonials" style={bandStyle(nextBand())} aria-labelledby={scopedId("testimonios")}>  
+            <H2 id={scopedId("testimonios")} className="cv-section-title" data-cv-italic={italic}>  
+              Testimonios  
+            </H2>  
+            <ul className="cv-testimonials__grid">  
+              {testimonials.map((image, index) => (  
+                <li key={`${image.url}-${index}`} className="cv-testimonial">  
+                  <Image  
+                    src={image.url}  
+                    alt={image.alt ?? `Testimonio para ${name} (${index + 1} de ${testimonials.length})`}  
+                    width={image.width ?? 900}  
+                    height={image.height ?? 1200}  
+                    className="cv-testimonial__img"  
+                    sizes="(min-width: 861px) 360px, 92vw"  
+                  />  
+                </li>  
+              ))}  
+            </ul>  
+          </section>  
+        )}
+
+        {/* ── Razón ("¿Por qué yo?"): su texto y su galería completa ────── */}  
         {paragraphs.length > 0 && (  
           <section className="cv-bio" style={bandStyle(nextBand())} aria-labelledby={id("bio")}>  
-            <div className="cv-bio__inner">  
+            <div className={bioGallery.length > 0 ? "cv-bio__inner" : "cv-bio__inner cv-bio__inner--solo"}>  
               <div className="cv-bio__copy">  
                 {canva.headings.bio && (  
                   <H2 id={id("bio")} className="cv-bio__title">  
@@ -313,21 +403,63 @@ export function CanvaTemplate({ portfolio, variant, filter, coverEdit, canva }: 
                   </p>  
                 ))}  
               </div>  
-              {canva.supportPhoto && (  
-                <figure className="cv-bio__photo">  
-                  <Image  
-                    src={canva.supportPhoto.url}  
-                    alt=""  
-                    fill  
-                    sizes="(min-width: 1024px) 460px, 84vw"  
+              {bioGallery.length > 0 && (  
+                <div className="cv-bio__gallery">  
+                  <CanvaImageSlider  
+                    images={bioGallery}  
+                    label={`Foto de ${name}`}  
+                    fit="cover"  
+                    sizes="(min-width: 861px) 584px, 92vw"  
                   />  
-                </figure>  
+                </div>  
               )}  
             </div>  
           </section>  
         )}
 
-        {/* ── 6 · Formas de colaborar (título + descripción, sin precio) ── */}  
+        {/* ── Fotos: grilla editorial hasta 6; más, en slider ─────────── */}  
+        {gallery.length > 0 && (  
+          <section className="cv-photos" style={bandStyle(nextBand())} aria-labelledby={scopedId("fotos")}>  
+            <H2 id={scopedId("fotos")} className="cv-section-title" data-cv-italic={italic}>  
+              Fotos  
+            </H2>  
+            {gallery.length > GALLERY_GRID_MAX ? (  
+              <div className="cv-photos__slider">  
+                <CanvaImageSlider  
+                  images={gallery}  
+                  label={`Fotos de ${name}`}  
+                  fit="cover"  
+                  sizes="(min-width: 861px) 560px, 92vw"  
+                />  
+              </div>  
+            ) : (  
+              <ul className="cv-gallery" data-count={gallery.length}>  
+                {gallery.map((image, index) => {  
+                  const featured = index === 0 && (gallery.length === 3 || gallery.length === 5);  
+                  return (  
+                    <li  
+                      key={`${image.url}-${index}`}  
+                      className={featured ? "cv-gallery__item cv-gallery__item--featured" : "cv-gallery__item"}  
+                    >  
+                      <Image  
+                        src={image.url}  
+                        alt={  
+                          image.alt ??  
+                          (gallery.length > 1 ? `Fotos de ${name} (${index + 1} de ${gallery.length})` : `Fotos de ${name}`)  
+                        }  
+                        fill  
+                        sizes={featured ? "(min-width: 861px) 50vw, 92vw" : "(min-width: 861px) 31vw, 46vw"}  
+                        loading="lazy"  
+                      />  
+                    </li>  
+                  );  
+                })}  
+              </ul>  
+            )}  
+          </section>  
+        )}
+
+        {/* ── Formas de colaborar: tarjetas de servicio ────────────────── */}  
         {services.length > 0 && (  
           <section className="cv-services" style={bandStyle(nextBand())} aria-labelledby={id("servicios")}>  
             <H2 id={id("servicios")} className="cv-section-title" data-cv-italic={italic}>  
@@ -344,37 +476,61 @@ export function CanvaTemplate({ portfolio, variant, filter, coverEdit, canva }: 
           </section>  
         )}
 
-        {/* ── 7 · Tarifas: su tarifario como imagen completa ───────────── */}  
-        {canva.rateCard && (  
+        {/* ── Tarifas: tarjetas de precio si hay dato; si no, su imagen ── */}  
+        {(rates.length > 0 || canva.rateCard) && (  
           <section className="cv-rates" style={bandStyle(nextBand())} aria-labelledby={scopedId("tarifas")}>  
             <H2 id={scopedId("tarifas")} className="cv-section-title" data-cv-italic={italic}>  
               Tarifas  
             </H2>  
-            <figure className="cv-rates__figure">  
-              <Image  
-                src={canva.rateCard.url}  
-                alt={`Tarifas de ${name}`}  
-                width={canva.rateCard.width ?? 900}  
-                height={canva.rateCard.height ?? 1200}  
-                className="cv-rates__img"  
-                sizes="(min-width: 1024px) 560px, 92vw"  
-              />  
-            </figure>  
+            {rates.length > 0 ? (  
+              <ul className="cv-pricing">  
+                {rates.map((rate, index) => (  
+                  <li key={`${index}-${rate.name}`} className="cv-price">  
+                    <H3 className="cv-price__name">{rate.name}</H3>  
+                    <p className="cv-price__amount">{rate.price}</p>  
+                    {rate.includes.length > 0 && (  
+                      <ul className="cv-price__list">  
+                        {rate.includes.map((item, itemIndex) => (  
+                          <li key={`${itemIndex}-${item}`} className="cv-price__item">  
+                            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false" className="cv-price__check">  
+                              <path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />  
+                            </svg>  
+                            <span>{item}</span>  
+                          </li>  
+                        ))}  
+                      </ul>  
+                    )}  
+                  </li>  
+                ))}  
+              </ul>  
+            ) : canva.rateCard ? (  
+              <figure className="cv-rates__figure">  
+                <Image  
+                  src={canva.rateCard.url}  
+                  alt={`Tarifas de ${name}`}  
+                  width={canva.rateCard.width ?? 900}  
+                  height={canva.rateCard.height ?? 1200}  
+                  className="cv-rates__img"  
+                  sizes="(min-width: 1024px) 560px, 92vw"  
+                />  
+              </figure>  
+            ) : null}  
           </section>  
         )}
 
-        {/* ── 8 · Contacto: cierre con un solo CTA ──────────────────────── */}  
+        {/* ── Contacto: cierre con un solo CTA (y su video de fondo, si lo trae) ── */}  
         {hasContact && (  
           <section  
             id={id("contacto")}  
-            className="cv-contact"  
+            className={closing ? "cv-contact cv-contact--video" : "cv-contact"}  
             style={bandStyle(nextBand())}  
             aria-labelledby={id("contacto-titulo")}  
           >  
+            {closing && <CanvaBackdropVideo src={closing.src} poster={canva.closingVideo?.poster?.url ?? null} />}  
             <div className="cv-contact__inner">  
-              {portfolio.photo && (  
+              {photo && (  
                 <figure className="cv-contact__photo">  
-                  <Image src={portfolio.photo.url} alt="" fill sizes="96px" />  
+                  <Image src={photo.url} alt="" fill sizes="96px" />  
                 </figure>  
               )}  
               <H2 id={id("contacto-titulo")} className="cv-contact__title" data-cv-italic={italic}>  
@@ -424,27 +580,39 @@ function isDerivedTitle(title: string, groupLabel: string | null): boolean {
   return false;  
 }
 
-/** Grilla de teléfonos; cada pieza conserva su data-pf-show para el filtro. */  
-function PhoneGrid({  
+/** Grilla de tarjetas; cada pieza conserva su data-pf-show para el filtro. */  
+function CardGrid({  
   pieces,  
   canva,  
   filterableSlugs,  
   Heading,  
   groupLabel,  
+  featureFirst,  
 }: {  
   pieces: ResolvedPiece[];  
   canva: CanvaData;  
   filterableSlugs: readonly string[];  
   Heading: "h3" | "h4";  
   groupLabel: string | null;  
+  featureFirst: boolean;  
 }) {  
   return (  
-    <ul className="cv-phones">  
-      {pieces.map((piece) => {  
+    <ul className="cv-cards">  
+      {pieces.map((piece, index) => {  
+        const featured = featureFirst && index === 0;  
         const meta = piece.video?.platform === "canva" ? null : pieceMeta(piece).meta;  
         return (  
-          <li key={piece.id} className="cv-piece" data-pf-piece={piece.id} data-pf-show={pieceShow(piece, filterableSlugs)}>  
-            <PhoneCard piece={piece} logo={piece.video ? canva.pieceLogos[piece.video.url] ?? null : null} />  
+          <li  
+            key={piece.id}  
+            className={featured ? "cv-cards__item cv-cards__item--featured" : "cv-cards__item"}  
+            data-pf-piece={piece.id}  
+            data-pf-show={pieceShow(piece, filterableSlugs)}  
+          >  
+            <PieceCard  
+              piece={piece}  
+              featured={featured}  
+              logo={piece.video ? canva.pieceLogos[piece.video.url] ?? null : null}  
+            />  
             {!isDerivedTitle(piece.title, groupLabel) && <Heading className="cv-piece__title">{piece.title}</Heading>}  
             {meta && <p className="cv-piece__meta">{meta}</p>}  
           </li>  
@@ -454,43 +622,38 @@ function PhoneGrid({
   );  
 }
 
-/** El teléfono: marco negro, el contenido adentro y el logo encima. Con video  
- * nativo de Canva (A1), el video mismo es la pantalla: frame real y play ahí  
- * dentro, sin badge ni salida a Canva. Un video de Canva sin fuente nativa  
- * nunca se convierte en link ni muestra la plataforma (cero fugas). */  
-function PhoneCard({ piece, logo }: { piece: ResolvedPiece; logo: StoredImage | null }) {  
+/** La tarjeta: sin marco de dispositivo. Con video nativo de su sitio, el video mismo es la tarjeta (frame real y  
+ * play aquí dentro). El chip con el logo de la marca sale SOLO si el dato asocia ese logo a esta pieza. Un video de  
+ * Canva sin fuente nativa nunca se convierte en link ni muestra la plataforma (cero fugas). */  
+function PieceCard({ piece, logo, featured }: { piece: ResolvedPiece; logo: StoredImage | null; featured: boolean }) {  
   const { platform } = pieceMeta(piece);  
   const native = piece.video ? nativeVideoFor(piece.video) : null;  
   const isCanva = piece.video?.platform === "canva";  
+  const sizes = featured ? FEATURED_SIZES : CARD_SIZES;  
   return (  
-    <div className="cv-phone">  
-      <span className="cv-phone__notch" aria-hidden="true" />  
+    <div className="cv-card">  
       {native ? (  
-        <div className="cv-phone__screen">  
-          <CanvaPhoneVideo src={native.src} title={piece.title} poster={piece.image?.url ?? null} />  
-        </div>  
+        <CanvaVideoCard src={native.src} title={piece.title} poster={piece.image?.url ?? null} sizes={sizes} />  
       ) : isCanva ? (  
-        <div className="cv-phone__screen">  
-          {piece.image ? (  
-            <Image src={piece.image.url} alt="" fill sizes="(min-width: 768px) 228px, 46vw" loading="lazy" />  
-          ) : null}  
+        <div className="cv-card__media">  
+          {piece.image ? <Image src={piece.image.url} alt="" fill sizes={sizes} loading="lazy" /> : null}  
         </div>  
       ) : (  
-        <PieceLink piece={piece} className="cv-phone__screen">  
+        <PieceLink piece={piece} className="cv-card__media">  
           {piece.image ? (  
-            <Image src={piece.image.url} alt="" fill sizes="(min-width: 768px) 228px, 46vw" loading="lazy" />  
+            <Image src={piece.image.url} alt="" fill sizes={sizes} loading="lazy" />  
           ) : piece.video ? (  
             <VideoFacade video={piece.video} />  
           ) : (  
-            <span className="cv-phone__placeholder">{platform ? `Video de ${platform}` : ""}</span>  
+            <span className="cv-card__placeholder">{platform ? `Video de ${platform}` : ""}</span>  
           )}  
           {piece.video && piece.image && (  
-            <span className="cv-phone__play" aria-hidden="true">  
-              <PlayIcon size={22} />  
+            <span className="cv-card__play" aria-hidden="true">  
+              <PlayIcon size={20} />  
             </span>  
           )}  
           {piece.link && (  
-            <span className="cv-phone__badge">  
+            <span className="cv-card__badge">  
               <PlatformIcon platform={piece.link.platform} size={13} />  
               {platform}  
             </span>  
@@ -498,7 +661,7 @@ function PhoneCard({ piece, logo }: { piece: ResolvedPiece; logo: StoredImage | 
         </PieceLink>  
       )}  
       {logo && (  
-        <span className="cv-phone__logo">  
+        <span className="cv-card__brand">  
           <Image src={logo.url} alt="" width={logo.width ?? 160} height={logo.height ?? 160} />  
         </span>  
       )}  

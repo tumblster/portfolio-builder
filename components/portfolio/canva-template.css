@@ -1,21 +1,24 @@
 /*  
  * Importador de Canva v2 · variante clonada (canva-template.tsx).  
- * Todo scoped a .pf--canva: los colores llegan por banda (style inline) y las  
+ * Todo scoped a .pf--canva: los colores llegan por sección (style inline) y las  
  * fuentes por variables (--cv-font-display/headings/body) desde su Canva.  
- * --cv-ink puede cambiar por banda (guardia de contraste); --cv-on-ink es el  
+ * --cv-band es el color base de la sección (su banda o el promedio de su textura);  
+ * --cv-ink puede cambiar por sección (guardia de contraste); --cv-on-ink es el  
  * color de texto sobre la tinta (botones).  
  *  
- * Ronda 13 · sistema de diseño:  
+ * Sistema de diseño (rondas 13–14):  
  * - Espaciado SOLO en la escala 4 / 8 / 16 / 24 / 32 / 48 / 64.  
  * - Botones: grande 52 / 32 · mediano 44 / 24 · chico 36 / 16.  
  * - Pesos 400 / 600 / 700.  
- * - Movimiento 150–300ms ease-out, apagado con prefers-reduced-motion.  
- * El reset de márgenes va con :where() (especificidad 0). Antes le ganaba a la  
- * clase de cada componente y se comía sus márgenes: títulos pegados a su  
- * contenido en la franja, la bio y los servicios, y grillas sin centrar.  
+ * - Movimiento 150–300ms ease-out, solo en lo interactivo, apagado con prefers-reduced-motion.  
+ * Rasgos de lenguaje medidos (clases en la raíz, cada uno opcional y combinable):  
+ * .cv-textured (textura de fondo), .cv-frames (marcos de línea fina), .cv-upper  
+ * (titulares en mayúsculas con tracking), .cv-airy (márgenes laterales amplios).  
+ * El reset de márgenes va con :where() (especificidad 0).  
  */
 
 .pf--canva {  
+  --cv-measure: 1200px;  
   color: var(--cv-ink, #191919);  
   font-family: var(--cv-font-body, inherit);  
 }
@@ -45,11 +48,13 @@
   white-space: nowrap;  
 }
 
-/* ── Secciones: aire entre secciones dentro de la escala ──────────────── */
+/* ── Secciones ────────────────────────────────────────────────────────── */
 
 .cv-work,  
 .cv-metrics,  
+.cv-testimonials,  
 .cv-bio,  
+.cv-photos,  
 .cv-services,  
 .cv-rates,  
 .cv-contact {  
@@ -61,12 +66,41 @@
   font-size: clamp(1.9rem, 4vw, 2.7rem);  
   font-weight: 400;  
   line-height: 1.2;  
-  max-width: 1200px;  
+  max-width: var(--cv-measure);  
   margin: 0 auto 24px;  
 }
 
 .cv-section-title[data-cv-italic] {  
   font-style: italic;  
+}
+
+/* ── Rasgos de lenguaje (C2) ──────────────────────────────────────────── */
+
+/* C2.2 · marcos de línea fina alrededor de cada sección, con la tinta a baja opacidad. */  
+.pf--canva.cv-frames section {  
+  position: relative;  
+}
+
+.pf--canva.cv-frames section::after {  
+  content: "";  
+  position: absolute;  
+  inset: 24px;  
+  border: 1px solid color-mix(in srgb, var(--cv-ink, #191919) 24%, transparent);  
+  pointer-events: none;  
+  z-index: 2;  
+}
+
+/* C2.3 · titulares editoriales del producto en MAYÚSCULAS con aire entre letras. El texto corrido no se toca. */  
+.pf--canva.cv-upper .cv-section-title,  
+.pf--canva.cv-upper .cv-group__title,  
+.pf--canva.cv-upper .cv-contact__title {  
+  text-transform: uppercase;  
+  letter-spacing: 0.08em;  
+}
+
+/* C2.4 · diseño aireado: medida más angosta y margen lateral alto de la escala. */  
+.pf--canva.cv-airy {  
+  --cv-measure: 1040px;  
 }
 
 /* ── Botones ──────────────────────────────────────────────────────────── */
@@ -107,7 +141,7 @@
   color: var(--cv-ink, #191919);  
 }
 
-/* ── 1 · Hero: ancho completo, la foto pegada al borde ────────────────── */
+/* ── Hero ─────────────────────────────────────────────────────────────── */
 
 .cv-hero__inner {  
   display: grid;  
@@ -125,8 +159,28 @@
   min-height: 420px;  
 }
 
+/* A1 · encuadre seguro para personas: sin punto focal, el cuarto superior (nunca el centro ciego). */  
 .cv-hero__media img {  
   object-fit: cover;  
+  object-position: 50% 22%;  
+}
+
+/* A1 · la foto no llena el área: el área adopta la proporción de la foto (cero recorte) y nunca  
+   se muestra más grande que su resolución de origen. La banda rellena el resto. */  
+.cv-hero__inner--ratio {  
+  min-height: 0;  
+  align-items: center;  
+}
+
+.cv-hero__media--ratio {  
+  min-height: 0;  
+  max-width: var(--cv-photo-max, none);  
+  aspect-ratio: var(--cv-photo-ratio);  
+  align-self: center;  
+}
+
+.cv-hero[data-photo-side="right"] .cv-hero__media--ratio {  
+  justify-self: end;  
 }
 
 .cv-hero__media--framed {  
@@ -169,7 +223,7 @@
   opacity: 0.75;  
 }
 
-/* ── 2 · Franja de marcas: carrusel infinito ──────────────────────────── */
+/* ── Franja de marcas: carrusel infinito ──────────────────────────────── */
 
 .cv-strip {  
   padding: 48px 0;  
@@ -211,8 +265,7 @@
   padding-right: 48px;  
 }
 
-/* Caja óptica uniforme: 40 de alto, hasta 120 de ancho, el logo completo y  
-   centrado. Ninguno se ve más grande o más chico por su proporción original. */  
+/* Caja óptica uniforme: 40 de alto, hasta 120 de ancho, el logo completo y centrado. */  
 .cv-strip__logo {  
   display: block;  
   height: 40px;  
@@ -228,7 +281,7 @@
   }  
 }
 
-/* ── 3 · Videos por sector ────────────────────────────────────────────── */
+/* ── Videos por sector: tarjetas ──────────────────────────────────────── */
 
 .cv-work {  
   scroll-margin-top: 64px;  
@@ -242,7 +295,7 @@
 
 .cv-group {  
   width: 100%;  
-  max-width: 1200px;  
+  max-width: var(--cv-measure);  
   margin-inline: auto;  
   scroll-margin-top: 64px;  
 }
@@ -261,85 +314,88 @@
   font-style: italic;  
 }
 
-.cv-phones {  
+/* Columnas fijas por ancho (4 · 3 · 2): la destacada (2×2) siempre cierra filas completas. */  
+.cv-cards {  
   display: grid;  
-  grid-template-columns: repeat(auto-fill, minmax(196px, 1fr));  
-  gap: 48px 24px;  
-  max-width: 1200px;  
-  margin-inline: auto;  
+  grid-template-columns: repeat(4, minmax(0, 1fr));  
+  gap: 32px 24px;  
 }
 
-.cv-piece {  
-  text-align: center;  
+.cv-cards__item {  
+  display: flex;  
+  flex-direction: column;  
+  min-width: 0;  
 }
 
-.cv-phone {  
+.cv-cards__item--featured {  
+  grid-column: span 2;  
+  grid-row: span 2;  
+}
+
+.cv-cards__item--featured .cv-card {  
+  flex: 1 1 auto;  
+}
+
+.cv-card {  
   position: relative;  
-  width: 100%;  
-  max-width: 228px;  
-  margin-inline: auto;  
-  aspect-ratio: 9 / 18.4;  
-  background: #101010;  
-  border-radius: 36px;  
-  padding: 8px;  
-  box-shadow: 0 20px 36px rgb(0 0 0 / 0.24);  
-}
-
-.cv-phone__notch {  
-  position: absolute;  
-  top: 8px;  
-  left: 50%;  
-  transform: translateX(-50%);  
-  width: 62px;  
-  height: 15px;  
-  border-radius: 0 0 10px 10px;  
-  background: #101010;  
-  z-index: 3;  
-}
-
-.cv-phone__screen {  
-  position: relative;  
-  display: block;  
-  width: 100%;  
-  height: 100%;  
-  border-radius: 28px;  
+  aspect-ratio: 4 / 5;  
+  border-radius: 24px;  
   overflow: hidden;  
-  background: #000;  
+  isolation: isolate;  
+  background: #0e0e0e;  
+  box-shadow:  
+    0 1px 2px rgb(0 0 0 / 0.06),  
+    0 12px 32px rgb(0 0 0 / 0.12);  
+  transition:  
+    transform 200ms ease-out,  
+    box-shadow 200ms ease-out;  
+}
+
+@media (hover: hover) {  
+  .cv-card:hover {  
+    transform: translateY(-4px);  
+    box-shadow:  
+      0 2px 4px rgb(0 0 0 / 0.08),  
+      0 24px 48px rgb(0 0 0 / 0.18);  
+  }
+
+  .cv-card:hover .cv-card__play {  
+    transform: scale(1.06);  
+  }  
+}
+
+.cv-card__media {  
+  position: absolute;  
+  inset: 0;  
+  display: block;  
   text-decoration: none;  
 }
 
-.cv-phone__screen img {  
+.cv-card__media img {  
   object-fit: cover;  
 }
 
-/* A1: el video nativo llena la pantalla del teléfono y corre ahí dentro. */  
-.cv-phone__screenwrap {  
-  position: relative;  
-  width: 100%;  
-  height: 100%;  
-}
-
-.cv-phone__video {  
+.cv-card__video {  
   display: block;  
   width: 100%;  
   height: 100%;  
   object-fit: cover;  
-  background: #000;  
+  background: #0e0e0e;  
 }
 
-/* Ronda 13: el póster del import solo cubre hasta que hay frame real. */  
-.cv-phone__poster {  
+/* El póster solo cubre hasta que hay frame real; después se desvanece. */  
+.cv-card__poster {  
   z-index: 1;  
   pointer-events: none;  
   opacity: 1;  
   transition: opacity 200ms ease-out;  
 }
 
-.cv-phone__poster--hidden {  
+.cv-card__poster--hidden {  
   opacity: 0;  
 }
 
-.cv-phone__playbtn {  
+.cv-card__play {  
   position: absolute;  
   inset: 0;  
   z-index: 2;  
@@ -348,14 +404,27 @@
   height: 52px;  
   border: none;  
   border-radius: 999px;  
-  background: rgb(0 0 0 / 0.45);  
-  color: #fff;  
+  background: rgb(255 255 255 / 0.92);  
+  color: #111;  
   display: grid;  
   place-items: center;  
   cursor: pointer;  
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.24);  
+  -webkit-backdrop-filter: blur(8px);  
+  backdrop-filter: blur(8px);  
+  transition: transform 200ms ease-out;  
 }
 
-.cv-phone__placeholder {  
+span.cv-card__play {  
+  pointer-events: none;  
+}
+
+.cv-card__play:focus-visible {  
+  outline: 2px solid #fff;  
+  outline-offset: 4px;  
+}
+
+.cv-card__placeholder {  
   display: grid;  
   place-items: center;  
   height: 100%;  
@@ -365,24 +434,11 @@
   text-align: center;  
 }
 
-.cv-phone__play {  
+.cv-card__badge {  
   position: absolute;  
-  inset: 0;  
-  margin: auto;  
-  width: 52px;  
-  height: 52px;  
-  border-radius: 999px;  
-  background: rgb(0 0 0 / 0.45);  
-  color: #fff;  
-  display: grid;  
-  place-items: center;  
-  pointer-events: none;  
-}
-
-.cv-phone__badge {  
-  position: absolute;  
-  left: 8px;  
-  bottom: 8px;  
+  left: 16px;  
+  bottom: 16px;  
+  z-index: 2;  
   display: inline-flex;  
   align-items: center;  
   gap: 4px;  
@@ -395,27 +451,35 @@
   pointer-events: none;  
 }
 
-.cv-phone__logo {  
+/* Chip de la marca: solo existe si el dato asocia el logo a la pieza. Se retira al reproducir. */  
+.cv-card__brand {  
   position: absolute;  
-  top: -16px;  
-  right: -8px;  
-  z-index: 4;  
-  display: grid;  
-  place-items: center;  
-  width: 64px;  
-  height: 64px;  
-  padding: 8px;  
-  border-radius: 16px;  
-  background: #fff;  
-  box-shadow: 0 8px 18px rgb(0 0 0 / 0.18);  
+  top: 16px;  
+  left: 16px;  
+  z-index: 3;  
+  display: inline-flex;  
+  align-items: center;  
+  height: 40px;  
+  padding: 0 16px;  
+  border-radius: 999px;  
+  background: rgb(255 255 255 / 0.92);  
+  box-shadow: 0 4px 16px rgb(0 0 0 / 0.16);  
+  -webkit-backdrop-filter: blur(8px);  
+  backdrop-filter: blur(8px);  
+  pointer-events: none;  
+  transition: opacity 200ms ease-out;  
 }
 
-.cv-phone__logo img {  
-  max-width: 100%;  
-  max-height: 100%;  
+.cv-card__brand img {  
+  display: block;  
+  height: 24px;  
   width: auto;  
-  height: auto;  
+  max-width: 72px;  
   object-fit: contain;  
+}
+
+.cv-card:has([data-playing]) .cv-card__brand {  
+  opacity: 0;  
 }
 
 .cv-piece__title {  
@@ -431,14 +495,12 @@
   opacity: 0.72;  
 }
 
-/* Botón flotante "Ver categorías": sticky al fondo de la sección de videos,  
-   así solo se ve mientras la sección está en pantalla (también en la vista  
-   previa del editor, sin taparle la interfaz). */  
+/* Botón flotante "Ver categorías": sticky al fondo de la sección de videos. */  
 .cv-sectors {  
   position: sticky;  
   bottom: calc(16px + env(safe-area-inset-bottom, 0px));  
   z-index: 10;  
-  max-width: 1200px;  
+  max-width: var(--cv-measure);  
   margin: 32px auto 0;  
   pointer-events: none;  
 }
@@ -544,11 +606,7 @@
   outline-offset: -2px;  
 }
 
-/* ── 4 · Resultados: slider de métricas ───────────────────────────────── */
-
-.cv-metrics {  
-  text-align: center;  
-}
+/* ── Slider único (Métricas, Razón y Fotos con muchas imágenes) ───────── */
 
 .cv-slider {  
   max-width: 480px;  
@@ -581,7 +639,7 @@
   scroll-snap-align: center;  
 }
 
-/* La captura completa, sin recorte: se achica entera hasta caber. */  
+/* contain: la captura completa, sin recorte; se achica entera hasta caber. */  
 .cv-slider__img {  
   display: block;  
   width: auto;  
@@ -590,6 +648,29 @@
   max-height: min(72vh, 640px);  
   object-fit: contain;  
   border-radius: 16px;  
+}
+
+/* cover: marco 4/5 lleno con el encuadre seguro para personas. */  
+.cv-slider--cover {  
+  max-width: none;  
+}
+
+.cv-slider--cover .cv-slider__track {  
+  border-radius: 24px;  
+}
+
+.cv-slider--cover .cv-slider__slide {  
+  aspect-ratio: 4 / 5;  
+}
+
+.cv-slider--cover .cv-slider__img {  
+  width: 100%;  
+  height: 100%;  
+  max-width: none;  
+  max-height: none;  
+  object-fit: cover;  
+  object-position: 50% 22%;  
+  border-radius: 0;  
 }
 
 .cv-slider__controls {  
@@ -656,15 +737,56 @@
   opacity: 1;  
 }
 
-/* ── 5 · Bio ──────────────────────────────────────────────────────────── */
+/* ── Métricas ─────────────────────────────────────────────────────────── */
+
+.cv-metrics {  
+  text-align: center;  
+}
+
+/* ── Testimonios: cada captura completa, en tarjeta ───────────────────── */
+
+.cv-testimonials {  
+  text-align: center;  
+}
+
+.cv-testimonials__grid {  
+  display: grid;  
+  grid-template-columns: repeat(auto-fit, minmax(260px, 360px));  
+  justify-content: center;  
+  align-items: start;  
+  gap: 24px;  
+  max-width: var(--cv-measure);  
+  margin-inline: auto;  
+}
+
+.cv-testimonial {  
+  padding: 16px;  
+  border-radius: 24px;  
+  background: color-mix(in srgb, var(--cv-ink, #191919) 5%, transparent);  
+  box-shadow: 0 12px 32px rgb(0 0 0 / 0.08);  
+}
+
+.cv-testimonial__img {  
+  display: block;  
+  width: 100%;  
+  height: auto;  
+  border-radius: 16px;  
+}
+
+/* ── Razón ("¿Por qué yo?") ───────────────────────────────────────────── */
 
 .cv-bio__inner {  
   display: grid;  
-  grid-template-columns: 1.08fr 0.92fr;  
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);  
   gap: 32px;  
   align-items: center;  
-  max-width: 1200px;  
+  max-width: var(--cv-measure);  
   margin-inline: auto;  
+}
+
+.cv-bio__inner--solo {  
+  grid-template-columns: minmax(0, 1fr);  
+  max-width: 720px;  
 }
 
 .cv-bio__title {  
@@ -685,48 +807,161 @@
   margin-top: 16px;  
 }
 
-.cv-bio__photo {  
+.cv-bio__gallery {  
+  min-width: 0;  
+}
+
+/* ── Fotos: grilla editorial (sin huecos) o slider ────────────────────── */
+
+.cv-photos {  
+  text-align: center;  
+}
+
+.cv-photos__slider {  
+  max-width: 560px;  
+  margin-inline: auto;  
+}
+
+.cv-gallery {  
+  display: grid;  
+  grid-template-columns: repeat(2, minmax(0, 1fr));  
+  gap: 16px;  
+  max-width: 880px;  
+  margin-inline: auto;  
+}
+
+.cv-gallery[data-count="1"] {  
+  grid-template-columns: minmax(0, 1fr);  
+  max-width: 560px;  
+}
+
+.cv-gallery[data-count="5"],  
+.cv-gallery[data-count="6"] {  
+  grid-template-columns: repeat(3, minmax(0, 1fr));  
+  max-width: var(--cv-measure);  
+}
+
+.cv-gallery__item {  
   position: relative;  
-  min-height: 380px;  
-  border-radius: 16px;  
+  aspect-ratio: 4 / 5;  
+  border-radius: 24px;  
   overflow: hidden;  
+  background: color-mix(in srgb, var(--cv-ink, #191919) 8%, transparent);  
 }
 
-.cv-bio__photo img {  
+.cv-gallery__item img {  
   object-fit: cover;  
+  object-position: 50% 22%;  
 }
 
-/* ── 6 · Formas de colaborar ──────────────────────────────────────────── */
+/* 3 fotos → F a / F b · 5 fotos → F a b / F c d: la primera ocupa dos filas, nunca quedan huecos. */  
+.cv-gallery__item--featured {  
+  grid-row: span 2;  
+  aspect-ratio: auto;  
+}
+
+/* ── Formas de colaborar: tarjetas de servicio ────────────────────────── */
 
 .cv-services__grid {  
   display: grid;  
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));  
   gap: 24px;  
-  max-width: 1200px;  
+  max-width: var(--cv-measure);  
   margin-inline: auto;  
 }
 
+/* Separadas por espacio y un fondo sutil de su banda; sin caja con borde alrededor. */  
 .cv-service {  
-  border: 1.5px solid color-mix(in srgb, var(--cv-ink, #191919) 55%, transparent);  
-  border-radius: 16px;  
+  display: flex;  
+  flex-direction: column;  
   padding: 24px;  
+  border-radius: 24px;  
+  background: color-mix(in srgb, var(--cv-ink, #191919) 6%, transparent);  
+}
+
+.cv-service::before {  
+  content: "";  
+  width: 32px;  
+  height: 2px;  
+  margin-bottom: 24px;  
+  border-radius: 2px;  
+  background: color-mix(in srgb, currentColor 40%, transparent);  
 }
 
 .cv-service__title {  
-  font-size: 1.12rem;  
+  font-size: 1.25rem;  
   font-weight: 700;  
+  line-height: 1.25;  
   margin-bottom: 8px;  
 }
 
 .cv-service__text {  
   line-height: 1.6;  
-  opacity: 0.88;  
+  opacity: 0.86;  
 }
 
-/* ── 7 · Tarifas ──────────────────────────────────────────────────────── */
+/* ── Tarifas ──────────────────────────────────────────────────────────── */
 
 .cv-rates {  
   text-align: center;  
+}
+
+/* Tarjetas de precio: mismo peso para todas (sin destacar ninguna: el dato no lo dice). */  
+.cv-pricing {  
+  display: grid;  
+  grid-template-columns: repeat(auto-fit, minmax(240px, 320px));  
+  justify-content: center;  
+  gap: 24px;  
+  max-width: var(--cv-measure);  
+  margin-inline: auto;  
+  text-align: left;  
+}
+
+.cv-price {  
+  display: flex;  
+  flex-direction: column;  
+  padding: 24px;  
+  border-radius: 24px;  
+  border: 1.5px solid color-mix(in srgb, var(--cv-ink, #191919) 18%, transparent);  
+  background: color-mix(in srgb, var(--cv-ink, #191919) 4%, transparent);  
+}
+
+.cv-price__name {  
+  font-size: 0.85rem;  
+  font-weight: 700;  
+  letter-spacing: 0.14em;  
+  text-transform: uppercase;  
+  opacity: 0.8;  
+  margin-bottom: 8px;  
+}
+
+.cv-price__amount {  
+  font-size: clamp(2.25rem, 4vw, 2.75rem);  
+  font-weight: 700;  
+  line-height: 1.05;  
+  letter-spacing: -0.01em;  
+  font-variant-numeric: tabular-nums;  
+}
+
+.cv-price__list {  
+  display: flex;  
+  flex-direction: column;  
+  gap: 8px;  
+  margin-top: 24px;  
+  padding-top: 24px;  
+  border-top: 1px solid color-mix(in srgb, var(--cv-ink, #191919) 14%, transparent);  
+}
+
+.cv-price__item {  
+  display: flex;  
+  align-items: flex-start;  
+  gap: 8px;  
+  line-height: 1.5;  
+}
+
+.cv-price__check {  
+  flex-shrink: 0;  
+  margin-top: 4px;  
 }
 
 .cv-rates__figure {  
@@ -745,7 +980,7 @@
   border-radius: 12px;  
 }
 
-/* ── 8 · Contacto (cierre) ────────────────────────────────────────────── */
+/* ── Contacto (cierre) ────────────────────────────────────────────────── */
 
 .cv-contact {  
   text-align: center;  
@@ -759,6 +994,43 @@
   margin-inline: auto;  
 }
 
+/* Con su video: fondo a sección completa, velo de la banda encima, contenido arriba. */  
+.cv-contact--video {  
+  position: relative;  
+  isolation: isolate;  
+  overflow: hidden;  
+  display: flex;  
+  align-items: center;  
+  justify-content: center;  
+  min-height: min(88vh, 760px);  
+}
+
+.cv-contact--video .cv-contact__inner {  
+  position: relative;  
+  z-index: 1;  
+}
+
+.cv-backdrop {  
+  position: absolute;  
+  inset: 0;  
+  z-index: 0;  
+  pointer-events: none;  
+}
+
+.cv-backdrop__video {  
+  display: block;  
+  width: 100%;  
+  height: 100%;  
+  object-fit: cover;  
+}
+
+.cv-backdrop__veil {  
+  position: absolute;  
+  inset: 0;  
+  background: var(--cv-band, #fff);  
+  opacity: 0.86;  
+}
+
 .cv-contact__photo {  
   position: relative;  
   width: 96px;  
@@ -768,8 +1040,13 @@
   overflow: hidden;  
 }
 
+.cv-contact--video .cv-contact__photo {  
+  box-shadow: 0 0 0 4px var(--cv-band, #fff);  
+}
+
 .cv-contact__photo img {  
   object-fit: cover;  
+  object-position: 50% 22%;  
 }
 
 .cv-contact__title {  
@@ -821,16 +1098,45 @@
   opacity: 0.75;  
 }
 
+/* ── Desktop: aire lateral alto en diseños aireados ───────────────────── */
+
+@media (min-width: 861px) {  
+  .pf--canva.cv-airy .cv-work,  
+  .pf--canva.cv-airy .cv-metrics,  
+  .pf--canva.cv-airy .cv-testimonials,  
+  .pf--canva.cv-airy .cv-bio,  
+  .pf--canva.cv-airy .cv-photos,  
+  .pf--canva.cv-airy .cv-services,  
+  .pf--canva.cv-airy .cv-rates,  
+  .pf--canva.cv-airy .cv-contact {  
+    padding-inline: 64px;  
+  }  
+}
+
+/* ── Tablet ───────────────────────────────────────────────────────────── */
+
+@media (min-width: 861px) and (max-width: 1023px) {  
+  .cv-cards {  
+    grid-template-columns: repeat(3, minmax(0, 1fr));  
+  }  
+}
+
 /* ── Móvil ────────────────────────────────────────────────────────────── */
 
 @media (max-width: 860px) {  
   .cv-work,  
   .cv-metrics,  
+  .cv-testimonials,  
   .cv-bio,  
+  .cv-photos,  
   .cv-services,  
   .cv-rates,  
   .cv-contact {  
     padding: 48px 16px;  
+  }
+
+  .pf--canva.cv-frames section::after {  
+    inset: 8px;  
   }
 
   .cv-hero__inner {  
@@ -838,14 +1144,20 @@
     min-height: 0;  
   }
 
+  /* A1 · en celular el área sigue la proporción de la foto (una foto muy alta se recorta a 4/5 como  
+     mucho, con el encuadre seguro); sin medidas, la proporción de siempre. */  
   .cv-hero__media {  
     min-height: 0;  
-    aspect-ratio: 4 / 3.4;  
+    aspect-ratio: var(--cv-photo-ratio-m, 4 / 3.4);  
+  }
+
+  .cv-hero__media--ratio {  
+    aspect-ratio: var(--cv-photo-ratio);  
+    justify-self: center;  
+    width: 100%;  
   }
 
   .cv-hero__media--framed {  
-    aspect-ratio: auto;  
-    min-height: 340px;  
     margin: 24px;  
   }
 
@@ -861,19 +1173,61 @@
     gap: 48px;  
   }
 
-  .cv-phones {  
-    grid-template-columns: repeat(auto-fill, minmax(152px, 1fr));  
-    gap: 32px 16px;  
+  .cv-cards {  
+    grid-template-columns: repeat(2, minmax(0, 1fr));  
+    gap: 24px 16px;  
   }
 
-  .cv-phone__logo {  
-    width: 48px;  
-    height: 48px;  
+  /* La destacada abre la grilla a ancho completo. */  
+  .cv-cards__item--featured {  
+    grid-column: 1 / -1;  
+    grid-row: auto;  
+  }
+
+  .cv-cards__item--featured .cv-card {  
+    flex: none;  
+  }
+
+  .cv-card__brand {  
+    top: 8px;  
+    left: 8px;  
+    height: 36px;  
+    padding: 0 8px;  
+  }
+
+  .cv-card__brand img {  
+    height: 20px;  
+    max-width: 64px;  
+  }
+
+  .cv-testimonials__grid {  
+    grid-template-columns: minmax(0, 1fr);  
   }
 
   .cv-bio__inner {  
-    grid-template-columns: 1fr;  
+    grid-template-columns: minmax(0, 1fr);  
     gap: 24px;  
+  }
+
+  .cv-gallery[data-count="5"],  
+  .cv-gallery[data-count="6"] {  
+    grid-template-columns: repeat(2, minmax(0, 1fr));  
+  }
+
+  /* En celular la primera foto abre la grilla a ancho completo (3 → F / a b · 5 → F / a b / c d). */  
+  .cv-gallery__item--featured {  
+    grid-column: 1 / -1;  
+    grid-row: auto;  
+    aspect-ratio: 4 / 5;  
+  }
+
+  /* Servicios: una por fila, grandes. */  
+  .cv-services__grid {  
+    grid-template-columns: minmax(0, 1fr);  
+  }
+
+  .cv-contact--video {  
+    min-height: min(80vh, 640px);  
   }  
 }
 
@@ -889,17 +1243,22 @@
   }
 
   .cv-btn,  
+  .cv-card,  
+  .cv-card__play,  
+  .cv-card__poster,  
+  .cv-card__brand,  
   .cv-sectors__toggle,  
   .cv-sectors__panel,  
   .cv-sectors__panel[data-open],  
   .cv-sectors__item,  
-  .cv-phone__poster,  
   .cv-slider__nav,  
   .cv-slider__dot::before {  
     transition: none;  
   }
 
   .cv-btn:active,  
+  .cv-card:hover,  
+  .cv-card:hover .cv-card__play,  
   .cv-sectors__toggle:active,  
   .cv-sectors__panel {  
     transform: none;  
