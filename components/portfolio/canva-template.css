@@ -1,649 +1,911 @@
-/*
- * Importador de Canva v2 · variante clonada (canva-template.tsx).
- * Todo scoped a .pf--canva: los colores llegan por banda (style inline) y las
- * fuentes por variables (--cv-font-display/headings/body) desde su Canva.
- * --cv-ink puede cambiar por banda (guardia de contraste); --cv-on-ink es el
- * color de texto sobre la tinta (botones).
+/*  
+ * Importador de Canva v2 · variante clonada (canva-template.tsx).  
+ * Todo scoped a .pf--canva: los colores llegan por banda (style inline) y las  
+ * fuentes por variables (--cv-font-display/headings/body) desde su Canva.  
+ * --cv-ink puede cambiar por banda (guardia de contraste); --cv-on-ink es el  
+ * color de texto sobre la tinta (botones).  
+ *  
+ * Ronda 13 · sistema de diseño:  
+ * - Espaciado SOLO en la escala 4 / 8 / 16 / 24 / 32 / 48 / 64.  
+ * - Botones: grande 52 / 32 · mediano 44 / 24 · chico 36 / 16.  
+ * - Pesos 400 / 600 / 700.  
+ * - Movimiento 150–300ms ease-out, apagado con prefers-reduced-motion.  
+ * El reset de márgenes va con :where() (especificidad 0). Antes le ganaba a la  
+ * clase de cada componente y se comía sus márgenes: títulos pegados a su  
+ * contenido en la franja, la bio y los servicios, y grillas sin centrar.  
  */
 
-.pf--canva {
-  color: var(--cv-ink, #191919);
-  font-family: var(--cv-font-body, inherit);
+.pf--canva {  
+  color: var(--cv-ink, #191919);  
+  font-family: var(--cv-font-body, inherit);  
 }
 
-/* El color se resuelve POR SECCIÓN: cada banda trae su --cv-ink (guardia de
-   contraste) y el texto hereda desde la sección, no desde la raíz. */
-.pf--canva section,
-.pf--canva footer {
-  color: var(--cv-ink, #191919);
+/* El color se resuelve POR SECCIÓN: cada banda trae su --cv-ink (guardia de  
+   contraste) y el texto hereda desde la sección, no desde la raíz. */  
+.pf--canva section,  
+.pf--canva footer {  
+  color: var(--cv-ink, #191919);  
 }
 
-.pf--canva figure,
-.pf--canva ul,
-.pf--canva p,
-.pf--canva h1,
-.pf--canva h2,
-.pf--canva h3 {
-  margin: 0;
+:where(.pf--canva) :where(figure, ul, p, h1, h2, h3, h4) {  
+  margin: 0;  
 }
 
-.pf--canva ul {
-  list-style: none;
-  padding: 0;
+:where(.pf--canva) :where(ul) {  
+  list-style: none;  
+  padding: 0;  
 }
 
-.cv-visually-hidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  white-space: nowrap;
+.cv-visually-hidden {  
+  position: absolute;  
+  width: 1px;  
+  height: 1px;  
+  overflow: hidden;  
+  clip: rect(0 0 0 0);  
+  white-space: nowrap;  
 }
 
-/* ── Hero: ancho completo, la foto pegada al borde ────────────────────── */
+/* ── Secciones: aire entre secciones dentro de la escala ──────────────── */
 
-.cv-hero__inner {
-  display: grid;
-  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
-  align-items: stretch;
-  min-height: min(88vh, 780px);
+.cv-work,  
+.cv-metrics,  
+.cv-bio,  
+.cv-services,  
+.cv-rates,  
+.cv-contact {  
+  padding: 64px 32px;  
 }
 
-.cv-hero[data-photo-side="right"] .cv-hero__media {
-  order: 2;
+.cv-section-title {  
+  font-family: var(--cv-font-headings, serif);  
+  font-size: clamp(1.9rem, 4vw, 2.7rem);  
+  font-weight: 400;  
+  line-height: 1.2;  
+  max-width: 1200px;  
+  margin: 0 auto 24px;  
 }
 
-.cv-hero__media {
-  position: relative;
-  min-height: 420px;
+.cv-section-title[data-cv-italic] {  
+  font-style: italic;  
 }
 
-.cv-hero__media img {
-  object-fit: cover;
+/* ── Botones ──────────────────────────────────────────────────────────── */
+
+.cv-actions {  
+  display: flex;  
+  flex-wrap: wrap;  
+  gap: 16px;  
+  margin-top: 8px;  
+}
+
+/* Grande: 52 de alto, 32 de padding horizontal. */  
+.cv-btn {  
+  display: inline-flex;  
+  align-items: center;  
+  justify-content: center;  
+  min-height: 52px;  
+  padding: 0 32px;  
+  border-radius: 999px;  
+  font-weight: 700;  
+  font-size: 1rem;  
+  text-decoration: none;  
+  border: 1.5px solid var(--cv-ink, #191919);  
+  transition: transform 150ms ease-out;  
 }
 
-.cv-hero__media--framed {
-  margin: clamp(18px, 3.5vw, 44px);
-  border-radius: 28px;
-  overflow: hidden;
-  box-shadow: 0 24px 48px rgb(0 0 0 / 0.18);
+.cv-btn:active {  
+  transform: scale(0.98);  
 }
 
-.cv-hero__copy {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 18px;
-  width: 100%;
-  max-width: 44rem;
-  padding: clamp(28px, 5vw, 72px);
+.cv-btn--solid {  
+  background: var(--cv-ink, #191919);  
+  color: var(--cv-on-ink, #fff);  
 }
 
-.cv-hero[data-photo-side="right"] .cv-hero__copy {
-  justify-self: end;
+.cv-btn--ghost {  
+  background: transparent;  
+  color: var(--cv-ink, #191919);  
 }
+
+/* ── 1 · Hero: ancho completo, la foto pegada al borde ────────────────── */
 
-.cv-hero__name {
-  font-family: var(--cv-font-display, serif);
-  font-weight: 400;
-  font-size: clamp(3rem, 6.6vw, 5.4rem);
-  line-height: 1.04;
+.cv-hero__inner {  
+  display: grid;  
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);  
+  align-items: stretch;  
+  min-height: min(88vh, 780px);  
 }
 
-.cv-hero__tagline {
-  font-size: 0.95rem;
-  font-weight: 700;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
+.cv-hero[data-photo-side="right"] .cv-hero__media {  
+  order: 2;  
 }
 
-.cv-hero__handle {
-  font-size: 1rem;
-  opacity: 0.75;
+.cv-hero__media {  
+  position: relative;  
+  min-height: 420px;  
 }
 
-.cv-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin-top: 8px;
+.cv-hero__media img {  
+  object-fit: cover;  
 }
 
-.cv-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 13px 26px;
-  border-radius: 999px;
-  font-weight: 700;
-  font-size: 0.98rem;
-  text-decoration: none;
-  border: 1.5px solid var(--cv-ink, #191919);
+.cv-hero__media--framed {  
+  margin: 48px;  
+  border-radius: 28px;  
+  overflow: hidden;  
+  box-shadow: 0 24px 48px rgb(0 0 0 / 0.18);  
 }
 
-.cv-btn--solid {
-  background: var(--cv-ink, #191919);
-  color: var(--cv-on-ink, #fff);
+.cv-hero__copy {  
+  display: flex;  
+  flex-direction: column;  
+  justify-content: center;  
+  gap: 16px;  
+  width: 100%;  
+  max-width: 44rem;  
+  padding: 64px;  
 }
 
-.cv-btn--ghost {
-  background: transparent;
-  color: var(--cv-ink, #191919);
+.cv-hero[data-photo-side="right"] .cv-hero__copy {  
+  justify-self: end;  
 }
 
-/* ── Franja de marcas: carrusel infinito ──────────────────────────────── */
+.cv-hero__name {  
+  font-family: var(--cv-font-display, serif);  
+  font-weight: 400;  
+  font-size: clamp(3rem, 6.6vw, 5.4rem);  
+  line-height: 1.04;  
+}
 
-.cv-strip {
-  padding: 30px 0 36px;
-  text-align: center;
-  overflow: hidden;
+.cv-hero__tagline {  
+  font-size: 0.95rem;  
+  font-weight: 700;  
+  letter-spacing: 0.22em;  
+  text-transform: uppercase;  
 }
 
-.cv-strip__label {
-  font-size: 0.8rem;
-  font-weight: 700;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  opacity: 0.8;
-  margin-bottom: 20px;
-  padding-inline: 20px;
+.cv-hero__handle {  
+  font-size: 1rem;  
+  opacity: 0.75;  
 }
+
+/* ── 2 · Franja de marcas: carrusel infinito ──────────────────────────── */
 
-.cv-strip__viewport {
-  overflow: hidden;
-  -webkit-mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent);
-  mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent);
+.cv-strip {  
+  padding: 48px 0;  
+  text-align: center;  
+  overflow: hidden;  
 }
 
-.cv-strip__track {
-  display: flex;
-  align-items: center;
-  width: max-content;
-  animation: cv-marquee 30s linear infinite;
+.cv-strip__label {  
+  font-size: 0.8rem;  
+  font-weight: 700;  
+  letter-spacing: 0.18em;  
+  text-transform: uppercase;  
+  opacity: 0.8;  
+  margin-bottom: 24px;  
+  padding-inline: 16px;  
 }
 
-.cv-strip:hover .cv-strip__track {
-  animation-play-state: paused;
+.cv-strip__viewport {  
+  overflow: hidden;  
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent);  
+  mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent);  
 }
 
-.cv-strip__item {
-  flex-shrink: 0;
-  padding-right: 64px;
+.cv-strip__track {  
+  display: flex;  
+  align-items: center;  
+  width: max-content;  
+  animation: cv-marquee 30s linear infinite;  
 }
 
-.cv-strip__logo {
-  height: 58px;
-  width: auto;
-  object-fit: contain;
+.cv-strip:hover .cv-strip__track {  
+  animation-play-state: paused;  
 }
 
-@keyframes cv-marquee {
-  to {
-    transform: translateX(-50%);
-  }
+.cv-strip__item {  
+  flex-shrink: 0;  
+  display: flex;  
+  align-items: center;  
+  padding-right: 48px;  
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .cv-strip__track {
-    animation: none;
-  }
+/* Caja óptica uniforme: 40 de alto, hasta 120 de ancho, el logo completo y  
+   centrado. Ninguno se ve más grande o más chico por su proporción original. */  
+.cv-strip__logo {  
+  display: block;  
+  height: 40px;  
+  width: auto;  
+  max-width: 120px;  
+  object-fit: contain;  
+  object-position: center;  
+}
 
-  .cv-strip__viewport {
-    overflow-x: auto;
-  }
+@keyframes cv-marquee {  
+  to {  
+    transform: translateX(-50%);  
+  }  
 }
 
-/* ── Videos por sector ────────────────────────────────────────────────── */
+/* ── 3 · Videos por sector ────────────────────────────────────────────── */
 
-.cv-work {
-  padding: clamp(56px, 7vw, 88px) clamp(20px, 5vw, 56px);
+.cv-work {  
+  scroll-margin-top: 64px;  
 }
 
-.cv-work__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: clamp(24px, 4vw, 56px);
-  max-width: 1200px;
-  margin: 0 auto clamp(34px, 4vw, 52px);
+.cv-work__groups {  
+  display: flex;  
+  flex-direction: column;  
+  gap: 64px;  
 }
 
-.cv-work__title {
-  font-size: clamp(1.7rem, 3.4vw, 2.5rem);
-  font-weight: 800;
-  line-height: 1.15;
+.cv-group {  
+  width: 100%;  
+  max-width: 1200px;  
+  margin-inline: auto;  
+  scroll-margin-top: 64px;  
 }
 
-.cv-work__photo {
-  position: relative;
-  flex-shrink: 0;
-  width: min(300px, 34vw);
-  aspect-ratio: 4 / 3;
-  border-radius: 18px;
-  overflow: hidden;
+.cv-group__title {  
+  font-family: var(--cv-font-headings, serif);  
+  font-size: clamp(1.9rem, 4vw, 2.7rem);  
+  font-weight: 400;  
+  /* A6: las fuentes script dibujan fuera de su caja; sin aire invaden la fila. */  
+  line-height: 1.3;  
+  padding-bottom: 0.14em;  
+  margin-bottom: 24px;  
 }
 
-.cv-work__photo img {
-  object-fit: cover;
+.cv-group__title[data-cv-italic] {  
+  font-style: italic;  
 }
 
-.cv-selector__buttons {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin-top: 22px;
+.cv-phones {  
+  display: grid;  
+  grid-template-columns: repeat(auto-fill, minmax(196px, 1fr));  
+  gap: 48px 24px;  
+  max-width: 1200px;  
+  margin-inline: auto;  
 }
 
-.cv-sector-btn {
-  display: inline-flex;
-  align-items: center;
-  padding: 12px 24px;
-  border-radius: 999px;
-  border: none;
-  background: var(--cv-ink, #191919);
-  color: var(--cv-on-ink, #fff);
-  font: inherit;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  font-size: 0.92rem;
-  text-decoration: none;
-  cursor: pointer;
+.cv-piece {  
+  text-align: center;  
 }
 
-.cv-sector-btn[aria-pressed="true"] {
-  background: var(--cv-accent, #191919);
+.cv-phone {  
+  position: relative;  
+  width: 100%;  
+  max-width: 228px;  
+  margin-inline: auto;  
+  aspect-ratio: 9 / 18.4;  
+  background: #101010;  
+  border-radius: 36px;  
+  padding: 8px;  
+  box-shadow: 0 20px 36px rgb(0 0 0 / 0.24);  
 }
 
-.cv-group {
-  max-width: 1200px;
-  margin: 0 auto clamp(44px, 6vw, 72px);
+.cv-phone__notch {  
+  position: absolute;  
+  top: 8px;  
+  left: 50%;  
+  transform: translateX(-50%);  
+  width: 62px;  
+  height: 15px;  
+  border-radius: 0 0 10px 10px;  
+  background: #101010;  
+  z-index: 3;  
 }
 
-.cv-group:last-child {
-  margin-bottom: 0;
+.cv-phone__screen {  
+  position: relative;  
+  display: block;  
+  width: 100%;  
+  height: 100%;  
+  border-radius: 28px;  
+  overflow: hidden;  
+  background: #000;  
+  text-decoration: none;  
 }
 
-.cv-group__title {
-  font-family: var(--cv-font-headings, serif);
-  font-size: clamp(1.9rem, 4vw, 2.7rem);
-  font-weight: 500;
-  /* A6: las fuentes script dibujan fuera de su caja; sin aire invaden la fila. */
-  line-height: 1.3;
-  padding-bottom: 0.14em;
-  margin-bottom: 26px;
+.cv-phone__screen img {  
+  object-fit: cover;  
 }
 
-/* A1: el video nativo llena la pantalla del teléfono y corre ahí dentro. */
-.cv-phone__screenwrap {
-  position: relative;
-  width: 100%;
-  height: 100%;
+/* A1: el video nativo llena la pantalla del teléfono y corre ahí dentro. */  
+.cv-phone__screenwrap {  
+  position: relative;  
+  width: 100%;  
+  height: 100%;  
 }
 
-.cv-phone__video {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  background: #000;
+.cv-phone__video {  
+  display: block;  
+  width: 100%;  
+  height: 100%;  
+  object-fit: cover;  
+  background: #000;  
 }
 
-.cv-phone__playbtn {
-  position: absolute;
-  inset: 0;
-  margin: auto;
-  width: 52px;
-  height: 52px;
-  border: none;
-  border-radius: 999px;
-  background: rgb(0 0 0 / 0.45);
-  color: #fff;
-  display: grid;
-  place-items: center;
-  cursor: pointer;
+/* Ronda 13: el póster del import solo cubre hasta que hay frame real. */  
+.cv-phone__poster {  
+  z-index: 1;  
+  pointer-events: none;  
+  opacity: 1;  
+  transition: opacity 200ms ease-out;  
 }
 
-.cv-group__title[data-cv-italic] {
-  font-style: italic;
+.cv-phone__poster--hidden {  
+  opacity: 0;  
 }
 
-.cv-phones {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(196px, 1fr));
-  gap: 42px 24px;
-  max-width: 1200px;
-  margin-inline: auto;
+.cv-phone__playbtn {  
+  position: absolute;  
+  inset: 0;  
+  z-index: 2;  
+  margin: auto;  
+  width: 52px;  
+  height: 52px;  
+  border: none;  
+  border-radius: 999px;  
+  background: rgb(0 0 0 / 0.45);  
+  color: #fff;  
+  display: grid;  
+  place-items: center;  
+  cursor: pointer;  
 }
 
-.cv-piece {
-  text-align: center;
+.cv-phone__placeholder {  
+  display: grid;  
+  place-items: center;  
+  height: 100%;  
+  padding: 16px;  
+  color: #fff;  
+  font-size: 0.9rem;  
+  text-align: center;  
 }
+
+.cv-phone__play {  
+  position: absolute;  
+  inset: 0;  
+  margin: auto;  
+  width: 52px;  
+  height: 52px;  
+  border-radius: 999px;  
+  background: rgb(0 0 0 / 0.45);  
+  color: #fff;  
+  display: grid;  
+  place-items: center;  
+  pointer-events: none;  
+}
 
-.cv-phone {
-  position: relative;
-  width: 100%;
-  max-width: 228px;
-  margin-inline: auto;
-  aspect-ratio: 9 / 18.4;
-  background: #101010;
-  border-radius: 36px;
-  padding: 9px;
-  box-shadow: 0 20px 36px rgb(0 0 0 / 0.24);
+.cv-phone__badge {  
+  position: absolute;  
+  left: 8px;  
+  bottom: 8px;  
+  display: inline-flex;  
+  align-items: center;  
+  gap: 4px;  
+  padding: 4px 8px;  
+  border-radius: 999px;  
+  background: rgb(0 0 0 / 0.55);  
+  color: #fff;  
+  font-size: 0.72rem;  
+  font-weight: 600;  
+  pointer-events: none;  
+}
+
+.cv-phone__logo {  
+  position: absolute;  
+  top: -16px;  
+  right: -8px;  
+  z-index: 4;  
+  display: grid;  
+  place-items: center;  
+  width: 64px;  
+  height: 64px;  
+  padding: 8px;  
+  border-radius: 16px;  
+  background: #fff;  
+  box-shadow: 0 8px 18px rgb(0 0 0 / 0.18);  
+}
+
+.cv-phone__logo img {  
+  max-width: 100%;  
+  max-height: 100%;  
+  width: auto;  
+  height: auto;  
+  object-fit: contain;  
+}
+
+.cv-piece__title {  
+  margin-top: 16px;  
+  font-size: 1rem;  
+  font-weight: 600;  
+  line-height: 1.35;  
+}
+
+.cv-piece__meta {  
+  margin-top: 4px;  
+  font-size: 0.86rem;  
+  opacity: 0.72;  
+}
+
+/* Botón flotante "Ver categorías": sticky al fondo de la sección de videos,  
+   así solo se ve mientras la sección está en pantalla (también en la vista  
+   previa del editor, sin taparle la interfaz). */  
+.cv-sectors {  
+  position: sticky;  
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));  
+  z-index: 10;  
+  max-width: 1200px;  
+  margin: 32px auto 0;  
+  pointer-events: none;  
+}
+
+/* Mediano: 44 de alto, 24 de padding horizontal. */  
+.cv-sectors__toggle {  
+  pointer-events: auto;  
+  display: inline-flex;  
+  align-items: center;  
+  gap: 8px;  
+  height: 44px;  
+  padding: 0 24px;  
+  border: none;  
+  border-radius: 999px;  
+  background: var(--cv-ink, #191919);  
+  color: var(--cv-on-ink, #fff);  
+  font: inherit;  
+  font-size: 0.95rem;  
+  font-weight: 700;  
+  cursor: pointer;  
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.24);  
+  transition: transform 150ms ease-out;  
+}
+
+.cv-sectors__toggle:active {  
+  transform: scale(0.97);  
+}
+
+.cv-sectors__toggle:focus-visible {  
+  outline: 2px solid var(--cv-ink, #191919);  
+  outline-offset: 4px;  
 }
 
-.cv-phone__notch {
-  position: absolute;
-  top: 9px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 62px;
-  height: 15px;
-  border-radius: 0 0 10px 10px;
-  background: #101010;
-  z-index: 3;
+.cv-sectors__panel {  
+  position: absolute;  
+  left: 0;  
+  bottom: calc(100% + 8px);  
+  min-width: 240px;  
+  max-width: min(320px, calc(100vw - 32px));  
+  max-height: min(60vh, 420px);  
+  overflow-y: auto;  
+  padding: 8px;  
+  border-radius: 16px;  
+  background: var(--cv-on-ink, #fff);  
+  color: var(--cv-ink, #191919);  
+  box-shadow: 0 16px 32px rgb(0 0 0 / 0.24);  
+  opacity: 0;  
+  transform: translateY(8px);  
+  visibility: hidden;  
+  transition:  
+    opacity 200ms ease-out,  
+    transform 200ms ease-out,  
+    visibility 0s linear 200ms;  
 }
 
-.cv-phone__screen {
-  position: relative;
-  display: block;
-  width: 100%;
-  height: 100%;
-  border-radius: 27px;
-  overflow: hidden;
-  background: #000;
-  text-decoration: none;
+.cv-sectors__panel[data-open] {  
+  pointer-events: auto;  
+  opacity: 1;  
+  transform: none;  
+  visibility: visible;  
+  transition:  
+    opacity 200ms ease-out,  
+    transform 200ms ease-out,  
+    visibility 0s;  
+}
+
+.cv-sectors__list {  
+  display: flex;  
+  flex-direction: column;  
+  gap: 4px;  
+}
+
+.cv-sectors__item {  
+  display: flex;  
+  align-items: center;  
+  width: 100%;  
+  min-height: 44px;  
+  padding: 0 16px;  
+  border: none;  
+  border-radius: 12px;  
+  background: transparent;  
+  color: inherit;  
+  font: inherit;  
+  font-weight: 600;  
+  text-align: left;  
+  text-decoration: none;  
+  cursor: pointer;  
+  transition: background-color 150ms ease-out;  
 }
+
+.cv-sectors__item:hover {  
+  background: color-mix(in srgb, currentColor 8%, transparent);  
+}
 
-.cv-phone__screen img {
-  object-fit: cover;
+.cv-sectors__item[aria-current="true"],  
+.cv-sectors__item[aria-pressed="true"] {  
+  font-weight: 700;  
+  background: color-mix(in srgb, currentColor 12%, transparent);  
+}
+
+.cv-sectors__item:focus-visible {  
+  outline: 2px solid currentColor;  
+  outline-offset: -2px;  
 }
 
-.cv-phone__placeholder {
-  display: grid;
-  place-items: center;
-  height: 100%;
-  padding: 16px;
-  color: #fff;
-  font-size: 0.9rem;
-  text-align: center;
+/* ── 4 · Resultados: slider de métricas ───────────────────────────────── */
+
+.cv-metrics {  
+  text-align: center;  
+}
+
+.cv-slider {  
+  max-width: 480px;  
+  margin-inline: auto;  
+}
+
+.cv-slider__track {  
+  display: flex;  
+  overflow-x: auto;  
+  scroll-snap-type: x mandatory;  
+  scroll-behavior: smooth;  
+  overscroll-behavior-x: contain;  
+  scrollbar-width: none;  
 }
 
-.cv-phone__play {
-  position: absolute;
-  inset: 0;
-  margin: auto;
-  width: 52px;
-  height: 52px;
-  border-radius: 999px;
-  background: rgb(0 0 0 / 0.45);
-  color: #fff;
-  display: grid;
-  place-items: center;
-  pointer-events: none;
+.cv-slider__track::-webkit-scrollbar {  
+  display: none;  
 }
 
-.cv-phone__badge {
-  position: absolute;
-  left: 10px;
-  bottom: 10px;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 4px 9px;
-  border-radius: 999px;
-  background: rgb(0 0 0 / 0.55);
-  color: #fff;
-  font-size: 0.72rem;
-  font-weight: 600;
-  pointer-events: none;
+.cv-slider__track:focus-visible {  
+  outline: 2px solid currentColor;  
+  outline-offset: 4px;  
+}
+
+.cv-slider__slide {  
+  flex: 0 0 100%;  
+  display: flex;  
+  align-items: center;  
+  justify-content: center;  
+  scroll-snap-align: center;  
 }
 
-.cv-phone__logo {
-  position: absolute;
-  top: -14px;
-  right: -8px;
-  z-index: 4;
-  display: grid;
-  place-items: center;
-  width: 62px;
-  height: 62px;
-  padding: 6px;
-  border-radius: 14px;
-  background: #fff;
-  box-shadow: 0 8px 18px rgb(0 0 0 / 0.18);
+/* La captura completa, sin recorte: se achica entera hasta caber. */  
+.cv-slider__img {  
+  display: block;  
+  width: auto;  
+  height: auto;  
+  max-width: 100%;  
+  max-height: min(72vh, 640px);  
+  object-fit: contain;  
+  border-radius: 16px;  
 }
 
-.cv-phone__logo img {
-  max-width: 100%;
-  max-height: 100%;
-  width: auto;
-  height: auto;
-  object-fit: contain;
+.cv-slider__controls {  
+  display: flex;  
+  align-items: center;  
+  justify-content: center;  
+  gap: 16px;  
+  margin-top: 16px;  
 }
 
-.cv-piece__title {
-  margin-top: 14px;
-  font-size: 1rem;
-  font-weight: 600;
-  line-height: 1.35;
+.cv-slider__nav {  
+  display: grid;  
+  place-items: center;  
+  width: 44px;  
+  height: 44px;  
+  padding: 0;  
+  border: 1.5px solid var(--cv-ink, #191919);  
+  border-radius: 999px;  
+  background: transparent;  
+  color: var(--cv-ink, #191919);  
+  cursor: pointer;  
+  transition: opacity 150ms ease-out;  
 }
 
-.cv-piece__meta {
-  margin-top: 4px;
-  font-size: 0.86rem;
-  opacity: 0.72;
+.cv-slider__nav:disabled {  
+  opacity: 0.32;  
+  cursor: default;  
 }
 
-/* ── Bio ──────────────────────────────────────────────────────────────── */
+.cv-slider__nav:focus-visible,  
+.cv-slider__dot:focus-visible {  
+  outline: 2px solid currentColor;  
+  outline-offset: 2px;  
+}
 
-.cv-bio {
-  padding: clamp(56px, 7vw, 88px) clamp(20px, 5vw, 56px);
+.cv-slider__dots {  
+  display: flex;  
+  align-items: center;  
 }
 
-.cv-bio__inner {
-  display: grid;
-  grid-template-columns: 1.08fr 0.92fr;
-  gap: clamp(24px, 4vw, 56px);
-  align-items: center;
-  max-width: 1200px;
-  margin-inline: auto;
+.cv-slider__dot {  
+  display: grid;  
+  place-items: center;  
+  width: 16px;  
+  height: 24px;  
+  padding: 0;  
+  border: none;  
+  background: none;  
+  color: inherit;  
+  cursor: pointer;  
 }
 
-.cv-bio__title {
-  font-family: var(--cv-font-display, serif);
-  font-weight: 400;
-  font-size: clamp(2.3rem, 5vw, 3.6rem);
-  line-height: 1.08;
-  margin-bottom: 22px;
+.cv-slider__dot::before {  
+  content: "";  
+  width: 8px;  
+  height: 8px;  
+  border-radius: 999px;  
+  background: currentColor;  
+  opacity: 0.3;  
+  transition: opacity 150ms ease-out;  
 }
 
-.cv-bio__text {
-  font-size: 1.06rem;
-  line-height: 1.72;
-  max-width: 62ch;
+.cv-slider__dot[aria-current="true"]::before {  
+  opacity: 1;  
 }
+
+/* ── 5 · Bio ──────────────────────────────────────────────────────────── */
 
-.cv-bio__text + .cv-bio__text {
-  margin-top: 14px;
+.cv-bio__inner {  
+  display: grid;  
+  grid-template-columns: 1.08fr 0.92fr;  
+  gap: 32px;  
+  align-items: center;  
+  max-width: 1200px;  
+  margin-inline: auto;  
 }
 
-.cv-bio__photo {
-  position: relative;
-  min-height: 380px;
-  border-radius: 18px;
-  overflow: hidden;
+.cv-bio__title {  
+  font-family: var(--cv-font-display, serif);  
+  font-weight: 400;  
+  font-size: clamp(2.3rem, 5vw, 3.6rem);  
+  line-height: 1.08;  
+  margin-bottom: 8px;  
 }
 
-.cv-bio__photo img {
-  object-fit: cover;
+.cv-bio__text {  
+  font-size: 1.06rem;  
+  line-height: 1.72;  
+  max-width: 62ch;  
 }
 
-/* ── Servicios ────────────────────────────────────────────────────────── */
+.cv-bio__text + .cv-bio__text {  
+  margin-top: 16px;  
+}
 
-.cv-services {
-  padding: clamp(56px, 7vw, 88px) clamp(20px, 5vw, 56px);
+.cv-bio__photo {  
+  position: relative;  
+  min-height: 380px;  
+  border-radius: 16px;  
+  overflow: hidden;  
 }
 
-.cv-section-title {
-  font-family: var(--cv-font-headings, serif);
-  font-size: clamp(1.9rem, 4vw, 2.7rem);
-  font-weight: 500;
-  max-width: 1200px;
-  margin: 0 auto 30px;
+.cv-bio__photo img {  
+  object-fit: cover;  
 }
+
+/* ── 6 · Formas de colaborar ──────────────────────────────────────────── */
 
-.cv-section-title[data-cv-italic] {
-  font-style: italic;
+.cv-services__grid {  
+  display: grid;  
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));  
+  gap: 24px;  
+  max-width: 1200px;  
+  margin-inline: auto;  
 }
 
-.cv-services__grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 18px;
-  max-width: 1200px;
-  margin-inline: auto;
+.cv-service {  
+  border: 1.5px solid color-mix(in srgb, var(--cv-ink, #191919) 55%, transparent);  
+  border-radius: 16px;  
+  padding: 24px;  
 }
 
-.cv-service {
-  border: 1.5px solid color-mix(in srgb, var(--cv-ink, #191919) 55%, transparent);
-  border-radius: 18px;
-  padding: 22px;
+.cv-service__title {  
+  font-size: 1.12rem;  
+  font-weight: 700;  
+  margin-bottom: 8px;  
 }
 
-.cv-service__title {
-  font-size: 1.12rem;
-  font-weight: 700;
-  margin-bottom: 8px;
+.cv-service__text {  
+  line-height: 1.6;  
+  opacity: 0.88;  
 }
 
-.cv-service__text {
-  line-height: 1.6;
-  opacity: 0.88;
+/* ── 7 · Tarifas ──────────────────────────────────────────────────────── */
+
+.cv-rates {  
+  text-align: center;  
 }
 
-/* ── Contacto ─────────────────────────────────────────────────────────── */
+.cv-rates__figure {  
+  max-width: 560px;  
+  margin-inline: auto;  
+  padding: 8px;  
+  border-radius: 20px;  
+  background: #fff;  
+  box-shadow: 0 18px 36px rgb(0 0 0 / 0.16);  
+}
 
-.cv-contact {
-  padding: clamp(56px, 7vw, 88px) clamp(20px, 5vw, 56px);
-  text-align: center;
+.cv-rates__img {  
+  display: block;  
+  width: 100%;  
+  height: auto;  
+  border-radius: 12px;  
 }
+
+/* ── 8 · Contacto (cierre) ────────────────────────────────────────────── */
 
-.cv-contact__title {
-  font-family: var(--cv-font-headings, serif);
-  font-size: clamp(2.4rem, 6vw, 4rem);
-  font-weight: 500;
-  letter-spacing: 0.02em;
-  margin-bottom: 20px;
+.cv-contact {  
+  text-align: center;  
 }
 
-.cv-contact__title[data-cv-italic] {
-  font-style: italic;
+.cv-contact__inner {  
+  display: flex;  
+  flex-direction: column;  
+  align-items: center;  
+  max-width: 640px;  
+  margin-inline: auto;  
 }
 
-.cv-mail {
-  display: inline-block;
-  font-size: 1.25rem;
-  font-weight: 600;
-  color: inherit;
-  text-decoration: underline;
-  text-underline-offset: 5px;
-  margin-bottom: 24px;
+.cv-contact__photo {  
+  position: relative;  
+  width: 96px;  
+  height: 96px;  
+  margin-bottom: 24px;  
+  border-radius: 999px;  
+  overflow: hidden;  
 }
 
-.cv-links {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 12px;
+.cv-contact__photo img {  
+  object-fit: cover;  
 }
 
-.cv-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 12px 22px;
-  border-radius: 999px;
-  border: 1.5px solid var(--cv-ink, #191919);
-  color: var(--cv-ink, #191919);
-  font-weight: 600;
-  text-decoration: none;
+.cv-contact__title {  
+  font-family: var(--cv-font-headings, serif);  
+  font-size: clamp(2.4rem, 6vw, 4rem);  
+  font-weight: 400;  
+  line-height: 1.15;  
+  letter-spacing: 0.02em;  
+  margin-bottom: 8px;  
 }
 
-.cv-ratecard {
-  margin-top: clamp(34px, 5vw, 52px);
+.cv-contact__title[data-cv-italic] {  
+  font-style: italic;  
 }
 
-.cv-ratecard__title {
-  font-family: var(--cv-font-headings, serif);
-  font-size: 1.5rem;
-  font-weight: 500;
-  margin-bottom: 18px;
+.cv-contact__text {  
+  font-size: 1.06rem;  
+  line-height: 1.6;  
+  margin-bottom: 24px;  
 }
 
-.cv-ratecard__figure {
-  max-width: 560px;
-  margin-inline: auto;
-  padding: 10px;
-  border-radius: 20px;
-  background: #fff;
-  box-shadow: 0 18px 36px rgb(0 0 0 / 0.16);
+.cv-links {  
+  display: flex;  
+  flex-wrap: wrap;  
+  justify-content: center;  
+  gap: 16px;  
 }
 
-.cv-ratecard__img {
-  width: 100%;
-  height: auto;
-  border-radius: 12px;
+/* Mediano: 44 / 24 (respaldo cuando no hay CTA directo). */  
+.cv-link {  
+  display: inline-flex;  
+  align-items: center;  
+  gap: 8px;  
+  min-height: 44px;  
+  padding: 0 24px;  
+  border-radius: 999px;  
+  border: 1.5px solid var(--cv-ink, #191919);  
+  color: var(--cv-ink, #191919);  
+  font-weight: 600;  
+  text-decoration: none;  
 }
 
 /* ── Footer ───────────────────────────────────────────────────────────── */
 
-.cv-footer {
-  padding: 22px 20px 30px;
-  text-align: center;
-  font-size: 0.88rem;
-  opacity: 0.75;
+.cv-footer {  
+  padding: 24px 16px 32px;  
+  text-align: center;  
+  font-size: 0.88rem;  
+  opacity: 0.75;  
 }
 
 /* ── Móvil ────────────────────────────────────────────────────────────── */
 
-@media (max-width: 860px) {
-  .cv-hero__inner {
-    grid-template-columns: 1fr;
-    min-height: 0;
+@media (max-width: 860px) {  
+  .cv-work,  
+  .cv-metrics,  
+  .cv-bio,  
+  .cv-services,  
+  .cv-rates,  
+  .cv-contact {  
+    padding: 48px 16px;  
   }
 
-  .cv-hero__media {
-    min-height: 0;
-    aspect-ratio: 4 / 3.4;
+  .cv-hero__inner {  
+    grid-template-columns: 1fr;  
+    min-height: 0;  
   }
 
-  .cv-hero__media--framed {
-    aspect-ratio: auto;
-    min-height: 340px;
+  .cv-hero__media {  
+    min-height: 0;  
+    aspect-ratio: 4 / 3.4;  
   }
 
-  .cv-work__head {
-    flex-direction: column;
-    align-items: flex-start;
+  .cv-hero__media--framed {  
+    aspect-ratio: auto;  
+    min-height: 340px;  
+    margin: 24px;  
   }
 
-  .cv-work__photo {
-    width: min(300px, 70vw);
+  .cv-hero__copy {  
+    padding: 32px 16px;  
   }
 
-  .cv-bio__inner {
-    grid-template-columns: 1fr;
+  .cv-strip__item {  
+    padding-right: 32px;  
   }
 
-  .cv-phones {
-    grid-template-columns: repeat(auto-fill, minmax(152px, 1fr));
-    gap: 32px 16px;
+  .cv-work__groups {  
+    gap: 48px;  
   }
 
-  .cv-phone__logo {
-    width: 50px;
-    height: 50px;
+  .cv-phones {  
+    grid-template-columns: repeat(auto-fill, minmax(152px, 1fr));  
+    gap: 32px 16px;  
   }
+
+  .cv-phone__logo {  
+    width: 48px;  
+    height: 48px;  
+  }
+
+  .cv-bio__inner {  
+    grid-template-columns: 1fr;  
+    gap: 24px;  
+  }  
+}
+
+/* ── Movimiento reducido ──────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {  
+  .cv-strip__track {  
+    animation: none;  
+  }
+
+  .cv-strip__viewport {  
+    overflow-x: auto;  
+  }
+
+  .cv-btn,  
+  .cv-sectors__toggle,  
+  .cv-sectors__panel,  
+  .cv-sectors__panel[data-open],  
+  .cv-sectors__item,  
+  .cv-phone__poster,  
+  .cv-slider__nav,  
+  .cv-slider__dot::before {  
+    transition: none;  
+  }
+
+  .cv-btn:active,  
+  .cv-sectors__toggle:active,  
+  .cv-sectors__panel {  
+    transform: none;  
+  }
+
+  .cv-slider__track {  
+    scroll-behavior: auto;  
+  }  
 }
