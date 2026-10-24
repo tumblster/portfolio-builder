@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState, type KeyboardEvent, type ReactNode, type RefObject } from "react";
+import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode, type RefObject } from "react";
 import { foldText } from "@/lib/portfolio/niche-taxonomy";
 
 /*
@@ -9,6 +9,9 @@ import { foldText } from "@/lib/portfolio/niche-taxonomy";
  * - Enter (o un clic) sobre una sugerencia la agrega SIN cerrar la lista, para encadenar varias;
  * - Backspace con el campo vacío quita el último chip; Escape cierra; el foco nunca sale del campo.
  * - Opcional: "Agregar «lo escrito»" para lo que no está en la lista (onCreate).
+ *
+ * Parte 2 · 5: un clic o toque FUERA del selector abierto lo cierra (en iOS tocar una zona sin foco no quita el foco
+ * del campo, así que no basta con onBlur). Tocar el campo de nuevo vuelve a abrir la lista.
  */
 
 export type ComboOption = { id: string; label: string; thumb?: ReactNode };
@@ -53,9 +56,21 @@ export function Combobox({
 }: Props) {
   const uid = useId();
   const listId = `${uid}-list`;
+  const rootRef = useRef<HTMLDivElement>(null);
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
+
+  // Parte 2 · 5: mientras la lista está abierta, un toque fuera del selector la cierra.
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (event: PointerEvent) => {
+      const root = rootRef.current;
+      if (root && event.target instanceof Node && !root.contains(event.target)) setOpen(false);
+    };
+    document.addEventListener("pointerdown", onPointerDown, true);
+    return () => document.removeEventListener("pointerdown", onPointerDown, true);
+  }, [open]);
 
   const q = foldText(query);
   const found = options.filter((option) => !q || foldText(option.label).includes(q)).slice(0, maxShown);
@@ -96,7 +111,7 @@ export function Combobox({
   }
 
   return (
-    <div className="combo" data-open={expanded ? "" : undefined}>
+    <div ref={rootRef} className="combo" data-open={expanded ? "" : undefined}>
       <input
         ref={inputRef}
         type="text"
@@ -118,6 +133,7 @@ export function Combobox({
           setOpen(true);
         }}
         onFocus={() => setOpen(true)}
+        onClick={() => setOpen(true)}
         onBlur={() => setOpen(false)}
         onKeyDown={onKeyDown}
         className="combo__input"

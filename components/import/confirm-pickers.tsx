@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { ChipList } from "@/components/chips/chip-list";
 import { Combobox, type ComboOption } from "@/components/chips/combobox";
+import { ShowMoreButton, SHOW_MORE_INITIAL, useShowMore } from "@/components/show-more";
 import type { DraftPiece } from "@/lib/import/events";
 import {
   LINK_INVALID,
@@ -24,20 +25,16 @@ import { embedFor } from "@/lib/portfolio/embed";
 
 /*
  * Pantalla "Confirma sus nichos y sus piezas" (ronda 30/09 · 7.1): dos selectores con chips.
- * - Nichos: chips precargados con lo que sugirió la IA + un campo con autocompletado sobre la taxonomía (y lo que
- *   sugirió la IA). Hasta 3. Se puede agregar uno propio ("Agregar «…»"), validado igual que siempre.
- * - Piezas: chips precargados con las que eligió la IA (con miniatura y su nicho) + autocompletado por título +
- *   "Tus últimos 12 contenidos" (antes "De tu perfil"): la grilla de sus publicaciones importadas con un + en cada una.
- * En los dos: × para quitar, asa y Alt + flechas para ordenar, Backspace con el campo vacío quita el último. El
- * foco vuelve al campo al quitar. El orden es el de elección: nunca se reordena solo.
+ * - Nichos: chips precargados con lo que sugirió la IA + un campo con autocompletado sobre la taxonomía. Hasta 3.
+ * - Piezas: chips precargados con las que eligió la IA + autocompletado por título + "Tus últimos 12 contenidos": la
+ *   grilla de sus publicaciones importadas con un + en cada una.
+ * En los dos: × para quitar, asa y Alt + flechas para ordenar, Backspace con el campo vacío quita el último.
  *
- * Ronda 6 · 13.4: la sección de la grilla lleva los textos exactos del dueño ("Tus últimos 12 contenidos" y "¿No ves
- * el que buscas? Pégalo por link ↓"), explica en simple dónde aparece lo agregado y nunca muestra jerga técnica.
- * Agregar por link (11/10): TikTok (oEmbed con miniatura) e Instagram (fachada diseñada, sin miniatura).
+ * Ronda 6 · 13.4: textos exactos del dueño en la grilla; agregar por link (TikTok e Instagram).
+ * Ronda 6 · 13.2 / 13.3: reels y carruseles en el overlay; fotos en el visor de imagen.
  *
- * Ronda 6 · 13.2 / 13.3: en la grilla, los reels y los carruseles se abren en el overlay (components/reel/
- * inline-reel.tsx); los carruseles prueban su cadena de embeds y, si no cargan, muestran la portada + un botón al
- * post original. Las fotos siguen en el visor de imagen.
+ * Parte 2 · 2 + addendum A1: la grilla muestra las primeras 6 y "Ver más" despliega el resto ("Ver menos" la pliega).
+ * Lo agregado por link va primero en la grilla, así aparece al instante.
  */
 
 export type NicheChip = { key: string; label: string };
@@ -87,8 +84,8 @@ function TileBadge({ kind }: { kind: "video" | "image" | "carousel" }) {
   );
 }
 
-/** Spec 11.5: cuántas piezas muestra la grilla de entrada y cuántas suma cada "VER MÁS". */
-export const PROFILE_PAGE = 12;
+/** Cuántas piezas muestra la grilla de entrada (Parte 2: las mismas 6 de todas las listas de piezas). */
+export const PROFILE_PAGE = SHOW_MORE_INITIAL;
 
 const move = <T,>(list: T[], from: number, to: number) => {
   const next = [...list];
@@ -200,18 +197,18 @@ export function NichePicker(props: {
             Otro
           </button>
         ) : (
-        <Combobox
-          inputRef={inputRef}
-          labelId={`${uid}-label`}
-          describedBy={`${uid}-help${full ? ` ${uid}-full` : ""}`}
-          options={options}
-          pinnedOption={{ id: "__otro", label: "Otro" }}
-          onSelect={(option) => (option.id === "__otro" ? openOther() : add(option.label))}
-          onCreate={add}
-          onBackspaceEmpty={() => niches.length > 0 && onChange(niches.slice(0, -1))}
-          placeholder={full ? "Ya tienes 3 nichos" : "Busca un nicho (ej.: Fitness)"}
-          disabled={full}
-        />
+          <Combobox
+            inputRef={inputRef}
+            labelId={`${uid}-label`}
+            describedBy={`${uid}-help${full ? ` ${uid}-full` : ""}`}
+            options={options}
+            pinnedOption={{ id: "__otro", label: "Otro" }}
+            onSelect={(option) => (option.id === "__otro" ? openOther() : add(option.label))}
+            onCreate={add}
+            onBackspaceEmpty={() => niches.length > 0 && onChange(niches.slice(0, -1))}
+            placeholder={full ? "Ya tienes 3 nichos" : "Busca un nicho (ej.: Fitness)"}
+            disabled={full}
+          />
         )}
         {otherOpen && !full && (
           <div className="flex min-w-0 flex-1 gap-2" data-niche-other>
@@ -273,22 +270,20 @@ export function PiecePicker(props: {
   /** Spec 11.5: "Agregar por link" necesita el borrador; la pieza nueva vuelve por onLinkPiece. */
   draftId: string;
   onLinkPiece: (piece: DraftPiece) => void;
-  /**
-   * 15/10 (obs. Fer): el wizard avisa al avanzar si quedó un link escrito sin marcar el permiso.
-   * Se evalúa en vivo al hacer clic (el link y el check son estado interno).
-   */
+  /** 15/10 (obs. Fer): el wizard avisa al avanzar si quedó un link escrito sin marcar el permiso. */
   linkPermissionCheckRef?: { current: (() => boolean) | null };
 }) {
   const { pieces, onChange, onError, limits } = props;
   const uid = useId();
+  const gridId = `${uid}-grid`;
   const inputRef = useRef<HTMLInputElement>(null);
   // Obs. 1 (11/10): "Otro" en el selector de nicho por pieza → cuadro de texto para escribir el nicho.
   const [customFor, setCustomFor] = useState<string | null>(null);
   const [customText, setCustomText] = useState("");
   const [customError, setCustomError] = useState<string | null>(null);
   const customRef = useRef<HTMLInputElement>(null);
-  // Spec 11.5: la grilla muestra 12 por defecto y "VER MÁS" suma de a 12 (las imágenes cargan perezosas).
-  const [shown, setShown] = useState(PROFILE_PAGE);
+  // Parte 2 · 2: la grilla muestra 6 de entrada; "Ver más" despliega el resto y "Ver menos" la pliega.
+  const more = useShowMore(props.pool.length);
   const [link, setLink] = useState("");
   const [linkState, setLinkState] = useState<{ busy: boolean; message: string | null }>({ busy: false, message: null });
   // Obs. 4 (11/10): confirmación de permiso para contenido externo.
@@ -324,8 +319,7 @@ export function PiecePicker(props: {
       setLinkState({ busy: false, message: LINK_ONLY_VIDEO });
       return;
     }
-    // Obs. 4: sin confirmación de permiso no se agrega: pop-up de advertencia con timer (15/10, como las
-    // demás advertencias) + el mensaje en línea.
+    // Obs. 4: sin confirmación de permiso no se agrega.
     if (!permissionOk) {
       showToast("Marca la confirmación de permiso para agregar este video.", 5000);
       setLinkState({ busy: false, message: "Marca la confirmación de permiso para agregar este video." });
@@ -340,7 +334,6 @@ export function PiecePicker(props: {
       });
       const data = await response.json().catch(() => null);
       if (!response.ok || !data?.piece) {
-        // Solo se muestran los mensajes pensados para la creadora; cualquier otro error, uno simple y sin jerga.
         const message =
           data?.error?.code === "invalid_input" && typeof data.error.message === "string"
             ? data.error.message
@@ -353,7 +346,6 @@ export function PiecePicker(props: {
       props.onLinkPiece(piece);
       setLink("");
       setPermissionOk(false);
-      // Dónde quedó, en simple: al final de sus piezas (arriba) y primero en la grilla de abajo.
       setLinkState({
         busy: false,
         message: already
@@ -377,10 +369,7 @@ export function PiecePicker(props: {
     onChange([...pieces, { id, nicheKey, pending: nicheKey === null }]);
   }
 
-  /**
-   * E2 del dueño: el botón de cada pieza es un toggle. Tocar una agregada la quita ("✓ Agregada" → "+ Agregar");
-   * tocar una nueva con el cupo lleno avisa con toast ("Quita una pieza…") en vez de un botón muerto.
-   */
+  /** E2 del dueño: el botón de cada pieza es un toggle. */
   function togglePiece(id: string) {
     if (chosen.has(id)) {
       onError(null);
@@ -453,7 +442,6 @@ export function PiecePicker(props: {
           getLabel={(piece) => titleOf(piece.id)}
           renderContent={(chip) => {
             const piece = byId.get(chip.id);
-            // Obs. 1: "Otro" → cuadro de texto para escribir el nicho a mano.
             if (customFor === chip.id) {
               return (
                 <span className="flex min-w-0 flex-1 flex-col gap-2 py-0.5">
@@ -598,7 +586,7 @@ export function PiecePicker(props: {
           <button
             type="submit"
             disabled={linkState.busy || !link.trim()}
-            className="inline-flex min-h-13 items-center rounded-2xl border border-ink bg-ink px-4 text-sm font-semibold text-cream disabled:opacity-50"
+            className="inline-flex min-h-13 items-center rounded-2xl border border-ink bg-ink px-4 text-sm font-semibold text-cream transition-transform duration-150 ease-out active:scale-[0.98] disabled:opacity-50 motion-reduce:transition-none"
           >
             {linkState.busy ? (isInstagramHost(linkHost(link)) ? "Trayendo tu video…" : "Buscando…") : "Agregar"}
           </button>
@@ -620,15 +608,22 @@ export function PiecePicker(props: {
           {linkState.message}
         </p>
       </div>
-      <ul aria-labelledby={`${uid}-profile`} className="mt-3 grid grid-cols-2 gap-3 min-[26rem]:grid-cols-3 sm:grid-cols-4" data-profile-grid>
-        {props.pool.slice(0, shown).map((piece) => {
+      <ul
+        id={gridId}
+        aria-labelledby={`${uid}-profile`}
+        className="mt-3 grid grid-cols-2 gap-3 min-[26rem]:grid-cols-3 sm:grid-cols-4"
+        data-profile-grid
+      >
+        {props.pool.slice(0, more.limit).map((piece) => {
           const added = chosen.has(piece.id);
           const viewer = viewerFor(piece, (video) => embedFor(video) !== null);
           return (
-            <li key={piece.id} className="flex min-w-0 flex-col gap-2 rounded-2xl border border-line bg-paper p-2" data-profile-piece={piece.id}>
-              {/* Spec 10.2 · ronda 6 13.2 / 13.3: TODA pieza se ve con tap o clic, esté o no agregada. Reels y
-                  carruseles en el overlay (play manual, uno a la vez; el carrusel prueba su cadena de embeds y, si
-                  no carga, muestra su portada + el botón al post); las fotos en el visor de imagen. Nunca hover. */}
+            <li
+              key={piece.id}
+              className="flex min-w-0 flex-col gap-2 rounded-2xl border border-line bg-paper p-2 transition-colors duration-200 hover:border-ink/40"
+              data-profile-piece={piece.id}
+            >
+              {/* Spec 10.2 · ronda 6 13.2 / 13.3: TODA pieza se ve con tap o clic, esté o no agregada. */}
               {viewer === "carousel" && piece.postUrl ? (
                 <InlineReel
                   link={{ platform: "instagram", url: piece.postUrl }}
@@ -676,10 +671,8 @@ export function PiecePicker(props: {
                 onClick={() => togglePiece(piece.id)}
                 aria-pressed={added}
                 aria-label={added ? `Quitar «${piece.title}» de tus piezas` : `Agregar «${piece.title}»`}
-                className={`inline-flex min-h-tap items-center justify-center gap-1.5 rounded-full border px-3 text-sm font-semibold transition-colors hover:border-ink ${
-                  added
-                    ? "border-ink bg-ink text-cream"
-                    : "border-ink/60 bg-paper text-ink"
+                className={`inline-flex min-h-tap items-center justify-center gap-1.5 rounded-full border px-3 text-sm font-semibold transition-[color,background-color,border-color,transform] duration-150 ease-out hover:border-ink active:scale-[0.97] motion-reduce:transition-none ${
+                  added ? "border-ink bg-ink text-cream" : "border-ink/60 bg-paper text-ink"
                 }`}
               >
                 <span aria-hidden="true">{added ? "✓" : "+"}</span>
@@ -689,17 +682,14 @@ export function PiecePicker(props: {
           );
         })}
       </ul>
-      {props.pool.length > shown && (
+      {more.hasMore && (
         <div className="mt-4 flex justify-center">
-          <button
-            type="button"
-            onClick={() => setShown((count) => count + PROFILE_PAGE)}
-            className="inline-flex min-h-tap items-center rounded-full border border-ink/60 bg-paper px-6 text-sm font-semibold tracking-[0.08em] text-ink uppercase hover:border-ink"
-            data-profile-more
-          >
-            Ver más
-            <span className="sr-only"> ({props.pool.length - shown} piezas más)</span>
-          </button>
+          <ShowMoreButton
+            expanded={more.expanded}
+            hidden={more.hidden}
+            onToggle={() => more.setExpanded((value) => !value)}
+            controls={gridId}
+          />
         </div>
       )}
     </div>

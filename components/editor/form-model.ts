@@ -31,32 +31,23 @@ import { NO_METRICS, type PieceMetrics, type ProfileStat } from "@/lib/portfolio
 /*
  * Modelo del formulario (crear y editar). Funciones puras: sin React ni red.
  *
- * Al editar, solo lo que la persona cambió de verdad se guarda como dato manual.
- * Lo que no tocó sigue heredando de la IA o de Instagram (regla manual → IA →
-Instagram),
- * así que abrir y guardar sin cambios no "congela" nada.
+ * Al editar, solo lo que la persona cambió de verdad se guarda como dato manual. Lo que no tocó sigue heredando de
+ * la IA o de Instagram (regla manual → IA → Instagram), así que abrir y guardar sin cambios no "congela" nada.
  *
- * v2: los nichos son propios de cada portafolio (los de la IA, o Belleza/Lifestyle/Viajes en
- * los creados a mano y en los de la v1). En M1 no se editan: el formulario los usa para el
- * selector de cada pieza y los conserva tal cual al guardar. Los servicios sí se editan.
- * Ronda 6 · 13.11: el género (del onboarding) tampoco se edita aquí: se conserva tal cual al
-guardar.
- * Ronda 6 · 13.19 / 13.20: Brand partners y case studies del Media kit se editan aquí (solo
-existen como dato manual,
- * así que se envían siempre que haya alguno o ya estuvieran guardados: guardar nunca los
-borra sin querer).
- * Canva v1: un prefill con `nicheLabel` (los sectores de su Canva) arma los nichos del
-portafolio y deja cada pieza en
- * su nicho; al crear se envían esos nichos. Sin `nicheLabel` (Instagram) todo sigue como
-siempre.
- * Canva v2: el diseño de su Canva (`canva`) atraviesa el formulario sin editarse: viaja al
-crear, se conserva al
- * guardar (si no, guardar lo borraba) y la vista previa lo usa para mostrar la variante
-clonada.
+ * v2: los nichos son propios de cada portafolio; en M1 no se editan (se conservan al guardar). Los servicios sí.
+ * Ronda 6 · 13.11: el género (del onboarding) se conserva tal cual al guardar.
+ * Ronda 6 · 13.19 / 13.20: Brand partners y case studies del Media kit se editan aquí.
+ * Canva v1: un prefill con `nicheLabel` arma los nichos del portafolio y deja cada pieza en su nicho.
+ * Canva v2: el diseño de su Canva (`canva`) atraviesa el formulario: viaja al crear, se conserva al guardar y la vista
+ * previa lo usa para mostrar la variante clonada.
+ *
+ * Parte 2 · 6: sus capturas de métricas (`canva.metricsImages`) se editan como `metricsImages` (quitar, reordenar,
+ * agregar, con tope LIMITS.maxCanvaMetrics) y vuelven dentro de `canva` al crear y al guardar. Si no cambiaron, lo
+ * guardado se conserva tal cual.
+ * Ronda 15 · E1: el prefill de Canva puede traer sus servicios (leídos por patrón): llegan precargados.
  */
 
-export const CONTACT_KEYS = ["email", "whatsapp", "telegram", "instagram", "tiktok",
-"youtube", "website"] as const;
+export const CONTACT_KEYS = ["email", "whatsapp", "telegram", "instagram", "tiktok", "youtube", "website"] as const;
 export type ContactKey = (typeof CONTACT_KEYS)[number];
 export type ContactDraft = Record<ContactKey, string>;
 
@@ -79,16 +70,15 @@ export type PieceDraft = {
 export type ServiceDraft = { key: string; title: string; description: string };
 
 export type FormState = {
- name: string;
- /** E2 del dueño: lo que sigue al separador del nombre de IG; va bajo el nombre en el
-hero. */
- tagline: string;
- bio: string;
- valueProp: string;
- photo: StoredImage | null;
- /** Foto del banner del hero (ajuste 7). */
- cover: StoredImage | null;
- contact: ContactDraft;
+  name: string;
+  /** E2 del dueño: lo que sigue al separador del nombre de IG; va bajo el nombre en el hero. */
+  tagline: string;
+  bio: string;
+  valueProp: string;
+  photo: StoredImage | null;
+  /** Foto del banner del hero (ajuste 7). */
+  cover: StoredImage | null;
+  contact: ContactDraft;
   /** Nichos disponibles para las piezas (no se editan en M1). */
   niches: NicheDef[];
   services: ServiceDraft[];
@@ -99,14 +89,13 @@ hero. */
   brandPartners: BrandPartnerDraft[];
   /** Ronda 6 · 13.20: case studies sobre sus publicaciones importadas. */
   caseStudies: CaseStudyDraft[];
-  /** Canva v2: el diseño de su Canva (no se edita aquí). null = su plantilla de siempre. */
+  /** Canva v2: el diseño de su Canva. null = su plantilla de siempre. */
   canva: CanvaData | null;
+  /** Parte 2 · 6: sus capturas de métricas, en el orden en que se muestran (solo con `canva`). */
+  metricsImages: StoredImage[];
 };
 
-/**
- * Lo que la vista previa muestra pero el formulario no edita: las cifras de Instagram
- * (del perfil y de cada pieza importada, por id de pieza).
- */
+/** Lo que la vista previa muestra pero el formulario no edita: las cifras de Instagram. */
 export type PreviewExtras = {
   stats: ProfileStat[];
   metrics: Record<string, PieceMetrics>;
@@ -114,8 +103,7 @@ export type PreviewExtras = {
   /** Seguidores, Interacciones promedio y ER (ronda 30/09 · 7.2). */
   creatorMetrics: CreatorMetric[];
 };
-export const NO_EXTRAS: PreviewExtras = { stats: [], metrics: {}, engagementRate: null,
-creatorMetrics: [] };
+export const NO_EXTRAS: PreviewExtras = { stats: [], metrics: {}, engagementRate: null, creatorMetrics: [] };
 
 /** Lo que estaba guardado al abrir (o al último guardado): para saber qué cambió. */
 export type Baseline = {
@@ -124,8 +112,7 @@ export type Baseline = {
   form: FormState;
   manual: ManualData;
   extras: PreviewExtras;
-  /** Ronda 6 · 13.20: sus publicaciones importadas, para marcar case studies. Ausente =
-ninguna. */
+  /** Ronda 6 · 13.20: sus publicaciones importadas, para marcar case studies. Ausente = ninguna. */
   imported?: ImportedPost[];
   /** Ronda 6 · 13.19 (a): @menciones de sus contenidos, candidatas a Brand partners. */
   mentions?: string[];
@@ -135,10 +122,8 @@ ninguna. */
 export type FieldErrors = Record<string, string>;
 
 let sequence = 0;
-/** Solo se llama en el navegador (piezas nuevas). No usa crypto.randomUUID: no existe en
-http por la red local. */
-export const newPieceKey = () => `nueva-${(sequence +=
-1)}-${Math.random().toString(36).slice(2, 8)}`;
+/** Solo se llama en el navegador (piezas nuevas). No usa crypto.randomUUID: no existe en http por la red local. */
+export const newPieceKey = () => `nueva-${(sequence += 1)}-${Math.random().toString(36).slice(2, 8)}`;
 
 const emptyContact = (): ContactDraft => ({
   email: "",
@@ -154,10 +139,18 @@ export function emptyPiece(key: string = newPieceKey()): PieceDraft {
   return { key, title: "", niche: null, image: null, imageSource: null, videoUrl: "", postLink: null };
 }
 
-export function serviceDraft(service: Partial<Service> = {}, key: string = newPieceKey()):
-ServiceDraft {
+export function serviceDraft(service: Partial<Service> = {}, key: string = newPieceKey()): ServiceDraft {
   return { key, title: service.title ?? "", description: service.description ?? "" };
 }
+
+/** Parte 2 · 6: las métricas dentro de su diseño, con el tope del esquema. */
+const withMetrics = (canva: CanvaData, images: StoredImage[]): CanvaData => ({
+  ...canva,
+  metricsImages: images.slice(0, LIMITS.maxCanvaMetrics),
+});
+
+const sameImageList = (a: StoredImage[], b: StoredImage[]) =>
+  a.length === b.length && a.every((image, index) => image.url === b[index]?.url);
 
 export function emptyForm(): FormState {
   return {
@@ -175,17 +168,17 @@ export function emptyForm(): FormState {
     brandPartners: [],
     caseStudies: [],
     canva: null,
+    metricsImages: [],
   };
 }
 
+/** Ronda 15 · E1: el prefill de Canva puede traer sus servicios. */
+type PrefillWithServices = ManualPrefill & { services?: Partial<Service>[] };
+
 /**
- * Datos que dejó la importación (perfil privado o con pocas publicaciones, o un sitio de
-Canva).
- * Canva v1: los `nicheLabel` de las piezas se convierten en los nichos del portafolio (hasta
-MAX_NICHES, ver
- * prefillNiches) y cada pieza queda en el suyo; las de un sector que no entró quedan en
-"Todo".
- * Canva v2: el diseño de su Canva (`prefill.canva`) queda en el formulario tal cual.
+ * Datos que dejó la importación (perfil privado o con pocas publicaciones, o un sitio de Canva).
+ * Canva v1: los `nicheLabel` de las piezas se convierten en los nichos del portafolio.
+ * Canva v2: el diseño de su Canva (`prefill.canva`) queda en el formulario; sus métricas, editables.
  */
 export function formFromPrefill(prefill: ManualPrefill): FormState {
   const niches = prefillNiches(prefill.pieces);
@@ -204,6 +197,15 @@ export function formFromPrefill(prefill: ManualPrefill): FormState {
     videoUrl: piece.videoUrl ?? "",
   }));
   while (pieces.length < LIMITS.minPieces) pieces.push(emptyPiece());
+  const services = ((prefill as PrefillWithServices).services ?? [])
+    .slice(0, LIMITS.maxServices)
+    .map((service) =>
+      serviceDraft({
+        title: (service.title ?? "").slice(0, LIMITS.serviceTitle),
+        description: (service.description ?? "").slice(0, LIMITS.serviceDescription),
+      }),
+    );
+  const canva = prefill.canva ?? null;
   return {
     name: prefill.name,
     tagline: prefill.tagline,
@@ -219,19 +221,19 @@ export function formFromPrefill(prefill: ManualPrefill): FormState {
       tiktok: prefill.contact.tiktok ?? "",
     },
     niches: niches.length > 0 ? niches : LEGACY_NICHES.map((niche) => ({ ...niche })),
-    services: [],
+    services,
     pieces,
-    design: { template: DEFAULT_DESIGN.template, palette:
-recommendedPalette(prefill.photo) },
+    design: { template: DEFAULT_DESIGN.template, palette: recommendedPalette(prefill.photo) },
     brandPartners: [],
     caseStudies: [],
-    canva: prefill.canva ?? null,
+    canva,
+    metricsImages: canva?.metricsImages ?? [],
   };
 }
 
-/** Un portafolio guardado, tal como se muestra (ya resuelto). Determinista: sirve en el
-servidor. */
+/** Un portafolio guardado, tal como se muestra (ya resuelto). Determinista: sirve en el servidor. */
 export function formFromPortfolio(resolved: ResolvedPortfolio): FormState {
+  const canva = (resolved as WithCanva<ResolvedPortfolio>).canva ?? null;
   return {
     name: resolved.name,
     tagline: resolved.tagline,
@@ -242,8 +244,7 @@ export function formFromPortfolio(resolved: ResolvedPortfolio): FormState {
     contact: { ...emptyContact(), ...resolved.contact },
     niches: resolved.niches.map((niche) => ({ ...niche })),
     // Claves deterministas (servidor y navegador iguales): el índice basta para los guardados.
-    services: resolved.services.map((service, index) => serviceDraft(service,
-`servicio-${index}`)),
+    services: resolved.services.map((service, index) => serviceDraft(service, `servicio-${index}`)),
     pieces: resolved.pieces.map((piece) => ({
       key: piece.id,
       id: piece.id,
@@ -258,8 +259,8 @@ export function formFromPortfolio(resolved: ResolvedPortfolio): FormState {
     design: resolved.design,
     brandPartners: partnerDraftsFrom(resolved.brandPartners ?? []),
     caseStudies: caseDraftsFrom(resolved.caseStudies ?? []),
-    // Canva v2: lo trae el portafolio resuelto si resolve.ts lo pasa (ver resolvePortfolio).
-    canva: (resolved as WithCanva<ResolvedPortfolio>).canva ?? null,
+    canva,
+    metricsImages: canva?.metricsImages ?? [],
   };
 }
 
@@ -274,10 +275,8 @@ export function extrasFromPortfolio(resolved: ResolvedPortfolio): PreviewExtras 
 }
 
 /**
- * El link de video que de verdad cuenta (spec 11.11): el campo viene pre-llenado con el post
-importado; si quedó
- * igual a ese link y la pieza no era un video, no se guarda como video (lo guardado no
-cambia por estar pre-llenado).
+ * El link de video que de verdad cuenta (spec 11.11): si quedó igual al link pre-llenado del post y la pieza no era
+ * un video, no se guarda como video.
  */
 export const effectiveVideoUrl = (piece: Pick<PieceDraft, "videoUrl" | "postLink">) => {
   const url = piece.videoUrl.trim();
@@ -292,15 +291,12 @@ const pieceInput = (piece: PieceDraft) => ({
   videoUrl: effectiveVideoUrl(piece),
 });
 
-const serviceInput = (service: ServiceDraft): Service => ({ title: service.title, description:
-service.description });
+const serviceInput = (service: ServiceDraft): Service => ({ title: service.title, description: service.description });
 
-/** ¿Son los nichos de la v1 (Belleza, Lifestyle, Viajes)? Entonces no hace falta enviarlos al
-crear. */
+/** ¿Son los nichos de la v1 (Belleza, Lifestyle, Viajes)? Entonces no hace falta enviarlos al crear. */
 const isLegacyNiches = (niches: NicheDef[]) =>
   niches.length === LEGACY_NICHES.length &&
-  niches.every((niche, index) => niche.slug === LEGACY_NICHES[index].slug &&
-niche.label === LEGACY_NICHES[index].label);
+  niches.every((niche, index) => niche.slug === LEGACY_NICHES[index].slug && niche.label === LEGACY_NICHES[index].label);
 
 export function toCreatePayload(form: FormState) {
   return {
@@ -311,45 +307,52 @@ export function toCreatePayload(form: FormState) {
     valueProp: form.valueProp,
     contact: form.contact,
     services: form.services.map(serviceInput),
-    // Canva v1: los nichos propios (sus sectores) viajan al crear; los de la v1 no (como
-// siempre).
+    // Canva v1: los nichos propios (sus sectores) viajan al crear; los de la v1 no.
     ...(isLegacyNiches(form.niches) ? {} : { niches: form.niches.map(({ slug, label }) => ({ slug, label })) }),
-    // Canva v2: el diseño de su Canva viaja al crear (se guarda en manual.canva).
-    ...(form.canva ? { canva: form.canva } : {}),
+    // Canva v2: el diseño de su Canva viaja al crear, con sus métricas como quedaron en el editor (Parte 2 · 6).
+    ...(form.canva ? { canva: withMetrics(form.canva, form.metricsImages) } : {}),
     pieces: form.pieces.map(pieceInput),
     design: form.design,
   };
 }
 
-const sameImage = (a: StoredImage | null, b: StoredImage | null) => (a?.url ?? null) ===
-(b?.url ?? null);
+const sameImage = (a: StoredImage | null, b: StoredImage | null) => (a?.url ?? null) === (b?.url ?? null);
 
 const servicesKey = (services: ServiceDraft[]) =>
- JSON.stringify(services.map((service) => [service.title.trim(), service.description.trim()]));
+  JSON.stringify(services.map((service) => [service.title.trim(), service.description.trim()]));
+
 export function toUpdatePayload(form: FormState, baseline: Baseline) {
- const text = (key: "name" | "tagline" | "bio" | "valueProp") =>
-  form[key].trim() !== baseline.form[key].trim() ? form[key] : baseline.manual[key];
+  const text = (key: "name" | "tagline" | "bio" | "valueProp") =>
+    form[key].trim() !== baseline.form[key].trim() ? form[key] : baseline.manual[key];
 
- const contact: Partial<ContactDraft> = {};
- for (const key of CONTACT_KEYS) {
-   const value =
-     form.contact[key].trim() !== baseline.form.contact[key].trim() ? form.contact[key] :
-baseline.manual.contact?.[key];
-   if (value !== undefined) contact[key] = value;
- }
+  const contact: Partial<ContactDraft> = {};
+  for (const key of CONTACT_KEYS) {
+    const value =
+      form.contact[key].trim() !== baseline.form.contact[key].trim() ? form.contact[key] : baseline.manual.contact?.[key];
+    if (value !== undefined) contact[key] = value;
+  }
 
- const services =
-  servicesKey(form.services) !== servicesKey(baseline.form.services)
-   ? form.services.map(serviceInput)
-   : baseline.manual.services;
+  const services =
+    servicesKey(form.services) !== servicesKey(baseline.form.services)
+      ? form.services.map(serviceInput)
+      : baseline.manual.services;
+
+  // Parte 2 · 6: el diseño de su Canva se conserva; solo sus métricas cambian si la persona las tocó.
+  const savedCanva = baseline.manual.canva;
+  const metricsChanged = !sameImageList(form.metricsImages, baseline.form.metricsImages);
+  const canva =
+    savedCanva !== undefined
+      ? metricsChanged && savedCanva
+        ? withMetrics(savedCanva, form.metricsImages)
+        : savedCanva
+      : undefined;
 
   const manual: ManualData = {
     name: text("name"),
     tagline: text("tagline"),
     bio: text("bio"),
     valueProp: text("valueProp"),
-    photo: sameImage(form.photo, baseline.form.photo) ? baseline.manual.photo :
-form.photo,
+    photo: sameImage(form.photo, baseline.form.photo) ? baseline.manual.photo : form.photo,
     ...(sameImage(form.cover, baseline.form.cover)
       ? baseline.manual.cover !== undefined
         ? { cover: baseline.manual.cover }
@@ -359,25 +362,19 @@ form.photo,
     // Los nichos no se editan en M1: se conservan tal como estaban guardados.
     ...(baseline.manual.niches !== undefined ? { niches: baseline.manual.niches } : {}),
     ...(services !== undefined ? { services } : {}),
-    // Ronda 6 · 13.11: el género del onboarding no se edita aquí: se conserva (si no, guardar
-// lo borraba).
+    // Ronda 6 · 13.11: el género del onboarding no se edita aquí: se conserva.
     ...(baseline.manual.gender !== undefined ? { gender: baseline.manual.gender } : {}),
-    // Ronda 6 · 13.19 / 13.20: lo que muestra el formulario es lo guardado; se envía siempre
-// que exista.
+    // Ronda 6 · 13.19 / 13.20: lo que muestra el formulario es lo guardado; se envía siempre que exista.
     ...(form.brandPartners.length > 0 || baseline.manual.brandPartners !== undefined
       ? { brandPartners: partnersPayload(form.brandPartners) }
       : {}),
     ...(form.caseStudies.length > 0 || baseline.manual.caseStudies !== undefined
       ? { caseStudies: caseStudiesPayload(form.caseStudies) }
       : {}),
-    // Canva v2: el diseño de su Canva no se edita aquí: se conserva (si no, guardar lo
-// borraba).
-    ...(baseline.manual.canva !== undefined ? { canva: baseline.manual.canva } : {}),
+    ...(canva !== undefined ? { canva } : {}),
   };
   const design = form.design;
-  const designChanged =
-    design.template !== baseline.form.design.template || design.palette !==
-baseline.form.design.palette;
+  const designChanged = design.template !== baseline.form.design.template || design.palette !== baseline.form.design.palette;
   return {
     revision: baseline.revision,
     manual,
@@ -399,9 +396,7 @@ export function issuesToErrors(issues: Issue[] | undefined): FieldErrors {
 }
 
 /**
- * La misma validación que hace el servidor, antes de enviar. Además marca de una vez
- * las piezas sin imagen ni video: zod solo revisa eso cuando el resto de la pieza ya
- * está bien, y así la persona no corrige en dos rondas.
+ * La misma validación que hace el servidor, antes de enviar. Además marca de una vez las piezas sin imagen ni video.
  */
 export function validateForm(form: FormState, baseline: Baseline | null): FieldErrors {
   const result = baseline
@@ -409,8 +404,7 @@ export function validateForm(form: FormState, baseline: Baseline | null): FieldE
     : createPortfolioInputSchema.safeParse(toCreatePayload(form));
   const errors = result.success
     ? {}
-    : issuesToErrors(result.error.issues.map((issue) => ({ path:
-issue.path.map(String).join("."), message: issue.message })));
+    : issuesToErrors(result.error.issues.map((issue) => ({ path: issue.path.map(String).join("."), message: issue.message })));
   form.pieces.forEach((piece, index) => {
     const key = `pieces.${index}.image`;
     if (!piece.image && !piece.videoUrl.trim() && !errors[key]) errors[key] = "Agrega una imagen o un link de video.";
@@ -418,48 +412,46 @@ issue.path.map(String).join("."), message: issue.message })));
   return errors;
 }
 
-/** Lo que muestra la vista previa: la misma forma que la página pública (Canva v2: con su
-diseño, si lo tiene). */
-export function toPreview(form: FormState, extras: PreviewExtras = NO_EXTRAS):
-WithCanva<ResolvedPortfolio> {
- const contact: Record<string, string> = {};
- for (const key of CONTACT_KEYS) {
-   const parsed = contactSchema.shape[key].safeParse(form.contact[key]);
-   if (parsed.success && parsed.data) contact[key] = parsed.data;
- }
+/** Lo que muestra la vista previa: la misma forma que la página pública (Canva v2: con su diseño y sus métricas). */
+export function toPreview(form: FormState, extras: PreviewExtras = NO_EXTRAS): WithCanva<ResolvedPortfolio> {
+  const contact: Record<string, string> = {};
+  for (const key of CONTACT_KEYS) {
+    const parsed = contactSchema.shape[key].safeParse(form.contact[key]);
+    if (parsed.success && parsed.data) contact[key] = parsed.data;
+  }
 
-    return {
-      slug: "vista-previa",
-      name: form.name.trim() || "Tu nombre",
-      tagline: form.tagline.trim(),
-      bio: form.bio.trim(),
-      photo: form.photo,
-      cover: form.cover,
-      archivedAt: null,
-      valueProp: form.valueProp.trim(),
-      contact: contact as ResolvedPortfolio["contact"],
-      niches: form.niches,
-      services: form.services
-        .filter((service) => service.title.trim())
-        .map((service) => ({ title: service.title.trim(), description: service.description.trim() })),
-      stats: extras.stats,
-      engagementRate: extras.engagementRate,
-      metrics: extras.creatorMetrics,
-      design: form.design,
-      pieces: form.pieces.map((piece, index) => {
-        const url = effectiveVideoUrl(piece);
-        const video = url ? parseVideoLink(url) : null;
-        return {
-          id: piece.key,
-          origin: "manual",
-          title: piece.title.trim() || `Pieza ${index + 1}`,
-          niche: piece.niche,
-          image: piece.image,
-          video,
-          link: video ?? piece.postLink,
-          metrics: extras.metrics[piece.key] ?? NO_METRICS,
-        };
-      }),
-      canva: form.canva,
-    };
+  return {
+    slug: "vista-previa",
+    name: form.name.trim() || "Tu nombre",
+    tagline: form.tagline.trim(),
+    bio: form.bio.trim(),
+    photo: form.photo,
+    cover: form.cover,
+    archivedAt: null,
+    valueProp: form.valueProp.trim(),
+    contact: contact as ResolvedPortfolio["contact"],
+    niches: form.niches,
+    services: form.services
+      .filter((service) => service.title.trim())
+      .map((service) => ({ title: service.title.trim(), description: service.description.trim() })),
+    stats: extras.stats,
+    engagementRate: extras.engagementRate,
+    metrics: extras.creatorMetrics,
+    design: form.design,
+    pieces: form.pieces.map((piece, index) => {
+      const url = effectiveVideoUrl(piece);
+      const video = url ? parseVideoLink(url) : null;
+      return {
+        id: piece.key,
+        origin: "manual",
+        title: piece.title.trim() || `Pieza ${index + 1}`,
+        niche: piece.niche,
+        image: piece.image,
+        video,
+        link: video ?? piece.postLink,
+        metrics: extras.metrics[piece.key] ?? NO_METRICS,
+      };
+    }),
+    canva: form.canva ? withMetrics(form.canva, form.metricsImages) : null,
+  };
 }
