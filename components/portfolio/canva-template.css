@@ -1,1270 +1,1446 @@
-/*  
- * Importador de Canva v2 · variante clonada (canva-template.tsx).  
- * Todo scoped a .pf--canva: los colores llegan por sección (style inline) y las  
- * fuentes por variables (--cv-font-display/headings/body) desde su Canva.  
- * --cv-band es el color base de la sección (su banda o el promedio de su textura);  
- * --cv-ink puede cambiar por sección (guardia de contraste); --cv-on-ink es el  
- * color de texto sobre la tinta (botones).  
- *  
- * Sistema de diseño (rondas 13–14):  
- * - Espaciado SOLO en la escala 4 / 8 / 16 / 24 / 32 / 48 / 64.  
- * - Botones: grande 52 / 32 · mediano 44 / 24 · chico 36 / 16.  
- * - Pesos 400 / 600 / 700.  
- * - Movimiento 150–300ms ease-out, solo en lo interactivo, apagado con prefers-reduced-motion.  
- * Rasgos de lenguaje medidos (clases en la raíz, cada uno opcional y combinable):  
- * .cv-textured (textura de fondo), .cv-frames (marcos de línea fina), .cv-upper  
- * (titulares en mayúsculas con tracking), .cv-airy (márgenes laterales amplios).  
- * El reset de márgenes va con :where() (especificidad 0).  
+/*
+ * Importador de Canva v2 · variante clonada (canva-template.tsx).
+ * Todo scoped a .pf--canva: los colores llegan por sección (style inline) y las fuentes por variables
+ * (--cv-font-display/headings/body) desde su Canva. --cv-band es el color base de la sección; --cv-ink puede cambiar
+ * por sección (guardia de contraste); --cv-on-ink es el color de texto sobre la tinta (botones).
+ *
+ * Sistema de diseño (rondas 13–15):
+ * - Espaciado SOLO en la escala 4 / 8 / 16 / 24 / 32 / 48 / 64.
+ * - Botones: grande 52 / 32 · mediano 44 / 24 · chico 36 / 16.
+ * - Pesos 400 / 600 / 700.
+ * - Movimiento 150–300ms ease-out, solo en lo interactivo, apagado con prefers-reduced-motion.
+ * Rasgos de lenguaje medidos (clases en la raíz): .cv-textured, .cv-frames, .cv-upper, .cv-airy.
  */
 
-.pf--canva {  
-  --cv-measure: 1200px;  
-  color: var(--cv-ink, #191919);  
-  font-family: var(--cv-font-body, inherit);  
+.pf--canva {
+  --cv-measure: 1200px;
+  color: var(--cv-ink, #191919);
+  font-family: var(--cv-font-body, inherit);
 }
 
-/* El color se resuelve POR SECCIÓN: cada banda trae su --cv-ink (guardia de  
-   contraste) y el texto hereda desde la sección, no desde la raíz. */  
-.pf--canva section,  
-.pf--canva footer {  
-  color: var(--cv-ink, #191919);  
+.pf--canva section,
+.pf--canva footer {
+  color: var(--cv-ink, #191919);
 }
 
-:where(.pf--canva) :where(figure, ul, p, h1, h2, h3, h4) {  
-  margin: 0;  
+:where(.pf--canva) :where(figure, ul, p, h1, h2, h3, h4) {
+  margin: 0;
 }
 
-:where(.pf--canva) :where(ul) {  
-  list-style: none;  
-  padding: 0;  
+:where(.pf--canva) :where(ul) {
+  list-style: none;
+  padding: 0;
 }
 
-.cv-visually-hidden {  
-  position: absolute;  
-  width: 1px;  
-  height: 1px;  
-  overflow: hidden;  
-  clip: rect(0 0 0 0);  
-  white-space: nowrap;  
+.cv-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }
 
 /* ── Secciones ────────────────────────────────────────────────────────── */
 
-.cv-work,  
-.cv-metrics,  
-.cv-testimonials,  
-.cv-bio,  
-.cv-photos,  
-.cv-services,  
-.cv-rates,  
-.cv-contact {  
-  padding: 64px 32px;  
+.cv-work,
+.cv-metrics,
+.cv-testimonials,
+.cv-bio,
+.cv-photos,
+.cv-services,
+.cv-rates,
+.cv-contact {
+  padding: 64px 32px;
 }
 
-.cv-section-title {  
-  font-family: var(--cv-font-headings, serif);  
-  font-size: clamp(1.9rem, 4vw, 2.7rem);  
-  font-weight: 400;  
-  line-height: 1.2;  
-  max-width: var(--cv-measure);  
-  margin: 0 auto 24px;  
+.cv-section-title {
+  font-family: var(--cv-font-headings, serif);
+  font-size: clamp(1.9rem, 4vw, 2.7rem);
+  font-weight: 400;
+  line-height: 1.2;
+  max-width: var(--cv-measure);
+  margin: 0 auto 24px;
 }
 
-.cv-section-title[data-cv-italic] {  
-  font-style: italic;  
+.cv-section-title[data-cv-italic] {
+  font-style: italic;
 }
 
-/* ── Rasgos de lenguaje (C2) ──────────────────────────────────────────── */
+/* ── Rasgos de lenguaje (C2 · ronda 14) ───────────────────────────────── */
 
-/* C2.2 · marcos de línea fina alrededor de cada sección, con la tinta a baja opacidad. */  
-.pf--canva.cv-frames section {  
-  position: relative;  
+.pf--canva.cv-frames section {
+  position: relative;
 }
 
-.pf--canva.cv-frames section::after {  
-  content: "";  
-  position: absolute;  
-  inset: 24px;  
-  border: 1px solid color-mix(in srgb, var(--cv-ink, #191919) 24%, transparent);  
-  pointer-events: none;  
-  z-index: 2;  
+.pf--canva.cv-frames section::after {
+  content: "";
+  position: absolute;
+  inset: 24px;
+  border: 1px solid color-mix(in srgb, var(--cv-ink, #191919) 24%, transparent);
+  pointer-events: none;
+  z-index: 2;
 }
 
-/* C2.3 · titulares editoriales del producto en MAYÚSCULAS con aire entre letras. El texto corrido no se toca. */  
-.pf--canva.cv-upper .cv-section-title,  
-.pf--canva.cv-upper .cv-group__title,  
-.pf--canva.cv-upper .cv-contact__title {  
-  text-transform: uppercase;  
-  letter-spacing: 0.08em;  
+.pf--canva.cv-upper .cv-section-title,
+.pf--canva.cv-upper .cv-group__title,
+.pf--canva.cv-upper .cv-contact__title {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
 }
 
-/* C2.4 · diseño aireado: medida más angosta y margen lateral alto de la escala. */  
-.pf--canva.cv-airy {  
-  --cv-measure: 1040px;  
+.pf--canva.cv-airy {
+  --cv-measure: 1040px;
 }
 
 /* ── Botones ──────────────────────────────────────────────────────────── */
 
-.cv-actions {  
-  display: flex;  
-  flex-wrap: wrap;  
-  gap: 16px;  
-  margin-top: 8px;  
+.cv-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 8px;
 }
 
-/* Grande: 52 de alto, 32 de padding horizontal. */  
-.cv-btn {  
-  display: inline-flex;  
-  align-items: center;  
-  justify-content: center;  
-  min-height: 52px;  
-  padding: 0 32px;  
-  border-radius: 999px;  
-  font-weight: 700;  
-  font-size: 1rem;  
-  text-decoration: none;  
-  border: 1.5px solid var(--cv-ink, #191919);  
-  transition: transform 150ms ease-out;  
+/* Grande: 52 de alto, 32 de padding horizontal. Sirve igual para <a> y <button>. */
+.cv-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 52px;
+  padding: 0 32px;
+  border-radius: 999px;
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 1rem;
+  text-decoration: none;
+  border: 1.5px solid var(--cv-ink, #191919);
+  cursor: pointer;
+  transition: transform 150ms ease-out;
 }
 
-.cv-btn:active {  
-  transform: scale(0.98);  
+.cv-btn:active {
+  transform: scale(0.98);
 }
 
-.cv-btn--solid {  
-  background: var(--cv-ink, #191919);  
-  color: var(--cv-on-ink, #fff);  
+.cv-btn:focus-visible {
+  outline: 2px solid var(--cv-ink, #191919);
+  outline-offset: 4px;
 }
 
-.cv-btn--ghost {  
-  background: transparent;  
-  color: var(--cv-ink, #191919);  
+.cv-btn--solid {
+  background: var(--cv-ink, #191919);
+  color: var(--cv-on-ink, #fff);
+}
+
+.cv-btn--ghost {
+  background: transparent;
+  color: var(--cv-ink, #191919);
 }
 
 /* ── Hero ─────────────────────────────────────────────────────────────── */
 
-.cv-hero__inner {  
-  display: grid;  
-  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);  
-  align-items: stretch;  
-  min-height: min(88vh, 780px);  
+.cv-hero__inner {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  align-items: stretch;
+  min-height: min(88vh, 780px);
 }
 
-.cv-hero[data-photo-side="right"] .cv-hero__media {  
-  order: 2;  
+.cv-hero[data-photo-side="right"] .cv-hero__media {
+  order: 2;
 }
 
-.cv-hero__media {  
-  position: relative;  
-  min-height: 420px;  
+.cv-hero__media {
+  position: relative;
+  min-height: 420px;
 }
 
-/* A1 · encuadre seguro para personas: sin punto focal, el cuarto superior (nunca el centro ciego). */  
-.cv-hero__media img {  
-  object-fit: cover;  
-  object-position: 50% 22%;  
+.cv-hero__media img {
+  object-fit: cover;
+  object-position: 50% 22%;
 }
 
-/* A1 · la foto no llena el área: el área adopta la proporción de la foto (cero recorte) y nunca  
-   se muestra más grande que su resolución de origen. La banda rellena el resto. */  
-.cv-hero__inner--ratio {  
-  min-height: 0;  
-  align-items: center;  
+.cv-hero__inner--ratio {
+  min-height: 0;
+  align-items: center;
 }
 
-.cv-hero__media--ratio {  
-  min-height: 0;  
-  max-width: var(--cv-photo-max, none);  
-  aspect-ratio: var(--cv-photo-ratio);  
-  align-self: center;  
+.cv-hero__media--ratio {
+  min-height: 0;
+  max-width: var(--cv-photo-max, none);
+  aspect-ratio: var(--cv-photo-ratio);
+  align-self: center;
 }
 
-.cv-hero[data-photo-side="right"] .cv-hero__media--ratio {  
-  justify-self: end;  
+.cv-hero[data-photo-side="right"] .cv-hero__media--ratio {
+  justify-self: end;
 }
 
-.cv-hero__media--framed {  
-  margin: 48px;  
-  border-radius: 28px;  
-  overflow: hidden;  
-  box-shadow: 0 24px 48px rgb(0 0 0 / 0.18);  
+.cv-hero__media--framed {
+  margin: 48px;
+  border-radius: 28px;
+  overflow: hidden;
+  box-shadow: 0 24px 48px rgb(0 0 0 / 0.18);
 }
 
-.cv-hero__copy {  
-  display: flex;  
-  flex-direction: column;  
-  justify-content: center;  
-  gap: 16px;  
-  width: 100%;  
-  max-width: 44rem;  
-  padding: 64px;  
+.cv-hero__copy {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 16px;
+  width: 100%;
+  max-width: 44rem;
+  padding: 64px;
 }
 
-.cv-hero[data-photo-side="right"] .cv-hero__copy {  
-  justify-self: end;  
+.cv-hero[data-photo-side="right"] .cv-hero__copy {
+  justify-self: end;
 }
 
-.cv-hero__name {  
-  font-family: var(--cv-font-display, serif);  
-  font-weight: 400;  
-  font-size: clamp(3rem, 6.6vw, 5.4rem);  
-  line-height: 1.04;  
+.cv-hero__name {
+  font-family: var(--cv-font-display, serif);
+  font-weight: 400;
+  font-size: clamp(3rem, 6.6vw, 5.4rem);
+  line-height: 1.04;
 }
 
-.cv-hero__tagline {  
-  font-size: 0.95rem;  
-  font-weight: 700;  
-  letter-spacing: 0.22em;  
-  text-transform: uppercase;  
+.cv-hero__tagline {
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
 }
 
-.cv-hero__handle {  
-  font-size: 1rem;  
-  opacity: 0.75;  
+.cv-hero__handle {
+  font-size: 1rem;
+  opacity: 0.75;
 }
 
-/* ── Franja de marcas: carrusel infinito ──────────────────────────────── */
+/* ── Franja de marcas: carrusel infinito sin huecos (C1) ──────────────── */
 
-.cv-strip {  
-  padding: 48px 0;  
-  text-align: center;  
-  overflow: hidden;  
+.cv-strip {
+  padding: 48px 0;
+  text-align: center;
+  overflow: hidden;
 }
 
-.cv-strip__label {  
-  font-size: 0.8rem;  
-  font-weight: 700;  
-  letter-spacing: 0.18em;  
-  text-transform: uppercase;  
-  opacity: 0.8;  
-  margin-bottom: 24px;  
-  padding-inline: 16px;  
+.cv-strip__label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  opacity: 0.8;
+  margin-bottom: 24px;
+  padding-inline: 16px;
 }
 
-.cv-strip__viewport {  
-  overflow: hidden;  
-  -webkit-mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent);  
-  mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent);  
+.cv-strip__viewport {
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent);
 }
 
-.cv-strip__track {  
-  display: flex;  
-  align-items: center;  
-  width: max-content;  
-  animation: cv-marquee 30s linear infinite;  
+/*
+ * La pista trae el conjunto repetido las veces necesarias (calculadas en la plantilla) y se traslada EXACTAMENTE el
+ * ancho de un conjunto (--cv-strip-set, en px): al reiniciar, la copia siguiente está en el mismo lugar.
+ */
+.cv-strip__track {
+  --cv-strip-shift: var(--cv-strip-set, 50%);
+  display: flex;
+  align-items: center;
+  width: max-content;
+  animation: cv-marquee var(--cv-strip-dur, 30s) linear infinite;
 }
 
-.cv-strip:hover .cv-strip__track {  
-  animation-play-state: paused;  
+.cv-strip:hover .cv-strip__track {
+  animation-play-state: paused;
 }
 
-.cv-strip__item {  
-  flex-shrink: 0;  
-  display: flex;  
-  align-items: center;  
-  padding-right: 48px;  
+.cv-strip__item {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-right: 48px;
 }
 
-/* Caja óptica uniforme: 40 de alto, hasta 120 de ancho, el logo completo y centrado. */  
-.cv-strip__logo {  
-  display: block;  
-  height: 40px;  
-  width: auto;  
-  max-width: 120px;  
-  object-fit: contain;  
-  object-position: center;  
+/* La caja la fija la plantilla (área comparable); el logo entra completo y centrado. */
+.cv-strip__logo {
+  display: block;
+  object-fit: contain;
+  object-position: center;
 }
 
-@keyframes cv-marquee {  
-  to {  
-    transform: translateX(-50%);  
-  }  
+@keyframes cv-marquee {
+  to {
+    transform: translateX(calc(-1 * var(--cv-strip-shift)));
+  }
 }
 
 /* ── Videos por sector: tarjetas ──────────────────────────────────────── */
 
-.cv-work {  
-  scroll-margin-top: 64px;  
+.cv-work {
+  scroll-margin-top: 64px;
 }
 
-.cv-work__groups {  
-  display: flex;  
-  flex-direction: column;  
-  gap: 64px;  
+.cv-work__groups {
+  display: flex;
+  flex-direction: column;
+  gap: 64px;
 }
 
-.cv-group {  
-  width: 100%;  
-  max-width: var(--cv-measure);  
-  margin-inline: auto;  
-  scroll-margin-top: 64px;  
+.cv-group {
+  width: 100%;
+  max-width: var(--cv-measure);
+  margin-inline: auto;
+  scroll-margin-top: 64px;
 }
 
-.cv-group__title {  
-  font-family: var(--cv-font-headings, serif);  
-  font-size: clamp(1.9rem, 4vw, 2.7rem);  
-  font-weight: 400;  
-  /* A6: las fuentes script dibujan fuera de su caja; sin aire invaden la fila. */  
-  line-height: 1.3;  
-  padding-bottom: 0.14em;  
-  margin-bottom: 24px;  
+.cv-group__title {
+  font-family: var(--cv-font-headings, serif);
+  font-size: clamp(1.9rem, 4vw, 2.7rem);
+  font-weight: 400;
+  line-height: 1.3;
+  padding-bottom: 0.14em;
+  margin-bottom: 24px;
 }
 
-.cv-group__title[data-cv-italic] {  
-  font-style: italic;  
+.cv-group__title[data-cv-italic] {
+  font-style: italic;
 }
 
-/* Columnas fijas por ancho (4 · 3 · 2): la destacada (2×2) siempre cierra filas completas. */  
-.cv-cards {  
-  display: grid;  
-  grid-template-columns: repeat(4, minmax(0, 1fr));  
-  gap: 32px 24px;  
+.cv-cards {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 32px 24px;
 }
 
-.cv-cards__item {  
-  display: flex;  
-  flex-direction: column;  
-  min-width: 0;  
+.cv-cards__item {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
 }
 
-.cv-cards__item--featured {  
-  grid-column: span 2;  
-  grid-row: span 2;  
+.cv-cards__item--featured {
+  grid-column: span 2;
+  grid-row: span 2;
 }
 
-.cv-cards__item--featured .cv-card {  
-  flex: 1 1 auto;  
+.cv-cards__item--featured .cv-card {
+  flex: 1 1 auto;
 }
 
-.cv-card {  
-  position: relative;  
-  aspect-ratio: 4 / 5;  
-  border-radius: 24px;  
-  overflow: hidden;  
-  isolation: isolate;  
-  background: #0e0e0e;  
-  box-shadow:  
-    0 1px 2px rgb(0 0 0 / 0.06),  
-    0 12px 32px rgb(0 0 0 / 0.12);  
-  transition:  
-    transform 200ms ease-out,  
-    box-shadow 200ms ease-out;  
+.cv-card {
+  position: relative;
+  aspect-ratio: 4 / 5;
+  border-radius: 24px;
+  overflow: hidden;
+  isolation: isolate;
+  background: #0e0e0e;
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 0.06),
+    0 12px 32px rgb(0 0 0 / 0.12);
+  transition:
+    transform 200ms ease-out,
+    box-shadow 200ms ease-out;
 }
 
-@media (hover: hover) {  
-  .cv-card:hover {  
-    transform: translateY(-4px);  
-    box-shadow:  
-      0 2px 4px rgb(0 0 0 / 0.08),  
-      0 24px 48px rgb(0 0 0 / 0.18);  
+@media (hover: hover) {
+  .cv-card:hover {
+    transform: translateY(-4px);
+    box-shadow:
+      0 2px 4px rgb(0 0 0 / 0.08),
+      0 24px 48px rgb(0 0 0 / 0.18);
   }
 
-  .cv-card:hover .cv-card__play {  
-    transform: scale(1.06);  
-  }  
+  .cv-card:hover .cv-card__play {
+    transform: scale(1.06);
+  }
 }
 
-.cv-card__media {  
-  position: absolute;  
-  inset: 0;  
-  display: block;  
-  text-decoration: none;  
+.cv-card__media {
+  position: absolute;
+  inset: 0;
+  display: block;
+  text-decoration: none;
 }
 
-.cv-card__media img {  
-  object-fit: cover;  
+.cv-card__media img {
+  object-fit: cover;
 }
 
-.cv-card__video {  
-  display: block;  
-  width: 100%;  
-  height: 100%;  
-  object-fit: cover;  
-  background: #0e0e0e;  
+.cv-card__video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: #0e0e0e;
 }
 
-/* El póster solo cubre hasta que hay frame real; después se desvanece. */  
-.cv-card__poster {  
-  z-index: 1;  
-  pointer-events: none;  
-  opacity: 1;  
-  transition: opacity 200ms ease-out;  
+.cv-card__poster {
+  z-index: 1;
+  pointer-events: none;
+  opacity: 1;
+  transition: opacity 200ms ease-out;
 }
 
-.cv-card__poster--hidden {  
-  opacity: 0;  
+.cv-card__poster--hidden {
+  opacity: 0;
 }
 
-.cv-card__play {  
-  position: absolute;  
-  inset: 0;  
-  z-index: 2;  
-  margin: auto;  
-  width: 52px;  
-  height: 52px;  
-  border: none;  
-  border-radius: 999px;  
-  background: rgb(255 255 255 / 0.92);  
-  color: #111;  
-  display: grid;  
-  place-items: center;  
-  cursor: pointer;  
-  box-shadow: 0 8px 24px rgb(0 0 0 / 0.24);  
-  -webkit-backdrop-filter: blur(8px);  
-  backdrop-filter: blur(8px);  
-  transition: transform 200ms ease-out;  
+.cv-card__play {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  margin: auto;
+  width: 52px;
+  height: 52px;
+  border: none;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.92);
+  color: #111;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.24);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  transition: transform 200ms ease-out;
 }
 
-span.cv-card__play {  
-  pointer-events: none;  
+span.cv-card__play {
+  pointer-events: none;
 }
 
-.cv-card__play:focus-visible {  
-  outline: 2px solid #fff;  
-  outline-offset: 4px;  
+.cv-card__play:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 4px;
 }
 
-.cv-card__placeholder {  
-  display: grid;  
-  place-items: center;  
-  height: 100%;  
-  padding: 16px;  
-  color: #fff;  
-  font-size: 0.9rem;  
-  text-align: center;  
+.cv-card__placeholder {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  padding: 16px;
+  color: #fff;
+  font-size: 0.9rem;
+  text-align: center;
 }
 
-.cv-card__badge {  
-  position: absolute;  
-  left: 16px;  
-  bottom: 16px;  
-  z-index: 2;  
-  display: inline-flex;  
-  align-items: center;  
-  gap: 4px;  
-  padding: 4px 8px;  
-  border-radius: 999px;  
-  background: rgb(0 0 0 / 0.55);  
-  color: #fff;  
-  font-size: 0.72rem;  
-  font-weight: 600;  
-  pointer-events: none;  
+.cv-card__badge {
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgb(0 0 0 / 0.55);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 600;
+  pointer-events: none;
 }
 
-/* Chip de la marca: solo existe si el dato asocia el logo a la pieza. Se retira al reproducir. */  
-.cv-card__brand {  
-  position: absolute;  
-  top: 16px;  
-  left: 16px;  
-  z-index: 3;  
-  display: inline-flex;  
-  align-items: center;  
-  height: 40px;  
-  padding: 0 16px;  
-  border-radius: 999px;  
-  background: rgb(255 255 255 / 0.92);  
-  box-shadow: 0 4px 16px rgb(0 0 0 / 0.16);  
-  -webkit-backdrop-filter: blur(8px);  
-  backdrop-filter: blur(8px);  
-  pointer-events: none;  
-  transition: opacity 200ms ease-out;  
+/* Chip de la marca: solo existe si el dato asocia el logo (o la etiqueta) a la pieza. Se retira al reproducir. */
+.cv-card__brand {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  height: 40px;
+  padding: 0 16px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.92);
+  box-shadow: 0 4px 16px rgb(0 0 0 / 0.16);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  pointer-events: none;
+  transition: opacity 200ms ease-out;
 }
 
-.cv-card__brand img {  
-  display: block;  
-  height: 24px;  
-  width: auto;  
-  max-width: 72px;  
-  object-fit: contain;  
+.cv-card__brand img {
+  display: block;
+  height: 24px;
+  width: auto;
+  max-width: 72px;
+  object-fit: contain;
 }
 
-.cv-card:has([data-playing]) .cv-card__brand {  
-  opacity: 0;  
+/* B5: la etiqueta escrita de la marca ("Siete Recipe"), tal como viene en su diseño. */
+.cv-card__brand--text {
+  max-width: calc(100% - 32px);
+  color: #111;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.cv-piece__title {  
-  margin-top: 16px;  
-  font-size: 1rem;  
-  font-weight: 600;  
-  line-height: 1.35;  
+.cv-card:has([data-playing]) .cv-card__brand {
+  opacity: 0;
 }
 
-.cv-piece__meta {  
-  margin-top: 4px;  
-  font-size: 0.86rem;  
-  opacity: 0.72;  
+.cv-piece__title {
+  margin-top: 16px;
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.35;
 }
 
-/* Botón flotante "Ver categorías": sticky al fondo de la sección de videos. */  
-.cv-sectors {  
-  position: sticky;  
-  bottom: calc(16px + env(safe-area-inset-bottom, 0px));  
-  z-index: 10;  
-  max-width: var(--cv-measure);  
-  margin: 32px auto 0;  
-  pointer-events: none;  
+.cv-piece__meta {
+  margin-top: 4px;
+  font-size: 0.86rem;
+  opacity: 0.72;
 }
 
-/* Mediano: 44 de alto, 24 de padding horizontal. */  
-.cv-sectors__toggle {  
-  pointer-events: auto;  
-  display: inline-flex;  
-  align-items: center;  
-  gap: 8px;  
-  height: 44px;  
-  padding: 0 24px;  
-  border: none;  
-  border-radius: 999px;  
-  background: var(--cv-ink, #191919);  
-  color: var(--cv-on-ink, #fff);  
-  font: inherit;  
-  font-size: 0.95rem;  
-  font-weight: 700;  
-  cursor: pointer;  
-  box-shadow: 0 8px 24px rgb(0 0 0 / 0.24);  
-  transition: transform 150ms ease-out;  
+/* Botón flotante "Ver categorías": sticky al fondo de la sección de videos. */
+.cv-sectors {
+  position: sticky;
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  z-index: 10;
+  max-width: var(--cv-measure);
+  margin: 32px auto 0;
+  pointer-events: none;
 }
 
-.cv-sectors__toggle:active {  
-  transform: scale(0.97);  
+.cv-sectors__toggle {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 24px;
+  border: none;
+  border-radius: 999px;
+  background: var(--cv-ink, #191919);
+  color: var(--cv-on-ink, #fff);
+  font: inherit;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.24);
+  transition: transform 150ms ease-out;
 }
 
-.cv-sectors__toggle:focus-visible {  
-  outline: 2px solid var(--cv-ink, #191919);  
-  outline-offset: 4px;  
+.cv-sectors__toggle:active {
+  transform: scale(0.97);
 }
 
-.cv-sectors__panel {  
-  position: absolute;  
-  left: 0;  
-  bottom: calc(100% + 8px);  
-  min-width: 240px;  
-  max-width: min(320px, calc(100vw - 32px));  
-  max-height: min(60vh, 420px);  
-  overflow-y: auto;  
-  padding: 8px;  
-  border-radius: 16px;  
-  background: var(--cv-on-ink, #fff);  
-  color: var(--cv-ink, #191919);  
-  box-shadow: 0 16px 32px rgb(0 0 0 / 0.24);  
-  opacity: 0;  
-  transform: translateY(8px);  
-  visibility: hidden;  
-  transition:  
-    opacity 200ms ease-out,  
-    transform 200ms ease-out,  
-    visibility 0s linear 200ms;  
+.cv-sectors__toggle:focus-visible {
+  outline: 2px solid var(--cv-ink, #191919);
+  outline-offset: 4px;
 }
 
-.cv-sectors__panel[data-open] {  
-  pointer-events: auto;  
-  opacity: 1;  
-  transform: none;  
-  visibility: visible;  
-  transition:  
-    opacity 200ms ease-out,  
-    transform 200ms ease-out,  
-    visibility 0s;  
+.cv-sectors__panel {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 8px);
+  min-width: 240px;
+  max-width: min(320px, calc(100vw - 32px));
+  max-height: min(60vh, 420px);
+  overflow-y: auto;
+  padding: 8px;
+  border-radius: 16px;
+  background: var(--cv-on-ink, #fff);
+  color: var(--cv-ink, #191919);
+  box-shadow: 0 16px 32px rgb(0 0 0 / 0.24);
+  opacity: 0;
+  transform: translateY(8px);
+  visibility: hidden;
+  transition:
+    opacity 200ms ease-out,
+    transform 200ms ease-out,
+    visibility 0s linear 200ms;
 }
 
-.cv-sectors__list {  
-  display: flex;  
-  flex-direction: column;  
-  gap: 4px;  
+.cv-sectors__panel[data-open] {
+  pointer-events: auto;
+  opacity: 1;
+  transform: none;
+  visibility: visible;
+  transition:
+    opacity 200ms ease-out,
+    transform 200ms ease-out,
+    visibility 0s;
 }
 
-.cv-sectors__item {  
-  display: flex;  
-  align-items: center;  
-  width: 100%;  
-  min-height: 44px;  
-  padding: 0 16px;  
-  border: none;  
-  border-radius: 12px;  
-  background: transparent;  
-  color: inherit;  
-  font: inherit;  
-  font-weight: 600;  
-  text-align: left;  
-  text-decoration: none;  
-  cursor: pointer;  
-  transition: background-color 150ms ease-out;  
+.cv-sectors__list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
-.cv-sectors__item:hover {  
-  background: color-mix(in srgb, currentColor 8%, transparent);  
+.cv-sectors__item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 16px;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color 150ms ease-out;
 }
 
-.cv-sectors__item[aria-current="true"],  
-.cv-sectors__item[aria-pressed="true"] {  
-  font-weight: 700;  
-  background: color-mix(in srgb, currentColor 12%, transparent);  
+.cv-sectors__item:hover {
+  background: color-mix(in srgb, currentColor 8%, transparent);
 }
 
-.cv-sectors__item:focus-visible {  
-  outline: 2px solid currentColor;  
-  outline-offset: -2px;  
+.cv-sectors__item[aria-current="true"],
+.cv-sectors__item[aria-pressed="true"] {
+  font-weight: 700;
+  background: color-mix(in srgb, currentColor 12%, transparent);
 }
 
-/* ── Slider único (Métricas, Razón y Fotos con muchas imágenes) ───────── */
-
-.cv-slider {  
-  max-width: 480px;  
-  margin-inline: auto;  
+.cv-sectors__item:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: -2px;
 }
 
-.cv-slider__track {  
-  display: flex;  
-  overflow-x: auto;  
-  scroll-snap-type: x mandatory;  
-  scroll-behavior: smooth;  
-  overscroll-behavior-x: contain;  
-  scrollbar-width: none;  
+/* ── Slider único (Métricas, Razón y Fotos): la imagen SIEMPRE completa ── */
+
+.cv-slider {
+  position: relative;
+  max-width: 480px;
+  margin-inline: auto;
 }
 
-.cv-slider__track::-webkit-scrollbar {  
-  display: none;  
+.cv-slider__stage {
+  position: relative;
 }
 
-.cv-slider__track:focus-visible {  
-  outline: 2px solid currentColor;  
-  outline-offset: 4px;  
+.cv-slider__track {
+  position: relative;
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
 }
 
-.cv-slider__slide {  
-  flex: 0 0 100%;  
-  display: flex;  
-  align-items: center;  
-  justify-content: center;  
-  scroll-snap-align: center;  
+.cv-slider__track::-webkit-scrollbar {
+  display: none;
 }
 
-/* contain: la captura completa, sin recorte; se achica entera hasta caber. */  
-.cv-slider__img {  
-  display: block;  
-  width: auto;  
-  height: auto;  
-  max-width: 100%;  
-  max-height: min(72vh, 640px);  
-  object-fit: contain;  
-  border-radius: 16px;  
+.cv-slider__track:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 4px;
 }
 
-/* cover: marco 4/5 lleno con el encuadre seguro para personas. */  
-.cv-slider--cover {  
-  max-width: none;  
+.cv-slider__slide {
+  flex: 0 0 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  scroll-snap-align: center;
+  transition: opacity 200ms ease-out;
 }
 
-.cv-slider--cover .cv-slider__track {  
-  border-radius: 24px;  
+/* Completa, sin recorte: se achica entera hasta caber. */
+.cv-slider__img {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: min(72vh, 640px);
+  object-fit: contain;
+  border-radius: 16px;
 }
 
-.cv-slider--cover .cv-slider__slide {  
-  aspect-ratio: 4 / 5;  
+/* Flechas laterales: solo existen en el escenario desktop. */
+.cv-slider__side {
+  display: none;
 }
 
-.cv-slider--cover .cv-slider__img {  
-  width: 100%;  
-  height: 100%;  
-  max-width: none;  
-  max-height: none;  
-  object-fit: cover;  
-  object-position: 50% 22%;  
-  border-radius: 0;  
+.cv-slider__controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 16px;
 }
 
-.cv-slider__controls {  
-  display: flex;  
-  align-items: center;  
-  justify-content: center;  
-  gap: 16px;  
-  margin-top: 16px;  
+.cv-slider__nav,
+.cv-slider__side {
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1.5px solid var(--cv-ink, #191919);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--cv-ink, #191919);
+  cursor: pointer;
+  transition: opacity 150ms ease-out;
 }
 
-.cv-slider__nav {  
-  display: grid;  
-  place-items: center;  
-  width: 44px;  
-  height: 44px;  
-  padding: 0;  
-  border: 1.5px solid var(--cv-ink, #191919);  
-  border-radius: 999px;  
-  background: transparent;  
-  color: var(--cv-ink, #191919);  
-  cursor: pointer;  
-  transition: opacity 150ms ease-out;  
+.cv-slider__nav {
+  display: grid;
 }
 
-.cv-slider__nav:disabled {  
-  opacity: 0.32;  
-  cursor: default;  
+.cv-slider__nav:disabled,
+.cv-slider__side:disabled {
+  opacity: 0.32;
+  cursor: default;
 }
 
-.cv-slider__nav:focus-visible,  
-.cv-slider__dot:focus-visible {  
-  outline: 2px solid currentColor;  
-  outline-offset: 2px;  
+.cv-slider__nav:focus-visible,
+.cv-slider__side:focus-visible,
+.cv-slider__dot:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
 }
 
-.cv-slider__dots {  
-  display: flex;  
-  align-items: center;  
+.cv-slider__dots {
+  display: flex;
+  align-items: center;
 }
 
-.cv-slider__dot {  
-  display: grid;  
-  place-items: center;  
-  width: 16px;  
-  height: 24px;  
-  padding: 0;  
-  border: none;  
-  background: none;  
-  color: inherit;  
-  cursor: pointer;  
+.cv-slider__dot {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  cursor: pointer;
 }
 
-.cv-slider__dot::before {  
-  content: "";  
-  width: 8px;  
-  height: 8px;  
-  border-radius: 999px;  
-  background: currentColor;  
-  opacity: 0.3;  
-  transition: opacity 150ms ease-out;  
+.cv-slider__dot::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: 0.3;
+  transition: opacity 150ms ease-out;
 }
 
-.cv-slider__dot[aria-current="true"]::before {  
-  opacity: 1;  
+.cv-slider__dot[aria-current="true"]::before {
+  opacity: 1;
+}
+
+/* C2 · escenario desktop: la activa al centro, completa (máx. 640 de alto); las vecinas asoman atenuadas. */
+@media (min-width: 1024px) {
+  .cv-slider--stage {
+    max-width: 1120px;
+  }
+
+  .cv-slider--stage .cv-slider__track {
+    gap: 24px;
+    padding-inline: 20%;
+    scroll-padding-inline: 20%;
+  }
+
+  .cv-slider--stage .cv-slider__slide {
+    opacity: 0.35;
+  }
+
+  .cv-slider--stage .cv-slider__slide[data-active] {
+    opacity: 1;
+  }
+
+  .cv-slider--stage .cv-slider__img {
+    max-height: 640px;
+  }
+
+  .cv-slider--stage .cv-slider__side {
+    position: absolute;
+    top: 50%;
+    z-index: 1;
+    display: grid;
+    background: var(--cv-band, #fff);
+    transform: translateY(-50%);
+  }
+
+  .cv-slider--stage .cv-slider__side--prev {
+    left: 0;
+  }
+
+  .cv-slider--stage .cv-slider__side--next {
+    right: 0;
+  }
+
+  .cv-slider--stage .cv-slider__controls .cv-slider__nav {
+    display: none;
+  }
 }
 
 /* ── Métricas ─────────────────────────────────────────────────────────── */
 
-.cv-metrics {  
-  text-align: center;  
+.cv-metrics {
+  text-align: center;
 }
 
 /* ── Testimonios: cada captura completa, en tarjeta ───────────────────── */
 
-.cv-testimonials {  
-  text-align: center;  
+.cv-testimonials {
+  text-align: center;
 }
 
-.cv-testimonials__grid {  
-  display: grid;  
-  grid-template-columns: repeat(auto-fit, minmax(260px, 360px));  
-  justify-content: center;  
-  align-items: start;  
-  gap: 24px;  
-  max-width: var(--cv-measure);  
-  margin-inline: auto;  
+.cv-testimonials__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 360px));
+  justify-content: center;
+  align-items: start;
+  gap: 24px;
+  max-width: var(--cv-measure);
+  margin-inline: auto;
 }
 
-.cv-testimonial {  
-  padding: 16px;  
-  border-radius: 24px;  
-  background: color-mix(in srgb, var(--cv-ink, #191919) 5%, transparent);  
-  box-shadow: 0 12px 32px rgb(0 0 0 / 0.08);  
+.cv-testimonial {
+  padding: 16px;
+  border-radius: 24px;
+  background: color-mix(in srgb, var(--cv-ink, #191919) 5%, transparent);
+  box-shadow: 0 12px 32px rgb(0 0 0 / 0.08);
 }
 
-.cv-testimonial__img {  
-  display: block;  
-  width: 100%;  
-  height: auto;  
-  border-radius: 16px;  
+.cv-testimonial__img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 16px;
 }
 
 /* ── Razón ("¿Por qué yo?") ───────────────────────────────────────────── */
 
-.cv-bio__inner {  
-  display: grid;  
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);  
-  gap: 32px;  
-  align-items: center;  
-  max-width: var(--cv-measure);  
-  margin-inline: auto;  
+.cv-bio__inner {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 32px;
+  align-items: center;
+  max-width: var(--cv-measure);
+  margin-inline: auto;
 }
 
-.cv-bio__inner--solo {  
-  grid-template-columns: minmax(0, 1fr);  
-  max-width: 720px;  
+.cv-bio__inner--solo {
+  grid-template-columns: minmax(0, 1fr);
+  max-width: 720px;
 }
 
-.cv-bio__title {  
-  font-family: var(--cv-font-display, serif);  
-  font-weight: 400;  
-  font-size: clamp(2.3rem, 5vw, 3.6rem);  
-  line-height: 1.08;  
-  margin-bottom: 8px;  
+.cv-bio__title {
+  font-family: var(--cv-font-display, serif);
+  font-weight: 400;
+  font-size: clamp(2.3rem, 5vw, 3.6rem);
+  line-height: 1.08;
+  margin-bottom: 8px;
 }
 
-.cv-bio__text {  
-  font-size: 1.06rem;  
-  line-height: 1.72;  
-  max-width: 62ch;  
+.cv-bio__text {
+  font-size: 1.06rem;
+  line-height: 1.72;
+  max-width: 62ch;
 }
 
-.cv-bio__text + .cv-bio__text {  
-  margin-top: 16px;  
+.cv-bio__text + .cv-bio__text {
+  margin-top: 16px;
 }
 
-.cv-bio__gallery {  
-  min-width: 0;  
+.cv-bio__gallery {
+  min-width: 0;
 }
 
 /* ── Fotos: grilla editorial (sin huecos) o slider ────────────────────── */
 
-.cv-photos {  
-  text-align: center;  
+.cv-photos {
+  text-align: center;
 }
 
-.cv-photos__slider {  
-  max-width: 560px;  
-  margin-inline: auto;  
+.cv-photos__slider {
+  max-width: 560px;
+  margin-inline: auto;
 }
 
-.cv-gallery {  
-  display: grid;  
-  grid-template-columns: repeat(2, minmax(0, 1fr));  
-  gap: 16px;  
-  max-width: 880px;  
-  margin-inline: auto;  
+.cv-gallery {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  max-width: 880px;
+  margin-inline: auto;
 }
 
-.cv-gallery[data-count="1"] {  
-  grid-template-columns: minmax(0, 1fr);  
-  max-width: 560px;  
+.cv-gallery[data-count="1"] {
+  grid-template-columns: minmax(0, 1fr);
+  max-width: 560px;
 }
 
-.cv-gallery[data-count="5"],  
-.cv-gallery[data-count="6"] {  
-  grid-template-columns: repeat(3, minmax(0, 1fr));  
-  max-width: var(--cv-measure);  
+.cv-gallery[data-count="5"],
+.cv-gallery[data-count="6"] {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  max-width: var(--cv-measure);
 }
 
-.cv-gallery__item {  
-  position: relative;  
-  aspect-ratio: 4 / 5;  
-  border-radius: 24px;  
-  overflow: hidden;  
-  background: color-mix(in srgb, var(--cv-ink, #191919) 8%, transparent);  
+.cv-gallery__item {
+  position: relative;
+  aspect-ratio: 4 / 5;
+  border-radius: 24px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--cv-ink, #191919) 8%, transparent);
 }
 
-.cv-gallery__item img {  
-  object-fit: cover;  
-  object-position: 50% 22%;  
+.cv-gallery__item img {
+  object-fit: cover;
+  object-position: 50% 22%;
 }
 
-/* 3 fotos → F a / F b · 5 fotos → F a b / F c d: la primera ocupa dos filas, nunca quedan huecos. */  
-.cv-gallery__item--featured {  
-  grid-row: span 2;  
-  aspect-ratio: auto;  
+.cv-gallery__item--featured {
+  grid-row: span 2;
+  aspect-ratio: auto;
 }
 
 /* ── Formas de colaborar: tarjetas de servicio ────────────────────────── */
 
-.cv-services__grid {  
-  display: grid;  
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));  
-  gap: 24px;  
-  max-width: var(--cv-measure);  
-  margin-inline: auto;  
+.cv-services__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 24px;
+  max-width: var(--cv-measure);
+  margin-inline: auto;
 }
 
-/* Separadas por espacio y un fondo sutil de su banda; sin caja con borde alrededor. */  
-.cv-service {  
-  display: flex;  
-  flex-direction: column;  
-  padding: 24px;  
-  border-radius: 24px;  
-  background: color-mix(in srgb, var(--cv-ink, #191919) 6%, transparent);  
+.cv-service {
+  display: flex;
+  flex-direction: column;
+  padding: 24px;
+  border-radius: 24px;
+  background: color-mix(in srgb, var(--cv-ink, #191919) 6%, transparent);
 }
 
-.cv-service::before {  
-  content: "";  
-  width: 32px;  
-  height: 2px;  
-  margin-bottom: 24px;  
-  border-radius: 2px;  
-  background: color-mix(in srgb, currentColor 40%, transparent);  
+.cv-service::before {
+  content: "";
+  width: 32px;
+  height: 2px;
+  margin-bottom: 24px;
+  border-radius: 2px;
+  background: color-mix(in srgb, currentColor 40%, transparent);
 }
 
-.cv-service__title {  
-  font-size: 1.25rem;  
-  font-weight: 700;  
-  line-height: 1.25;  
-  margin-bottom: 8px;  
+.cv-service__title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1.25;
+  margin-bottom: 8px;
 }
 
-.cv-service__text {  
-  line-height: 1.6;  
-  opacity: 0.86;  
+.cv-service__text {
+  line-height: 1.6;
+  opacity: 0.86;
 }
 
 /* ── Tarifas ──────────────────────────────────────────────────────────── */
 
-.cv-rates {  
-  text-align: center;  
+.cv-rates {
+  text-align: center;
 }
 
-/* Tarjetas de precio: mismo peso para todas (sin destacar ninguna: el dato no lo dice). */  
-.cv-pricing {  
-  display: grid;  
-  grid-template-columns: repeat(auto-fit, minmax(240px, 320px));  
-  justify-content: center;  
-  gap: 24px;  
-  max-width: var(--cv-measure);  
-  margin-inline: auto;  
-  text-align: left;  
+.cv-pricing {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 320px));
+  justify-content: center;
+  gap: 24px;
+  max-width: var(--cv-measure);
+  margin-inline: auto;
+  text-align: left;
 }
 
-.cv-price {  
-  display: flex;  
-  flex-direction: column;  
-  padding: 24px;  
-  border-radius: 24px;  
-  border: 1.5px solid color-mix(in srgb, var(--cv-ink, #191919) 18%, transparent);  
-  background: color-mix(in srgb, var(--cv-ink, #191919) 4%, transparent);  
+.cv-price {
+  display: flex;
+  flex-direction: column;
+  padding: 24px;
+  border-radius: 24px;
+  border: 1.5px solid color-mix(in srgb, var(--cv-ink, #191919) 18%, transparent);
+  background: color-mix(in srgb, var(--cv-ink, #191919) 4%, transparent);
 }
 
-.cv-price__name {  
-  font-size: 0.85rem;  
-  font-weight: 700;  
-  letter-spacing: 0.14em;  
-  text-transform: uppercase;  
-  opacity: 0.8;  
-  margin-bottom: 8px;  
+.cv-price__name {
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  opacity: 0.8;
+  margin-bottom: 8px;
 }
 
-.cv-price__amount {  
-  font-size: clamp(2.25rem, 4vw, 2.75rem);  
-  font-weight: 700;  
-  line-height: 1.05;  
-  letter-spacing: -0.01em;  
-  font-variant-numeric: tabular-nums;  
+.cv-price__amount {
+  font-size: clamp(2.25rem, 4vw, 2.75rem);
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
 }
 
-.cv-price__list {  
-  display: flex;  
-  flex-direction: column;  
-  gap: 8px;  
-  margin-top: 24px;  
-  padding-top: 24px;  
-  border-top: 1px solid color-mix(in srgb, var(--cv-ink, #191919) 14%, transparent);  
+.cv-price__list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid color-mix(in srgb, var(--cv-ink, #191919) 14%, transparent);
 }
 
-.cv-price__item {  
-  display: flex;  
-  align-items: flex-start;  
-  gap: 8px;  
-  line-height: 1.5;  
+.cv-price__item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  line-height: 1.5;
 }
 
-.cv-price__check {  
-  flex-shrink: 0;  
-  margin-top: 4px;  
+.cv-price__check {
+  flex-shrink: 0;
+  margin-top: 4px;
 }
 
-.cv-rates__figure {  
-  max-width: 560px;  
-  margin-inline: auto;  
-  padding: 8px;  
-  border-radius: 20px;  
-  background: #fff;  
-  box-shadow: 0 18px 36px rgb(0 0 0 / 0.16);  
+.cv-rates__figure {
+  max-width: 560px;
+  margin-inline: auto;
+  padding: 8px;
+  border-radius: 20px;
+  background: #fff;
+  box-shadow: 0 18px 36px rgb(0 0 0 / 0.16);
 }
 
-.cv-rates__img {  
-  display: block;  
-  width: 100%;  
-  height: auto;  
-  border-radius: 12px;  
+.cv-rates__img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 12px;
 }
 
 /* ── Contacto (cierre) ────────────────────────────────────────────────── */
 
-.cv-contact {  
-  text-align: center;  
+.cv-contact {
+  text-align: center;
 }
 
-.cv-contact__inner {  
-  display: flex;  
-  flex-direction: column;  
-  align-items: center;  
-  max-width: 640px;  
-  margin-inline: auto;  
+.cv-contact__inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: 640px;
+  margin-inline: auto;
 }
 
-/* Con su video: fondo a sección completa, velo de la banda encima, contenido arriba. */  
-.cv-contact--video {  
-  position: relative;  
-  isolation: isolate;  
-  overflow: hidden;  
-  display: flex;  
-  align-items: center;  
-  justify-content: center;  
-  min-height: min(88vh, 760px);  
+/* Con su video: fondo a sección completa, velo de la banda encima, contenido arriba (y sin la foto: C3). */
+.cv-contact--video {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: min(88vh, 760px);
 }
 
-.cv-contact--video .cv-contact__inner {  
-  position: relative;  
-  z-index: 1;  
+.cv-contact--video .cv-contact__inner {
+  position: relative;
+  z-index: 1;
 }
 
-.cv-backdrop {  
-  position: absolute;  
-  inset: 0;  
-  z-index: 0;  
-  pointer-events: none;  
+.cv-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
 }
 
-.cv-backdrop__video {  
-  display: block;  
-  width: 100%;  
-  height: 100%;  
-  object-fit: cover;  
+.cv-backdrop__video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
-.cv-backdrop__veil {  
-  position: absolute;  
-  inset: 0;  
-  background: var(--cv-band, #fff);  
-  opacity: 0.86;  
+.cv-backdrop__veil {
+  position: absolute;
+  inset: 0;
+  background: var(--cv-band, #fff);
+  opacity: 0.86;
 }
 
-.cv-contact__photo {  
-  position: relative;  
-  width: 96px;  
-  height: 96px;  
-  margin-bottom: 24px;  
-  border-radius: 999px;  
-  overflow: hidden;  
+.cv-contact__photo {
+  position: relative;
+  width: 96px;
+  height: 96px;
+  margin-bottom: 24px;
+  border-radius: 999px;
+  overflow: hidden;
 }
 
-.cv-contact--video .cv-contact__photo {  
-  box-shadow: 0 0 0 4px var(--cv-band, #fff);  
+.cv-contact__photo img {
+  object-fit: cover;
+  object-position: 50% 22%;
 }
 
-.cv-contact__photo img {  
-  object-fit: cover;  
-  object-position: 50% 22%;  
+.cv-contact__title {
+  font-family: var(--cv-font-headings, serif);
+  font-size: clamp(2.4rem, 6vw, 4rem);
+  font-weight: 400;
+  line-height: 1.15;
+  letter-spacing: 0.02em;
+  margin-bottom: 8px;
 }
 
-.cv-contact__title {  
-  font-family: var(--cv-font-headings, serif);  
-  font-size: clamp(2.4rem, 6vw, 4rem);  
-  font-weight: 400;  
-  line-height: 1.15;  
-  letter-spacing: 0.02em;  
-  margin-bottom: 8px;  
+.cv-contact__title[data-cv-italic] {
+  font-style: italic;
 }
 
-.cv-contact__title[data-cv-italic] {  
-  font-style: italic;  
+.cv-contact__text {
+  font-size: 1.06rem;
+  line-height: 1.6;
+  margin-bottom: 24px;
 }
 
-.cv-contact__text {  
-  font-size: 1.06rem;  
-  line-height: 1.6;  
-  margin-bottom: 24px;  
+.cv-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 16px;
 }
 
-.cv-links {  
-  display: flex;  
-  flex-wrap: wrap;  
-  justify-content: center;  
-  gap: 16px;  
+.cv-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 24px;
+  border-radius: 999px;
+  border: 1.5px solid var(--cv-ink, #191919);
+  color: var(--cv-ink, #191919);
+  font-weight: 600;
+  text-decoration: none;
 }
 
-/* Mediano: 44 / 24 (respaldo cuando no hay CTA directo). */  
-.cv-link {  
-  display: inline-flex;  
-  align-items: center;  
-  gap: 8px;  
-  min-height: 44px;  
-  padding: 0 24px;  
-  border-radius: 999px;  
-  border: 1.5px solid var(--cv-ink, #191919);  
-  color: var(--cv-ink, #191919);  
-  font-weight: 600;  
-  text-decoration: none;  
+/* ── Panel de contacto (C5) ───────────────────────────────────────────── */
+
+.cv-contact-panel {
+  width: min(100% - 32px, 400px);
+  max-width: none;
+  margin: auto;
+  padding: 0;
+  border: none;
+  border-radius: 24px;
+  background: var(--cv-band, #fff);
+  color: var(--cv-ink, #191919);
+  font-family: var(--cv-font-body, inherit);
+  box-shadow: 0 24px 48px rgb(0 0 0 / 0.24);
 }
 
-/* ── Footer ───────────────────────────────────────────────────────────── */
+.cv-contact-panel[open] {
+  animation: cv-panel-in 200ms ease-out;
+}
 
-.cv-footer {  
-  padding: 24px 16px 32px;  
-  text-align: center;  
-  font-size: 0.88rem;  
-  opacity: 0.75;  
+.cv-contact-panel::backdrop {
+  background: rgb(0 0 0 / 0.45);
+}
+
+@keyframes cv-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+.cv-contact-panel__body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 24px;
+  text-align: center;
+}
+
+.cv-contact-panel__title {
+  font-family: var(--cv-font-headings, serif);
+  font-size: 1.5rem;
+  line-height: 1.2;
+}
+
+.cv-contact-panel__email {
+  padding: 16px;
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--cv-ink, #191919) 6%, transparent);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
+.cv-contact-panel__link,
+.cv-contact-panel__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 16px;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.cv-contact-panel__link {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.cv-contact-panel__close {
+  opacity: 0.75;
+}
+
+.cv-contact-panel__link:focus-visible,
+.cv-contact-panel__close:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+  border-radius: 12px;
+}
+
+/* ── Pie: redes (C4) y copyright ──────────────────────────────────────── */
+
+.cv-footer {
+  padding: 32px 16px;
+  text-align: center;
+  font-size: 0.88rem;
+}
+
+.cv-socials {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.cv-social {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  color: var(--cv-ink, #191919);
+  transition: background-color 150ms ease-out;
+}
+
+.cv-social:hover {
+  background: color-mix(in srgb, currentColor 8%, transparent);
+}
+
+.cv-social:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+.cv-footer__copy {
+  opacity: 0.75;
 }
 
 /* ── Desktop: aire lateral alto en diseños aireados ───────────────────── */
 
-@media (min-width: 861px) {  
-  .pf--canva.cv-airy .cv-work,  
-  .pf--canva.cv-airy .cv-metrics,  
-  .pf--canva.cv-airy .cv-testimonials,  
-  .pf--canva.cv-airy .cv-bio,  
-  .pf--canva.cv-airy .cv-photos,  
-  .pf--canva.cv-airy .cv-services,  
-  .pf--canva.cv-airy .cv-rates,  
-  .pf--canva.cv-airy .cv-contact {  
-    padding-inline: 64px;  
-  }  
+@media (min-width: 861px) {
+  .pf--canva.cv-airy .cv-work,
+  .pf--canva.cv-airy .cv-metrics,
+  .pf--canva.cv-airy .cv-testimonials,
+  .pf--canva.cv-airy .cv-bio,
+  .pf--canva.cv-airy .cv-photos,
+  .pf--canva.cv-airy .cv-services,
+  .pf--canva.cv-airy .cv-rates,
+  .pf--canva.cv-airy .cv-contact {
+    padding-inline: 64px;
+  }
 }
 
 /* ── Tablet ───────────────────────────────────────────────────────────── */
 
-@media (min-width: 861px) and (max-width: 1023px) {  
-  .cv-cards {  
-    grid-template-columns: repeat(3, minmax(0, 1fr));  
-  }  
+@media (min-width: 861px) and (max-width: 1023px) {
+  .cv-cards {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 /* ── Móvil ────────────────────────────────────────────────────────────── */
 
-@media (max-width: 860px) {  
-  .cv-work,  
-  .cv-metrics,  
-  .cv-testimonials,  
-  .cv-bio,  
-  .cv-photos,  
-  .cv-services,  
-  .cv-rates,  
-  .cv-contact {  
-    padding: 48px 16px;  
+@media (max-width: 860px) {
+  .cv-work,
+  .cv-metrics,
+  .cv-testimonials,
+  .cv-bio,
+  .cv-photos,
+  .cv-services,
+  .cv-rates,
+  .cv-contact {
+    padding: 48px 16px;
   }
 
-  .pf--canva.cv-frames section::after {  
-    inset: 8px;  
+  .pf--canva.cv-frames section::after {
+    inset: 8px;
   }
 
-  .cv-hero__inner {  
-    grid-template-columns: 1fr;  
-    min-height: 0;  
+  .cv-hero__inner {
+    grid-template-columns: 1fr;
+    min-height: 0;
   }
 
-  /* A1 · en celular el área sigue la proporción de la foto (una foto muy alta se recorta a 4/5 como  
-     mucho, con el encuadre seguro); sin medidas, la proporción de siempre. */  
-  .cv-hero__media {  
-    min-height: 0;  
-    aspect-ratio: var(--cv-photo-ratio-m, 4 / 3.4);  
+  .cv-hero__media {
+    min-height: 0;
+    aspect-ratio: var(--cv-photo-ratio-m, 4 / 3.4);
   }
 
-  .cv-hero__media--ratio {  
-    aspect-ratio: var(--cv-photo-ratio);  
-    justify-self: center;  
-    width: 100%;  
+  .cv-hero__media--ratio {
+    aspect-ratio: var(--cv-photo-ratio);
+    justify-self: center;
+    width: 100%;
   }
 
-  .cv-hero__media--framed {  
-    margin: 24px;  
+  .cv-hero__media--framed {
+    margin: 24px;
   }
 
-  .cv-hero__copy {  
-    padding: 32px 16px;  
+  .cv-hero__copy {
+    padding: 32px 16px;
   }
 
-  .cv-strip__item {  
-    padding-right: 32px;  
+  /* C1: en celular el conjunto mide distinto (separación 32): la pista traslada su propio ancho. */
+  .cv-strip__track {
+    --cv-strip-shift: var(--cv-strip-set-m, 50%);
+    animation-duration: var(--cv-strip-dur-m, 30s);
   }
 
-  .cv-work__groups {  
-    gap: 48px;  
+  .cv-strip__item {
+    padding-right: 32px;
   }
 
-  .cv-cards {  
-    grid-template-columns: repeat(2, minmax(0, 1fr));  
-    gap: 24px 16px;  
+  .cv-work__groups {
+    gap: 48px;
   }
 
-  /* La destacada abre la grilla a ancho completo. */  
-  .cv-cards__item--featured {  
-    grid-column: 1 / -1;  
-    grid-row: auto;  
+  .cv-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 24px 16px;
   }
 
-  .cv-cards__item--featured .cv-card {  
-    flex: none;  
+  .cv-cards__item--featured {
+    grid-column: 1 / -1;
+    grid-row: auto;
   }
 
-  .cv-card__brand {  
-    top: 8px;  
-    left: 8px;  
-    height: 36px;  
-    padding: 0 8px;  
+  .cv-cards__item--featured .cv-card {
+    flex: none;
   }
 
-  .cv-card__brand img {  
-    height: 20px;  
-    max-width: 64px;  
+  .cv-card__brand {
+    top: 8px;
+    left: 8px;
+    height: 36px;
+    padding: 0 8px;
   }
 
-  .cv-testimonials__grid {  
-    grid-template-columns: minmax(0, 1fr);  
+  .cv-card__brand img {
+    height: 20px;
+    max-width: 64px;
   }
 
-  .cv-bio__inner {  
-    grid-template-columns: minmax(0, 1fr);  
-    gap: 24px;  
+  .cv-card__brand--text {
+    max-width: calc(100% - 16px);
+    font-size: 0.72rem;
   }
 
-  .cv-gallery[data-count="5"],  
-  .cv-gallery[data-count="6"] {  
-    grid-template-columns: repeat(2, minmax(0, 1fr));  
+  .cv-testimonials__grid {
+    grid-template-columns: minmax(0, 1fr);
   }
 
-  /* En celular la primera foto abre la grilla a ancho completo (3 → F / a b · 5 → F / a b / c d). */  
-  .cv-gallery__item--featured {  
-    grid-column: 1 / -1;  
-    grid-row: auto;  
-    aspect-ratio: 4 / 5;  
+  .cv-bio__inner {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 24px;
   }
 
-  /* Servicios: una por fila, grandes. */  
-  .cv-services__grid {  
-    grid-template-columns: minmax(0, 1fr);  
+  .cv-gallery[data-count="5"],
+  .cv-gallery[data-count="6"] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .cv-contact--video {  
-    min-height: min(80vh, 640px);  
-  }  
+  .cv-gallery__item--featured {
+    grid-column: 1 / -1;
+    grid-row: auto;
+    aspect-ratio: 4 / 5;
+  }
+
+  .cv-services__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .cv-contact--video {
+    min-height: min(80vh, 640px);
+  }
 }
 
 /* ── Movimiento reducido ──────────────────────────────────────────────── */
 
-@media (prefers-reduced-motion: reduce) {  
-  .cv-strip__track {  
-    animation: none;  
+@media (prefers-reduced-motion: reduce) {
+  /* Franja quieta: un solo conjunto, centrado y en varias filas si hace falta. */
+  .cv-strip__track {
+    animation: none;
+    width: auto;
+    flex-wrap: wrap;
+    justify-content: center;
+    row-gap: 24px;
+    padding-inline: 16px;
   }
 
-  .cv-strip__viewport {  
-    overflow-x: auto;  
+  .cv-strip__item[aria-hidden="true"] {
+    display: none;
   }
 
-  .cv-btn,  
-  .cv-card,  
-  .cv-card__play,  
-  .cv-card__poster,  
-  .cv-card__brand,  
-  .cv-sectors__toggle,  
-  .cv-sectors__panel,  
-  .cv-sectors__panel[data-open],  
-  .cv-sectors__item,  
-  .cv-slider__nav,  
-  .cv-slider__dot::before {  
-    transition: none;  
+  .cv-strip__viewport {
+    -webkit-mask-image: none;
+    mask-image: none;
   }
 
-  .cv-btn:active,  
-  .cv-card:hover,  
-  .cv-card:hover .cv-card__play,  
-  .cv-sectors__toggle:active,  
-  .cv-sectors__panel {  
-    transform: none;  
+  .cv-btn,
+  .cv-card,
+  .cv-card__play,
+  .cv-card__poster,
+  .cv-card__brand,
+  .cv-sectors__toggle,
+  .cv-sectors__panel,
+  .cv-sectors__panel[data-open],
+  .cv-sectors__item,
+  .cv-slider__slide,
+  .cv-slider__nav,
+  .cv-slider__side,
+  .cv-slider__dot::before,
+  .cv-social {
+    transition: none;
   }
 
-  .cv-slider__track {  
-    scroll-behavior: auto;  
-  }  
+  .cv-contact-panel[open] {
+    animation: none;
+  }
+
+  .cv-btn:active,
+  .cv-card:hover,
+  .cv-card:hover .cv-card__play,
+  .cv-sectors__toggle:active,
+  .cv-sectors__panel {
+    transform: none;
+  }
+
+  .cv-slider__track {
+    scroll-behavior: auto;
+  }
 }
