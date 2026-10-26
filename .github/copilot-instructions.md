@@ -13,9 +13,11 @@
 - Build: `npm run build`
 
 ## Reglas de implementación
+- Todo el trabajo debe hacerse en la rama `v2-m4-rev`; no trabajar ni aplicar cambios en `main`.
 - Hacer cambios **mínimos y enfocados** al requerimiento; evitar refactors amplios no solicitados.
 - Reutilizar componentes y utilidades existentes en `components/` y `lib/` antes de crear nuevos.
 - Mantener nombres y textos de UI en español cuando correspondan al producto actual.
+- No escribir nombres de creadoras reales en el código ni en comentarios.
 - No romper rutas ni contratos de API existentes en `app/api/**`.
 - Conservar la separación entre vistas:
   - Landing en `app/(landing)/`
