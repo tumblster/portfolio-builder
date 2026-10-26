@@ -10,6 +10,12 @@
  * - Pesos 400 / 600 / 700.
  * - Movimiento 150–300ms ease-out, solo en lo interactivo, apagado con prefers-reduced-motion.
  * Rasgos de lenguaje medidos (clases en la raíz): .cv-textured, .cv-frames, .cv-upper, .cv-airy.
+ *
+ * Ronda de corrección:
+ * - F5: los logos cuadrados de la franja llevan radio 12 (el de las tarjetas chicas de la plantilla).
+ * - F6: en celular el fundido de los bordes del carrusel es más ancho (64 px) y escalonado: se lee como fundido.
+ * - V1: en celular el velo del cierre usa --cv-veil-m (calculado en la plantilla); desktop sigue en 0.86.
+ * - S3: estilos del simulador de tarifas (.cv-sim).
  */
 
 .pf--canva {
@@ -270,6 +276,11 @@
   display: block;
   object-fit: contain;
   object-position: center;
+}
+
+/* F5: el cuadrado se suaviza sin volverse círculo (radio de la plantilla). */
+.cv-strip__logo--square {
+  border-radius: 12px;
 }
 
 @keyframes cv-marquee {
@@ -1023,6 +1034,287 @@ span.cv-card__play {
   border-radius: 12px;
 }
 
+/* ── Tarifas: simulador (S3) ──────────────────────────────────────────── */
+
+.cv-sim {
+  display: grid;
+  gap: 24px;
+  max-width: 960px;
+  margin-inline: auto;
+  text-align: left;
+}
+
+.cv-sim--static {
+  max-width: 360px;
+}
+
+.cv-sim__controls {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  min-width: 0;
+}
+
+.cv-sim__group {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.cv-sim__legend {
+  padding: 0;
+  margin-bottom: 8px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  opacity: 0.8;
+}
+
+.cv-sim__choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* Selección: tarjeta tappable (52 de alto mínimo); el radio queda oculto pero accesible. */
+.cv-sim__chip {
+  position: relative;
+  display: inline-flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  min-height: 52px;
+  padding: 8px 16px;
+  border-radius: 16px;
+  border: 1.5px solid color-mix(in srgb, var(--cv-ink, #191919) 24%, transparent);
+  cursor: pointer;
+  transition:
+    background-color 150ms ease-out,
+    color 150ms ease-out;
+}
+
+.cv-sim__chip input,
+.cv-sim__switch input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.cv-sim__chip:has(input:checked) {
+  background: var(--cv-ink, #191919);
+  border-color: var(--cv-ink, #191919);
+  color: var(--cv-on-ink, #fff);
+}
+
+.cv-sim__chip:has(input:focus-visible),
+.cv-sim__switch:has(input:focus-visible) {
+  outline: 2px solid var(--cv-ink, #191919);
+  outline-offset: 2px;
+}
+
+.cv-sim__chip-name {
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.cv-sim__chip-price {
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.86;
+}
+
+.cv-sim__includes {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cv-sim__include {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  line-height: 1.5;
+}
+
+.cv-sim__check {
+  flex-shrink: 0;
+  margin-top: 4px;
+}
+
+/* Interruptores (extras y modificadores de una sola opción). */
+.cv-sim__switches {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cv-sim__switch {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 16px;
+  min-height: 52px;
+  padding: 8px 16px;
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--cv-ink, #191919) 6%, transparent);
+  cursor: pointer;
+}
+
+.cv-sim__switch-name {
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.cv-sim__switch-price {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.86;
+}
+
+.cv-sim__switch-track {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--cv-ink, #191919) 24%, transparent);
+  transition: background-color 150ms ease-out;
+}
+
+.cv-sim__switch-track::after {
+  content: "";
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.24);
+  transition: transform 150ms ease-out;
+}
+
+.cv-sim__switch:has(input:checked) .cv-sim__switch-track {
+  background: var(--cv-ink, #191919);
+}
+
+.cv-sim__switch:has(input:checked) .cv-sim__switch-track::after {
+  transform: translateX(20px);
+}
+
+.cv-sim__notes {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cv-sim__note {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  line-height: 1.5;
+}
+
+.cv-sim__note-name {
+  font-weight: 700;
+}
+
+/* Resumen: desglose + total. En celular se queda pegado abajo mientras se eligen opciones (total siempre visible). */
+.cv-sim__summary {
+  position: sticky;
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 24px;
+  border-radius: 24px;
+  border: 1.5px solid color-mix(in srgb, var(--cv-ink, #191919) 18%, transparent);
+  background: var(--cv-band, #fff);
+  color: var(--cv-ink, #191919);
+  box-shadow: 0 12px 32px rgb(0 0 0 / 0.12);
+}
+
+.cv-sim--static .cv-sim__summary {
+  position: static;
+  gap: 8px;
+}
+
+.cv-sim__name {
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  opacity: 0.8;
+}
+
+.cv-sim__lines {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 0.95rem;
+}
+
+.cv-sim__line {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  line-height: 1.4;
+}
+
+.cv-sim__line-value {
+  flex-shrink: 0;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.cv-sim__total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding-top: 16px;
+  border-top: 1px solid color-mix(in srgb, var(--cv-ink, #191919) 14%, transparent);
+  font-weight: 700;
+}
+
+.cv-sim__amount {
+  font-size: clamp(1.9rem, 4vw, 2.5rem);
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+}
+
+.cv-sim__pending {
+  font-size: 0.95rem;
+  line-height: 1.5;
+  opacity: 0.86;
+}
+
+@media (min-width: 861px) {
+  .cv-sim {
+    grid-template-columns: minmax(0, 1.4fr) minmax(280px, 1fr);
+    align-items: start;
+    gap: 48px;
+  }
+
+  .cv-sim--static {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 24px;
+  }
+
+  .cv-sim__summary {
+    top: 24px;
+    bottom: auto;
+  }
+}
+
 /* ── Contacto (cierre) ────────────────────────────────────────────────── */
 
 .cv-contact {
@@ -1315,6 +1607,39 @@ span.cv-card__play {
     padding: 32px 16px;
   }
 
+  /*
+   * F6: en celular el 10 % del ancho (≈ 39 px) cortaba los logos oscuros como un bloque gris. El fundido pasa a
+   * 64 px con una curva escalonada: el logo se desvanece de a poco. Mismo carrusel, misma animación.
+   */
+  .cv-strip__viewport {
+    -webkit-mask-image: linear-gradient(
+      90deg,
+      transparent 0,
+      rgb(0 0 0 / 0.1) 12px,
+      rgb(0 0 0 / 0.35) 28px,
+      rgb(0 0 0 / 0.7) 44px,
+      #000 64px,
+      #000 calc(100% - 64px),
+      rgb(0 0 0 / 0.7) calc(100% - 44px),
+      rgb(0 0 0 / 0.35) calc(100% - 28px),
+      rgb(0 0 0 / 0.1) calc(100% - 12px),
+      transparent 100%
+    );
+    mask-image: linear-gradient(
+      90deg,
+      transparent 0,
+      rgb(0 0 0 / 0.1) 12px,
+      rgb(0 0 0 / 0.35) 28px,
+      rgb(0 0 0 / 0.7) 44px,
+      #000 64px,
+      #000 calc(100% - 64px),
+      rgb(0 0 0 / 0.7) calc(100% - 44px),
+      rgb(0 0 0 / 0.35) calc(100% - 28px),
+      rgb(0 0 0 / 0.1) calc(100% - 12px),
+      transparent 100%
+    );
+  }
+
   /* C1: en celular el conjunto mide distinto (separación 32): la pista traslada su propio ancho. */
   .cv-strip__track {
     --cv-strip-shift: var(--cv-strip-set-m, 50%);
@@ -1384,8 +1709,29 @@ span.cv-card__play {
     grid-template-columns: minmax(0, 1fr);
   }
 
+  /* S3: resumen compacto en celular; si el desglose crece, se desplaza dentro del resumen y el total queda fijo. */
+  .cv-sim__summary {
+    gap: 8px;
+    padding: 16px;
+  }
+
+  .cv-sim__lines {
+    max-height: 30vh;
+    overflow-y: auto;
+    font-size: 0.88rem;
+  }
+
+  .cv-sim__total {
+    padding-top: 8px;
+  }
+
   .cv-contact--video {
     min-height: min(80vh, 640px);
+  }
+
+  /* V1: en celular el velo deja ver el movimiento; la plantilla calcula la opacidad que conserva el contraste. */
+  .cv-backdrop__veil {
+    opacity: var(--cv-veil-m, 0.86);
   }
 }
 
@@ -1424,7 +1770,10 @@ span.cv-card__play {
   .cv-slider__nav,
   .cv-slider__side,
   .cv-slider__dot::before,
-  .cv-social {
+  .cv-social,
+  .cv-sim__chip,
+  .cv-sim__switch-track,
+  .cv-sim__switch-track::after {
     transition: none;
   }
 

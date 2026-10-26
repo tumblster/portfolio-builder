@@ -1,12 +1,13 @@
 import Image from "next/image";
 import type { CSSProperties } from "react";
-import type { CanvaData, StoredImage, VideoLink } from "@/lib/portfolio/schema";
+import type { CanvaData, CanvaRate, StoredImage, VideoLink } from "@/lib/portfolio/schema";
 import { fontPlan } from "@/lib/portfolio/font-map";
 import type { ResolvedPiece } from "@/lib/portfolio/resolve";
 import { nativeVideoFor } from "@/lib/portfolio/embed";
 import { CanvaBackdropVideo } from "./canva-backdrop-video";
 import { CanvaContactButton } from "./canva-contact-button";
 import { CanvaImageSlider } from "./canva-image-slider";
+import { CanvaRatesSimulator } from "./canva-rates-simulator";
 import { CanvaSectorMenu } from "./canva-sector-button";
 import { CanvaVideoCard } from "./canva-video-card";
 import { NicheScope } from "./niche-filter";
@@ -50,6 +51,14 @@ import "./canva-template.css";
  *   persona lo elige, "Abrir en tu correo"). Nada abre una app sin elegirla.
  * - B5: una pieza de Canva sin logo asociado y con un título corto propio (su etiqueta de marca) lo muestra como chip
  *   sobre la tarjeta, en lugar de repetirlo debajo.
+ *
+ * Ronda de corrección:
+ * - F5: los logos cuadrados de la franja llevan la clase --square (radio suave en el CSS).
+ * - S3 / S5: con tarifas estructuradas, Tarifas muestra el simulador (mismos datos que las tarjetas); sin estructura,
+ *   las tarjetas de siempre; sin tarifas, la imagen del tarifario.
+ * - V1: con video de cierre, la plantilla calcula la opacidad del velo en celular (--cv-veil-m): la menor (desde 0.5)
+ *   con la que la tinta conserva el contraste de la guardia (3.2) aun en el peor cuadro posible del video (uno del
+ *   mismo color que la tinta). Desktop queda en 0.86.
  */
 
 type CanvaTemplateProps = TemplateProps & { canva: CanvaData };
@@ -81,10 +90,19 @@ const STRIP_MAX_COPIES = 48;
 /** Velocidad constante: px por segundo (más logos = más tiempo, misma velocidad). */
 const STRIP_SPEED = 40;
 const STRIP_MIN_SECONDS = 12;
+/** F5: un logo es cuadrado si su proporción está a ±12 % de 1. */
+const STRIP_SQUARE_TOLERANCE = 0.12;
 
 /** B5: una etiqueta de marca es corta. */
 const BRAND_LABEL_MAX_WORDS = 4;
 const BRAND_LABEL_MAX_CHARS = 40;
+
+/** Guardia de contraste (la misma de las bandas). */
+const CONTRAST_MIN = 3.2;
+/** V1: opacidad del velo del cierre: desktop (la vigente) y el piso en celular. */
+const VEIL_DESKTOP = 0.86;
+const VEIL_MOBILE_MIN = 0.5;
+const VEIL_STEP = 0.02;
 
 /** Luminancia relativa y contraste (WCAG) para la guardia de accesibilidad. */
 function luminance(hex: string): number {
@@ -107,12 +125,38 @@ function contrastRatio(a: string, b: string): number {
  */
 function readablePair(band: string, ink: string | null): { ink: string; onInk: string } {
   const base = ink ?? "#191919";
-  if (contrastRatio(base, band) >= 3.2) return { ink: base, onInk: band };
+  if (contrastRatio(base, band) >= CONTRAST_MIN) return { ink: base, onInk: band };
   const white = "#FFFFFF";
   const black = "#111111";
   const best = contrastRatio(white, band) >= contrastRatio(black, band) ? white : black;
-  const onInk = contrastRatio(band, best) >= 3.2 ? band : best === white ? black : white;
+  const onInk = contrastRatio(band, best) >= CONTRAST_MIN ? band : best === white ? black : white;
   return { ink: best, onInk };
+}
+
+/** Mezcla de dos colores como la compone el navegador (velo de opacidad `weightA` sobre `b`). */
+function mixHex(a: string, b: string, weightA: number): string {
+  const channel = (hex: string, at: number) => parseInt(hex.replace("#", "").slice(at, at + 2), 16);
+  const mix = (at: number) =>
+    Math.round(channel(a, at) * weightA + channel(b, at) * (1 - weightA))
+      .toString(16)
+      .padStart(2, "0");
+  return ("#" + mix(0) + mix(2) + mix(4)).toUpperCase();
+}
+
+/**
+ * V1: la menor opacidad del velo (desde VEIL_MOBILE_MIN) con la que la tinta sigue pasando la guardia aun si el
+ * cuadro del video detrás tuviera el mismo color que la tinta (el peor caso). Si ninguna alcanza, la vigente.
+ */
+function closingVeil(band: string, ink: string): number {
+  for (let opacity = VEIL_MOBILE_MIN; opacity < VEIL_DESKTOP; opacity += VEIL_STEP) {
+    if (contrastRatio(ink, mixHex(band, ink, opacity)) >= CONTRAST_MIN) return Math.round(opacity * 100) / 100;
+  }
+  return VEIL_DESKTOP;
+}
+
+/** S3: las tarifas traen estructura (al menos un servicio tipado): se simulan. */
+function isStructuredRates(rates: readonly CanvaRate[]): boolean {
+  return rates.some((rate) => rate.kind === "service");
 }
 
 /** Reglas del filtro por nicho + fondo de la página, como las de TemplateFrame. */
@@ -125,11 +169,12 @@ function canvaRules(views: readonly string[], background: string | null): string
     : filter;
 }
 
-type StripItem = { logo: StoredImage; width: number; height: number };
+type StripItem = { logo: StoredImage; width: number; height: number; square: boolean };
 
 /**
  * C1: el tamaño de cada logo (área comparable, alto 40–64, ancho ≤ 200, según su caja de contenido real: los logos
  * sin fondo ya llegan recortados al importar) y cuántas veces se repite el conjunto para no dejar nunca un hueco.
+ * F5: marca los cuadrados (radio suave en el CSS).
  */
 function stripPlan(logos: readonly StoredImage[]) {
   const items: StripItem[] = logos.map((logo) => {
@@ -140,7 +185,12 @@ function stripPlan(logos: readonly StoredImage[]) {
       width = STRIP_MAX_W;
       height = Math.max(STRIP_MIN_H, Math.min(height, STRIP_MAX_W / ratio));
     }
-    return { logo, width: Math.round(width), height: Math.round(height) };
+    return {
+      logo,
+      width: Math.round(width),
+      height: Math.round(height),
+      square: Math.abs(ratio - 1) <= STRIP_SQUARE_TOLERANCE,
+    };
   });
   const setWidth = (gap: number) => items.reduce((total, item) => total + item.width + gap, 0);
   const set = setWidth(STRIP_GAP);
@@ -230,18 +280,22 @@ export function CanvaTemplate({ portfolio, variant, filter, coverEdit, canva }: 
     bandIndex += 1;
     return color;
   };
-  const bandStyle = (color: string | null): CSSProperties => {
+  /** El color base de una banda (su textura manda) y su par de tintas legibles. */
+  const bandParts = (color: string | null) => {
     const base = textureBase ?? color;
-    if (!base) return {};
-    const pair = readablePair(base, theme.inkColor);
+    return base ? { base, pair: readablePair(base, theme.inkColor) } : null;
+  };
+  const bandStyle = (color: string | null): CSSProperties => {
+    const parts = bandParts(color);
+    if (!parts) return {};
     return {
-      backgroundColor: base,
+      backgroundColor: parts.base,
       ...(texture
         ? { backgroundImage: `url("${texture.url}")`, backgroundSize: "cover", backgroundPosition: "center" }
         : {}),
-      "--cv-band": base,
-      "--cv-ink": pair.ink,
-      "--cv-on-ink": pair.onInk,
+      "--cv-band": parts.base,
+      "--cv-ink": parts.pair.ink,
+      "--cv-on-ink": parts.pair.onInk,
     } as CSSProperties;
   };
 
@@ -267,6 +321,15 @@ export function CanvaTemplate({ portfolio, variant, filter, coverEdit, canva }: 
   const rates = canva.rates ?? [];
   const closingLink: VideoLink | null = canva.closingVideo ? { platform: "canva", url: canva.closingVideo.url } : null;
   const closing = closingLink ? nativeVideoFor(closingLink) : null;
+
+  /** V1: el cierre con video suma la opacidad del velo en celular (desktop no cambia). */
+  const closingStyle = (color: string | null): CSSProperties => {
+    const style = bandStyle(color);
+    const parts = bandParts(color);
+    return closing && parts
+      ? ({ ...style, "--cv-veil-m": closingVeil(parts.base, parts.pair.ink).toFixed(2) } as CSSProperties)
+      : style;
+  };
 
   const photo = portfolio.photo;
   const photoWidth = photo?.width ?? null;
@@ -381,7 +444,7 @@ export function CanvaTemplate({ portfolio, variant, filter, coverEdit, canva }: 
                         alt=""
                         width={item.width}
                         height={item.height}
-                        className="cv-strip__logo"
+                        className={item.square ? "cv-strip__logo cv-strip__logo--square" : "cv-strip__logo"}
                         style={{ width: item.width, height: item.height }}
                         loading="lazy"
                       />
@@ -567,33 +630,37 @@ export function CanvaTemplate({ portfolio, variant, filter, coverEdit, canva }: 
           </section>
         )}
 
-        {/* ── Tarifas: tarjetas de precio si hay dato; si no, su imagen ── */}
+        {/* ── Tarifas: simulador (S3) si hay estructura; tarjetas si hay dato plano; si no, su imagen ── */}
         {(rates.length > 0 || canva.rateCard) && (
           <section className="cv-rates" style={bandStyle(nextBand())} aria-labelledby={scopedId("tarifas")}>
             <H2 id={scopedId("tarifas")} className="cv-section-title" data-cv-italic={italic}>
               Tarifas
             </H2>
             {rates.length > 0 ? (
-              <ul className="cv-pricing">
-                {rates.map((rate, index) => (
-                  <li key={`${index}-${rate.name}`} className="cv-price">
-                    <H3 className="cv-price__name">{rate.name}</H3>
-                    <p className="cv-price__amount">{rate.price}</p>
-                    {rate.includes.length > 0 && (
-                      <ul className="cv-price__list">
-                        {rate.includes.map((item, itemIndex) => (
-                          <li key={`${itemIndex}-${item}`} className="cv-price__item">
-                            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false" className="cv-price__check">
-                              <path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-                            </svg>
-                            <span>{item}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </li>
-                ))}
-              </ul>
+              isStructuredRates(rates) ? (
+                <CanvaRatesSimulator rates={rates} />
+              ) : (
+                <ul className="cv-pricing">
+                  {rates.map((rate, index) => (
+                    <li key={`${index}-${rate.name}`} className="cv-price">
+                      <H3 className="cv-price__name">{rate.name}</H3>
+                      <p className="cv-price__amount">{rate.price}</p>
+                      {rate.includes.length > 0 && (
+                        <ul className="cv-price__list">
+                          {rate.includes.map((item, itemIndex) => (
+                            <li key={`${itemIndex}-${item}`} className="cv-price__item">
+                              <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false" className="cv-price__check">
+                                <path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+                              </svg>
+                              <span>{item}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )
             ) : canva.rateCard ? (
               <figure className="cv-rates__figure">
                 <Image
@@ -609,12 +676,12 @@ export function CanvaTemplate({ portfolio, variant, filter, coverEdit, canva }: 
           </section>
         )}
 
-        {/* ── Contacto: cierre con un solo CTA; con video, sin la foto (C3) ── */}
+        {/* ── Contacto: cierre con un solo CTA; con video, sin la foto (C3) y con el velo de V1 ── */}
         {hasContact && (
           <section
             id={id("contacto")}
             className={closing ? "cv-contact cv-contact--video" : "cv-contact"}
-            style={bandStyle(nextBand())}
+            style={closingStyle(nextBand())}
             aria-labelledby={id("contacto-titulo")}
           >
             {closing && <CanvaBackdropVideo src={closing.src} poster={canva.closingVideo?.poster?.url ?? null} />}
