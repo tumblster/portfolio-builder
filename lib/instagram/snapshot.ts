@@ -98,7 +98,7 @@ const interaction = (post: InstagramPost) => (post.likesCount ?? 0) + (post.comm
  * Los posts con más interacción (likes + comentarios) que tengan imagen. En empate, el
 más reciente.
  *
- * Canva v1: LIMITS.maxPieces subió a 30 (el tope del portafolio), pero la selección inicial
+ * Canva v1: LIMITS.maxPieces subió a 40 (el tope del portafolio), pero la selección inicial
 del import de Instagram
  * sigue en LIMITS.importSelectPieces (6). Como instagram-import.ts la pide con
 LIMITS.maxPieces, el tope se aplica

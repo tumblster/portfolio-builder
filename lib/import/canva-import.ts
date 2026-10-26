@@ -29,10 +29,17 @@ import {
 import { ImportError, isTimeoutError } from "./errors";
 import { prefillNiches, type ImportStep, type ManualPrefill } from "./events";
 import { saveImage } from "@/lib/media";
-import { classifyLogoCandidate, type LogoKind } from "./logo-vision";
+import { auditStripLogo, readLogoCandidate, type LogoReading } from "./logo-vision";
 import { classifyProofImage, classifyProofZone, visionConfigured, type ProofKind } from "./proof-vision";
 import { readRateCardDetailed } from "./rate-vision";
-import { hasVisibleContent, isWhiteBoxedLogo, removeWhiteBackground } from "./remove-bg";
+import {
+  hasRealTransparency,
+  hasVisibleContent,
+  isWhiteBoxedLogo,
+  removeWhiteBackground,
+  whiteBorderShare,
+  type BackgroundMode,
+} from "./remove-bg";
 
 /*
  * Importador de Canva: link público de un sitio de Canva → formulario manual prellenado.
@@ -43,9 +50,7 @@ import { hasVisibleContent, isWhiteBoxedLogo, removeWhiteBackground } from "./re
  * Ronda 15 (determinismo):
  * - A1: lo que la geometría resolvió (Métricas, Testimonios y Fotos con título, bio, cierre, sectores) es FINAL. La
  *   visión solo decide el pool SIN zona. Ninguna zona detectada puede quedar vacía por la visión.
- * - A2 / E3: la franja exige píxeles Y visión. La visión veta (persona = fuera sin apelación) y no rescata. Sin
- *   veredicto, decide un test de píxeles reforzado que reconoce la firma de captura. Las insignias o logos con su
- *   fondo completo entran COMO VIENEN (solo se quita el fondo de logos con poca tinta sobre caja blanca).
+ * - A2 / E3: la franja exige píxeles Y visión. La visión veta (persona = fuera sin apelación) y no rescata.
  * - A3: un veredicto por imagen, cacheado por hash de contenido dentro de la importación (duplicados = el primero).
  * - A4: lo que no se pudo completar (tarifario, clasificación, imágenes sin sección) queda en los avisos.
  * - B3 / B4: deduplicación estricta (mismo contenido o píxeles casi idénticos a la resolución completa de la menor),
@@ -54,6 +59,20 @@ import { hasVisibleContent, isWhiteBoxedLogo, removeWhiteBackground } from "./re
  * - E1: sus servicios leídos por patrón viajan en el prefill (`services`).
  * - E2: las láminas sin título se clasifican como conjunto (imágenes + textos vecinos) y, si eso falla, imagen por
  *   imagen (con el mismo caché).
+ *
+ * Ronda de corrección (franja · cierre):
+ * - F1: falla cerrada. Un candidato entra a la franja SOLO si la visión lo confirma como logo. Sin llave, sin
+ *   respuesta o sin veredicto claro, no entra (puede seguir en otras zonas). Los píxeles ya no admiten por sí solos.
+ * - F2: veto duro por píxeles además de la visión: firma de captura, foto de persona (paleta fotográfica + tonos de
+ *   piel) y póster (paleta fotográfica + bloques de texto en formato vertical).
+ * - F3: auditoría de visión de la franja final (sobre la copia que se publica): lo que no es logo se retira y se
+ *   avisa; sin visión en ese momento, la franja queda marcada "sin auditoría de visión" con los logos ya confirmados.
+ * - F4: copia transparente para TODO logo con caja o bordes blancos: clave global para los de poca tinta (lo de
+ *   siempre) y clave desde el borde para los de color (su fondo propio y sus blancos interiores quedan intactos). Un
+ *   error deja la copia normal y se avisa.
+ * - F5: deduplicado por marca (nombre leído por la visión o etiqueta de su pieza) y por píxeles casi iguales; queda
+ *   la transparente y, entre iguales, la de mayor resolución.
+ * - V2: el póster del video de cierre solo se guarda si es útil (no un cuadro plano).
  */
 
 const FETCH_TIMEOUT_MS = 25_000;
@@ -63,6 +82,9 @@ const LOGO_CONCURRENCY = 4;
 const LOGO_TIMEOUT_MS = 15_000;
 const MAX_LOGO_BYTES = 6_000_000;
 const TEXTURE_MAX_STDEV = 18;
+const UNIFORM_MAX_STDEV = 7;
+/** V2: un póster de cierre con menos variación que esto es un cuadro plano (no representa el video). */
+const POSTER_FLAT_STDEV = 12;
 const PROOF_CONCURRENCY = 4;
 const PROOF_MIN_VOTES = 2;
 const GALLERY_FLOOD_FACTOR = 2;
@@ -87,6 +109,22 @@ const SCREENSHOT_TALL_RATIO = 1.7;
 const SCREENSHOT_TALL_BANDS = 3;
 const PHOTO_MIN_COLORS = 900;
 const DENSE_SHARE = 0.5;
+/** F2: foto de persona = paleta fotográfica con al menos esta parte en tonos de piel. */
+const SKIN_PHOTO_SHARE = 0.18;
+/** F2: póster = paleta fotográfica, formato vertical y bloques de texto. */
+const POSTER_TEXT_BANDS = 3;
+const POSTER_TALL_RATIO = 1.25;
+/** F4: bordes blancos (parte del borde) para quitar el fondo desde el borde. */
+const WHITE_EDGE_SHARE = 0.6;
+/** F4: lado máximo de trabajo de la clave desde el borde (la franja dibuja ≤ 200 px). */
+const EDGE_MAX_SIDE = 1200;
+/** F4: una copia transparente con menos opacidad media que esto quedó vacía (se usa la normal). */
+const MIN_ALPHA_MEAN = 2.5;
+/** F5: logos casi iguales (recortados, normalizados a 48 px en grises). */
+const LOGO_TWIN_SIDE = 48;
+const LOGO_TWIN_RATIO_TOLERANCE = 0.08;
+const LOGO_TWIN_MAX_MEAN = 8;
+const LOGO_TWIN_MAX_OFF = 0.02;
 const CANVA_IMAGE_HOSTS = [/(^|\.)canva\.site$/i];
 const BROWSER_UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36";
@@ -102,6 +140,14 @@ export type CanvaPrefill = ManualPrefill & { services?: CanvaService[] };
 
 export type CanvaImportOutcome = { kind: "manual"; reason: "canva_import"; message: string; prefill: CanvaPrefill };
 
+type LogoCandidate = CanvaPortfolio["logoCandidates"][number];
+
+/** F1 / F4 / F5: un logo confirmado, con su modo de transparencia y su marca (si la visión la leyó). */
+type StripEntry = { candidate: LogoCandidate; transparency: BackgroundMode | null; brand: string | null };
+
+/** F5: huella de un logo para compararlo con otros (proporción recortada + 48×48 en grises). */
+type LogoPrint = { ratio: number; pixels: Buffer };
+
 // ── A3: caché de la importación (bytes, hashes y veredictos) ──────────
 type ImageMeta = { width: number; height: number };
 
@@ -111,8 +157,13 @@ type ImportContext = {
   metas: Map<string, Promise<ImageMeta | null>>;
   /** Veredicto de contenido por HASH: la misma imagen nunca recibe dos. */
   proofVerdicts: Map<string, Promise<ProofKind | null>>;
-  logoVerdicts: Map<string, Promise<LogoKind | null>>;
-  /** Hashes de imágenes que la visión no pudo revisar (con llave configurada). */
+  logoVerdicts: Map<string, Promise<LogoReading | null>>;
+  /** F3: auditoría por hash de la copia final. */
+  auditVerdicts: Map<string, Promise<LogoReading | null>>;
+  /** F5: huellas de logos y transparencia de origen, por URL. */
+  logoPrints: Map<string, Promise<LogoPrint | null>>;
+  alphas: Map<string, Promise<boolean>>;
+  /** Hashes de imágenes de prueba que la visión no pudo revisar (con llave configurada). */
   visionMisses: Set<string>;
 };
 
@@ -122,6 +173,9 @@ const createContext = (): ImportContext => ({
   metas: new Map(),
   proofVerdicts: new Map(),
   logoVerdicts: new Map(),
+  auditVerdicts: new Map(),
+  logoPrints: new Map(),
+  alphas: new Map(),
   visionMisses: new Set(),
 });
 
@@ -166,15 +220,28 @@ async function proofVerdictOf(ctx: ImportContext, url: string): Promise<ProofKin
   });
 }
 
-async function logoVerdictOf(ctx: ImportContext, url: string, bytes: Buffer): Promise<LogoKind | null> {
+async function logoVerdictOf(ctx: ImportContext, url: string, bytes: Buffer): Promise<LogoReading | null> {
   const hash = await hashOf(ctx, url);
   if (!hash) return null;
-  return cached(ctx.logoVerdicts, hash, async () => {
-    const kind = await classifyLogoCandidate(bytes);
-    if (kind === null && visionConfigured()) ctx.visionMisses.add(hash);
-    return kind;
-  });
+  return cached(ctx.logoVerdicts, hash, () => readLogoCandidate(bytes));
 }
+
+/** F3: auditoría de la copia final de un logo (por hash de esos bytes). */
+function auditVerdictOf(ctx: ImportContext, bytes: Buffer): Promise<LogoReading | null> {
+  const hash = createHash("sha256").update(bytes).digest("hex");
+  return cached(ctx.auditVerdicts, hash, () => auditStripLogo(bytes));
+}
+
+/** F5: ¿el archivo de origen ya trae transparencia real? */
+const transparentSourceOf = (ctx: ImportContext, url: string) =>
+  cached(ctx.alphas, url, async () => {
+    try {
+      const bytes = await bytesOf(ctx, url);
+      return bytes ? await hasRealTransparency(bytes) : false;
+    } catch {
+      return false;
+    }
+  });
 
 export async function importFromCanva(siteUrl: string, onStep: (step: ImportStep) => void): Promise<CanvaImportOutcome> {
   onStep("scrape");
@@ -212,16 +279,18 @@ export async function importFromCanva(siteUrl: string, onStep: (step: ImportStep
   // A1 + E2: prueba y fotos (la geometría manda; la visión solo decide lo que quedó sin zona).
   const proof = await resolveProof(portfolio, Boolean(theme), ctx);
   const candidates = theme ? portfolio.logoCandidates.filter((candidate) => !proof.claimed.has(candidate.asset.url)) : [];
-  // A2 / E3: píxeles Y visión.
+  // F1 / F2: píxeles Y visión; sin veredicto claro de la visión, nada entra a la franja.
   const verdicts = await mapWithConcurrency(candidates, LOGO_CONCURRENCY, (candidate) => inspectLogo(ctx, candidate.asset.url));
   const discardedShots = verdicts.filter((verdict) => verdict.discarded).length;
-  const accepted = candidates.flatMap((candidate, index) =>
-    verdicts[index].logo ? [{ candidate, removeBackground: verdicts[index].removeBackground }] : [],
-  );
+  const unconfirmedLogos = verdicts.filter((verdict) => verdict.unconfirmed).length;
+  const accepted: StripEntry[] = candidates.flatMap((candidate, index) => {
+    const verdict = verdicts[index];
+    return verdict.logo ? [{ candidate, transparency: verdict.transparency, brand: verdict.brand }] : [];
+  });
   const logoUrls = new Set(accepted.map((entry) => entry.candidate.asset.url));
-  // E3: la misma imagen no entra dos veces a la franja.
-  const uniqueLogoUrls = new Set((await dedupeShots(ctx, accepted.map((entry) => entry.candidate.asset))).map((asset) => asset.url));
-  const stripLogos = accepted.filter((entry) => uniqueLogoUrls.has(entry.candidate.asset.url));
+  // F5: la franja deduplica por marca y por píxeles casi iguales (queda la mejor).
+  const deduped = await dedupeStrip(ctx, accepted, portfolio.videoLabels);
+  const stripCandidates = deduped.kept;
   const plan = logoUrls.size > 0 ? planPieces(portfolio.sectors, logoUrls) : firstPlan;
   const bioExtra = portfolio.bioLogoSized.filter((asset) => !logoUrls.has(asset.url));
   const galleryExtra = proof.galleryMaybe.filter((asset) => !logoUrls.has(asset.url));
@@ -250,15 +319,49 @@ export async function importFromCanva(siteUrl: string, onStep: (step: ImportStep
   ];
   const copied = await mapWithConcurrency(toCopy, IMAGE_CONCURRENCY, (url) => copyRemoteImage(url, CANVA_IMAGE_HOSTS));
   const stored = new Map(toCopy.map((url, index) => [url, copied[index]]));
-  // Solo los logos de poca tinta sobre caja blanca se guardan sin fondo (E3: las insignias, como vienen).
-  const transparentUrls = [...new Set(accepted.filter((entry) => entry.removeBackground).map((entry) => entry.candidate.asset.url))];
-  const transparentLogos = await mapWithConcurrency(transparentUrls, LOGO_CONCURRENCY, (url) => copyLogoTransparent(ctx, url));
-  const logoStored = new Map(
-    transparentUrls.flatMap((url, index) => {
-      const image = transparentLogos[index];
-      return image ? [[url, image] as const] : [];
-    }),
+  // F4: todo logo con caja o bordes blancos se guarda sin ese fondo (global o desde el borde). Error = copia normal.
+  const transparentJobs = [
+    ...new Map(
+      accepted.flatMap((entry) =>
+        entry.transparency ? [[entry.candidate.asset.url, entry.transparency] as const] : [],
+      ),
+    ).entries(),
+  ];
+  const transparentResults = await mapWithConcurrency(transparentJobs, LOGO_CONCURRENCY, ([url, mode]) =>
+    copyLogoTransparent(ctx, url, mode),
   );
+  const logoStored = new Map<string, StoredImage>();
+  const logoFinalBytes = new Map<string, Buffer>();
+  const transparencyFailed = new Set<string>();
+  transparentJobs.forEach(([url], index) => {
+    const result = transparentResults[index];
+    if (result) {
+      logoStored.set(url, result.image);
+      logoFinalBytes.set(url, result.bytes);
+    } else {
+      transparencyFailed.add(url);
+    }
+  });
+  // F3: auditoría de visión de cada logo final de la franja (sobre la copia que se publica).
+  const audits = await mapWithConcurrency(stripCandidates, LOGO_CONCURRENCY, async (entry) => {
+    const url = entry.candidate.asset.url;
+    const bytes = logoFinalBytes.get(url) ?? (await bytesOf(ctx, url));
+    return bytes ? auditVerdictOf(ctx, bytes) : null;
+  });
+  const auditRemoved = new Set<string>();
+  let unaudited = 0;
+  const stripLogos = stripCandidates.filter((entry, index) => {
+    const audit = audits[index];
+    if (audit === null) {
+      unaudited += 1;
+      return true;
+    }
+    if (audit.kind === "logo") return true;
+    auditRemoved.add(entry.candidate.asset.url);
+    return false;
+  });
+  const transparencyFailures = stripLogos.filter((entry) => transparencyFailed.has(entry.candidate.asset.url)).length;
+
   let photo = heroUrl ? (stored.get(heroUrl) ?? null) : null;
   let heroSourceUrl = heroUrl;
   let textureBg: string | null = null;
@@ -356,6 +459,7 @@ export async function importFromCanva(siteUrl: string, onStep: (step: ImportStep
     const videoUrls = new Set(pieces.map((piece) => piece.videoUrl));
     const pieceLogos: Record<string, StoredImage> = {};
     for (const entry of accepted) {
+      if (auditRemoved.has(entry.candidate.asset.url)) continue;
       const image = logoImageOf(entry.candidate.asset);
       const videoUrl = entry.candidate.videoUrl;
       if (image && videoUrl && videoUrls.has(videoUrl) && !pieceLogos[videoUrl]) pieceLogos[videoUrl] = image;
@@ -365,7 +469,12 @@ export async function importFromCanva(siteUrl: string, onStep: (step: ImportStep
     const galleryFinal = heroSourceUrl ? await withoutImage(ctx, galleryAssets, heroSourceUrl) : galleryAssets;
     // Ronda 14 · C: el video del cierre, solo si es un MP4 de su sitio (igual que las piezas).
     const closingLink = portfolio.closingVideo ? parseVideoLink(portfolio.closingVideo.url) : null;
-    const closingPoster = portfolio.closingVideo?.poster ? (stored.get(portfolio.closingVideo.poster) ?? null) : null;
+    // V2: su póster solo si representa el video (un cuadro plano no sirve: la página usa un cuadro real del video).
+    const closingPosterUrl = portfolio.closingVideo?.poster ?? null;
+    const closingPoster =
+      closingPosterUrl && !(await isFlatImage(ctx, closingPosterUrl, POSTER_FLAT_STDEV))
+        ? (stored.get(closingPosterUrl) ?? null)
+        : null;
     // Ronda 14 · C2.1: la textura entra al tema solo si sus píxeles la confirmaron.
     const swatch = await textureTask;
     const textureCopy = portfolio.texture ? imageOf(portfolio.texture) : null;
@@ -457,6 +566,40 @@ export async function importFromCanva(siteUrl: string, onStep: (step: ImportStep
   if (discardedShots > 0) {
     warnings.push(
       `Descartamos ${discardedShots} ${discardedShots === 1 ? "imagen" : "imágenes"} de la franja de marcas porque no ${discardedShots === 1 ? "era un logo" : "eran logos"}.`,
+    );
+  }
+  // F1: lo que la visión no confirmó no entra a la franja, y se dice.
+  if (unconfirmedLogos > 0) {
+    warnings.push(
+      visionConfigured()
+        ? `${unconfirmedLogos} ${unconfirmedLogos === 1 ? "imagen no entró" : "imágenes no entraron"} a la franja de marcas porque no pudimos confirmar que ${unconfirmedLogos === 1 ? "fuera un logo" : "fueran logos"}.`
+        : "Sin la revisión de contenido no pudimos confirmar los logos de tu Canva: tu portafolio sale sin franja de marcas.",
+    );
+  }
+  // F5: marcas repetidas.
+  if (deduped.merged > 0) {
+    warnings.push(
+      `Quitamos ${deduped.merged} ${deduped.merged === 1 ? "logo repetido" : "logos repetidos"} de tu franja de marcas.`,
+    );
+  }
+  // F3: auditoría de la franja final.
+  if (auditRemoved.size > 0) {
+    const removed = auditRemoved.size;
+    warnings.push(
+      `Se ${removed === 1 ? "retiró" : "retiraron"} ${removed} ${removed === 1 ? "imagen" : "imágenes"} de la franja porque no ${removed === 1 ? "era un logo" : "eran logos"}.`,
+    );
+  }
+  if (unaudited > 0) {
+    warnings.push(
+      unaudited === stripCandidates.length
+        ? "Tu franja de marcas quedó sin auditoría de visión: conservamos solo los logos que ya habíamos confirmado."
+        : `${unaudited} ${unaudited === 1 ? "logo de tu franja quedó" : "logos de tu franja quedaron"} sin auditoría de visión: ${unaudited === 1 ? "lo conservamos porque ya estaba confirmado" : "los conservamos porque ya estaban confirmados"}.`,
+    );
+  }
+  // F4: un logo cuyo fondo no se pudo quitar se queda con su copia normal (nunca se pierde).
+  if (transparencyFailures > 0) {
+    warnings.push(
+      `${transparencyFailures} ${transparencyFailures === 1 ? "logo de tu franja conserva" : "logos de tu franja conservan"} su fondo blanco porque no pudimos quitárselo.`,
     );
   }
   if (textureBg) {
@@ -734,6 +877,98 @@ async function withoutImage(ctx: ImportContext, assets: CanvaAsset[], url: strin
   return kept;
 }
 
+// ── F5: la franja, una vez por marca ──
+
+/** La clave de una marca: sin acentos, minúsculas, solo letras y números. null si no alcanza. */
+function brandKey(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const key = value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
+  return key.length >= 2 ? key : null;
+}
+
+/** F5: huella de un logo (recortado su aire, sobre blanco, 48×48 en grises). Cacheada por URL. */
+const logoPrintOf = (ctx: ImportContext, url: string) =>
+  cached(ctx.logoPrints, url, async (): Promise<LogoPrint | null> => {
+    try {
+      const bytes = await bytesOf(ctx, url);
+      if (!bytes) return null;
+      const flat = await sharp(bytes).flatten({ background: "#ffffff" }).png().toBuffer();
+      const trimmed = await sharp(flat)
+        .trim()
+        .png()
+        .toBuffer({ resolveWithObject: true })
+        .catch(async () => sharp(flat).png().toBuffer({ resolveWithObject: true }));
+      const ratio = trimmed.info.width / Math.max(1, trimmed.info.height);
+      const pixels = await sharp(trimmed.data)
+        .resize(LOGO_TWIN_SIDE, LOGO_TWIN_SIDE, { fit: "contain", background: "#ffffff" })
+        .flatten({ background: "#ffffff" })
+        .greyscale()
+        .raw()
+        .toBuffer();
+      return { ratio, pixels };
+    } catch {
+      return null;
+    }
+  });
+
+/** F5: dos logos casi iguales en píxeles (otra resolución, otro margen). Ante duda: distintos. */
+async function similarLogo(ctx: ImportContext, a: string, b: string): Promise<boolean> {
+  const [printA, printB] = await Promise.all([logoPrintOf(ctx, a), logoPrintOf(ctx, b)]);
+  if (!printA || !printB) return false;
+  if (Math.abs(printA.ratio - printB.ratio) / Math.max(printA.ratio, printB.ratio) > LOGO_TWIN_RATIO_TOLERANCE) return false;
+  const { mean, offShare } = pixelDiff(printA.pixels, printB.pixels);
+  return mean <= LOGO_TWIN_MAX_MEAN && offShare <= LOGO_TWIN_MAX_OFF;
+}
+
+const sameLogo = async (ctx: ImportContext, a: string, b: string) =>
+  (await sameImage(ctx, a, b)) || (await similarLogo(ctx, a, b));
+
+/** F5: ¿`a` es mejor que `b`? La transparente gana; entre iguales, la de mayor resolución. */
+async function betterLogo(ctx: ImportContext, a: string, b: string): Promise<boolean> {
+  const [alphaA, alphaB] = await Promise.all([transparentSourceOf(ctx, a), transparentSourceOf(ctx, b)]);
+  if (alphaA !== alphaB) return alphaA;
+  const [metaA, metaB] = await Promise.all([metaOf(ctx, a), metaOf(ctx, b)]);
+  return Boolean(metaA && metaB && metaA.width * metaA.height > metaB.width * metaB.height);
+}
+
+/**
+ * F5: deduplicado por marca. Dos entradas son la misma marca si comparten nombre (leído por la visión o, si no, la
+ * etiqueta de marca de su pieza) o si sus píxeles son casi iguales. Queda la mejor, en el lugar de la primera.
+ */
+async function dedupeStrip(
+  ctx: ImportContext,
+  entries: StripEntry[],
+  labels: Record<string, string>,
+): Promise<{ kept: StripEntry[]; merged: number }> {
+  const kept: { entry: StripEntry; key: string | null }[] = [];
+  let merged = 0;
+  for (const entry of entries) {
+    const videoUrl = entry.candidate.videoUrl;
+    const key = brandKey(entry.brand) ?? brandKey(videoUrl ? labels[videoUrl] : null);
+    let twin = -1;
+    for (let index = 0; index < kept.length; index += 1) {
+      const other = kept[index];
+      if ((key && other.key === key) || (await sameLogo(ctx, other.entry.candidate.asset.url, entry.candidate.asset.url))) {
+        twin = index;
+        break;
+      }
+    }
+    if (twin < 0) {
+      kept.push({ entry, key });
+      continue;
+    }
+    merged += 1;
+    if (await betterLogo(ctx, entry.candidate.asset.url, kept[twin].entry.candidate.asset.url)) {
+      kept[twin] = { entry, key: kept[twin].key ?? key };
+    }
+  }
+  return { kept: kept.map((item) => item.entry), merged };
+}
+
 /** GET al sitio con User-Agent de navegador (HEAD no sirve en Canva). Solo hosts de Canva, también tras redirigir. */
 async function fetchCanvaPage(siteUrl: string): Promise<{ html: string; url: string }> {
   let response: Response;
@@ -814,17 +1049,20 @@ function meanHex(channels: { mean: number }[]): string | null {
   return ("#" + byte(r.mean) + byte(g.mean) + byte(b.mean)).toUpperCase();
 }
 
-/** ¿La imagen es casi uniforme (textura, papel, color plano)? Ante cualquier error, false. */
-async function isUniformImage(ctx: ImportContext, url: string): Promise<boolean> {
+/** ¿La imagen es casi plana (variación en grises menor a `maxStdev`)? Ante cualquier error, false. */
+async function isFlatImage(ctx: ImportContext, url: string, maxStdev: number): Promise<boolean> {
   try {
     const bytes = await bytesOf(ctx, url);
     if (!bytes) return false;
     const stats = await sharp(bytes).resize(64, 64, { fit: "inside" }).greyscale().stats();
-    return (stats.channels[0]?.stdev ?? 99) < 7;
+    return (stats.channels[0]?.stdev ?? 99) < maxStdev;
   } catch {
     return false;
   }
 }
+
+/** ¿La imagen es casi uniforme (textura, papel, color plano)? Ante cualquier error, false. */
+const isUniformImage = (ctx: ImportContext, url: string) => isFlatImage(ctx, url, UNIFORM_MAX_STDEV);
 
 /** Color promedio de una imagen (para rescatar el fondo real de una textura). */
 async function averageColor(ctx: ImportContext, url: string): Promise<string | null> {
@@ -840,7 +1078,7 @@ async function averageColor(ctx: ImportContext, url: string): Promise<string | n
 
 type RatesOutcome = { rates: CanvaRate[] | null; failed: boolean };
 
-/** B2: sus tarifas leídas del tarifario (con un reintento en rate-vision). `failed` alimenta el aviso (A4). */
+/** B2 / S1: sus tarifas leídas del tarifario (con un reintento en rate-vision). `failed` alimenta el aviso (A4). */
 async function readRatesFrom(ctx: ImportContext, url: string): Promise<RatesOutcome> {
   try {
     const bytes = await bytesOf(ctx, url);
@@ -874,44 +1112,65 @@ async function textureSwatch(ctx: ImportContext, url: string): Promise<string | 
 }
 
 /**
- * Copia un logo de poca tinta sobre caja blanca quitándole el fondo, y recorta su aire transparente (C1: la franja
- * escala por la caja de contenido real). Ante cualquier error, null y quien llama usa la copia normal.
+ * F4: copia un logo con caja o bordes blancos quitándole ese fondo ("global" para los de poca tinta, "edge" para los
+ * de color: solo el blanco unido al borde) y recorta su aire transparente (C1: la franja escala por la caja de
+ * contenido real). Devuelve la imagen guardada y sus bytes finales (para la auditoría F3). Ante cualquier error (también
+ * si saveImage lo rechaza, p. ej. por pesar más de 4 MB) o si el logo quedara vacío, null y quien llama usa la copia
+ * normal (y lo avisa).
  */
-async function copyLogoTransparent(ctx: ImportContext, url: string): Promise<StoredImage | null> {
+async function copyLogoTransparent(
+  ctx: ImportContext,
+  url: string,
+  mode: BackgroundMode,
+): Promise<{ image: StoredImage; bytes: Buffer } | null> {
   try {
     const bytes = await bytesOf(ctx, url);
     if (!bytes) return null;
-    const transparent = await removeWhiteBackground(bytes);
+    const source =
+      mode === "edge"
+        ? await sharp(bytes).resize(EDGE_MAX_SIDE, EDGE_MAX_SIDE, { fit: "inside", withoutEnlargement: true }).toBuffer()
+        : bytes;
+    const transparent = await removeWhiteBackground(source, mode);
     const trimmed = await sharp(transparent)
       .trim()
       .png()
       .toBuffer()
       .catch(() => transparent);
-    return await saveImage(trimmed);
+    const alpha = await sharp(trimmed).ensureAlpha().extractChannel(3).stats();
+    if ((alpha.channels[0]?.mean ?? 0) < MIN_ALPHA_MEAN) throw new Error("el logo quedó vacío al quitar el fondo");
+    const image = await saveImage(trimmed);
+    return { image: { ...image, transparent: true }, bytes: trimmed };
   } catch (error) {
     console.warn("[import/canva] no se pudo quitar el fondo de un logo:", url, error);
     return null;
   }
 }
 
-/** A2 / E3: lo que dicen los píxeles de un candidato a logo. */
+/** A2 / E3 / F2: lo que dicen los píxeles de un candidato a logo. */
 type PixelSignal = {
   /** Tiene contenido visible (no es un fondo vacío). */
   content: boolean;
-  /** Logo sobre caja blanca (el test de siempre). */
+  /** Logo sobre caja blanca (el test de siempre: borde ≥ 95 % blanco y lado ≤ 800). */
   whiteBoxed: boolean;
+  /** F4: parte del borde que es blanca, a cualquier tamaño. */
+  whiteEdges: number;
   /** Firma de captura: predominio de blanco con muchas líneas de interfaz, o pantalla de celular con texto. */
   screenshot: boolean;
   /** Paleta de fotografía (demasiados colores para un logo o una insignia). */
   photoLike: boolean;
+  /** F2: foto de persona (paleta fotográfica con tonos de piel). */
+  person: boolean;
+  /** F2: póster (paleta fotográfica, formato vertical y bloques de texto). */
+  poster: boolean;
   /** Más de la mitad de la imagen tiene tinta (insignia o logo con su fondo completo). */
   dense: boolean;
 };
 
 async function pixelSignal(bytes: Buffer): Promise<PixelSignal> {
-  const [content, whiteBoxed, meta] = await Promise.all([
+  const [content, whiteBoxed, whiteEdges, meta] = await Promise.all([
     hasVisibleContent(bytes),
     isWhiteBoxedLogo(bytes),
+    whiteBorderShare(bytes),
     sharp(bytes).metadata(),
   ]);
   const { data, info } = await sharp(bytes)
@@ -922,6 +1181,7 @@ async function pixelSignal(bytes: Buffer): Promise<PixelSignal> {
     .toBuffer({ resolveWithObject: true });
   const { width, height, channels } = info;
   let white = 0;
+  let skin = 0;
   const colors = new Set<number>();
   let textBands = 0;
   let inBand = false;
@@ -935,7 +1195,12 @@ async function pixelSignal(bytes: Buffer): Promise<PixelSignal> {
       const b = data[at + 2];
       if (r >= WHITE_LEVEL && g >= WHITE_LEVEL && b >= WHITE_LEVEL) white += 1;
       colors.add(((r >> 4) << 8) | ((g >> 4) << 4) | (b >> 4));
-      const dark = 0.299 * r + 0.587 * g + 0.114 * b < DARK_LUMA;
+      const luma = 0.299 * r + 0.587 * g + 0.114 * b;
+      // F2: tonos de piel (YCbCr clásico).
+      const cb = 128 - 0.168736 * r - 0.331264 * g + 0.5 * b;
+      const cr = 128 + 0.5 * r - 0.418688 * g - 0.081312 * b;
+      if (luma > 40 && cb >= 77 && cb <= 127 && cr >= 133 && cr <= 173) skin += 1;
+      const dark = luma < DARK_LUMA;
       if (previous !== null && dark !== previous) transitions += 1;
       previous = dark;
     }
@@ -943,48 +1208,61 @@ async function pixelSignal(bytes: Buffer): Promise<PixelSignal> {
     if (textRow && !inBand) textBands += 1;
     inBand = textRow;
   }
-  const whiteShare = white / Math.max(1, width * height);
-  const tall = meta.width && meta.height ? meta.height / meta.width >= SCREENSHOT_TALL_RATIO : false;
+  const pixels = Math.max(1, width * height);
+  const whiteShare = white / pixels;
+  const heightRatio = meta.width && meta.height ? meta.height / meta.width : 1;
+  const photoLike = colors.size >= PHOTO_MIN_COLORS;
   return {
     content,
     whiteBoxed,
+    whiteEdges,
     screenshot:
       (whiteShare >= SCREENSHOT_WHITE_SHARE && textBands >= SCREENSHOT_TEXT_BANDS) ||
-      (tall && textBands >= SCREENSHOT_TALL_BANDS),
-    photoLike: colors.size >= PHOTO_MIN_COLORS,
+      (heightRatio >= SCREENSHOT_TALL_RATIO && textBands >= SCREENSHOT_TALL_BANDS),
+    photoLike,
+    person: photoLike && skin / pixels >= SKIN_PHOTO_SHARE,
+    poster: photoLike && heightRatio >= POSTER_TALL_RATIO && textBands >= POSTER_TEXT_BANDS,
     dense: 1 - whiteShare >= DENSE_SHARE,
   };
 }
 
 type LogoVerdict = {
-  /** Confirmado como logo: entra a la franja. */
+  /** Confirmado como logo por la visión: entra a la franja. */
   logo: boolean;
-  /** Parecía logo pero la visión o la firma de captura lo descartaron: se avisa. */
+  /** Parecía logo pero la visión o el veto de píxeles lo descartaron: se avisa. */
   discarded: boolean;
-  /** Solo los logos de poca tinta sobre caja blanca pierden su fondo (E3: las insignias, como vienen). */
-  removeBackground: boolean;
+  /** F1: la visión no dio veredicto claro (o no hay llave): no entra a la franja; se avisa. */
+  unconfirmed: boolean;
+  /** F4: cómo se le quita el fondo blanco (null = entra como viene). */
+  transparency: BackgroundMode | null;
+  /** F5: la marca que leyó la visión (si se lee). */
+  brand: string | null;
 };
 
 /**
- * A2 / E3: ¿la imagen ES un logo? Píxeles Y visión.
- * 1. Píxeles (sin exigir caja blanca: B6): contenido visible, sin firma de captura y con paleta de logo o caja blanca.
- *    Si los píxeles dicen que no, no entra (la visión no rescata) y ni se consulta.
- * 2. Visión: "logo" confirma; persona, captura, foto u otro vetan (persona: sin apelación). Sin veredicto, manda el
- *    test de píxeles reforzado del paso 1.
+ * F1 / F2: ¿la imagen ES un logo?
+ * 1. Veto duro por píxeles: captura, foto de persona o póster quedan fuera sin apelación (y no se consulta la visión).
+ * 2. Píxeles: contenido visible y paleta de logo o caja blanca. Si los píxeles dicen que no, no entra (la visión no
+ *    rescata) y ni se consulta.
+ * 3. Visión: SOLO "logo" admite. Persona, póster, captura, foto u otro vetan. Sin veredicto: no entra (falla cerrada).
+ * F4: con caja blanca y poca tinta, clave global (lo de siempre); con bordes blancos y color, clave desde el borde.
  * Ante cualquier error, no es logo y no se avisa (nunca rompe el import).
  */
 async function inspectLogo(ctx: ImportContext, url: string): Promise<LogoVerdict> {
-  const none: LogoVerdict = { logo: false, discarded: false, removeBackground: false };
+  const none: LogoVerdict = { logo: false, discarded: false, unconfirmed: false, transparency: null, brand: null };
   try {
     const bytes = await bytesOf(ctx, url);
     if (!bytes) return none;
     const pixels = await pixelSignal(bytes);
-    const removeBackground = pixels.whiteBoxed && !pixels.dense;
-    const pixelOk = pixels.content && !pixels.screenshot && (pixels.whiteBoxed || !pixels.photoLike);
-    if (!pixelOk) return { logo: false, discarded: pixels.content && pixels.screenshot, removeBackground };
-    const vision = await logoVerdictOf(ctx, url, bytes);
-    if (vision !== null && vision !== "logo") return { logo: false, discarded: true, removeBackground };
-    return { logo: true, discarded: false, removeBackground };
+    if (pixels.content && (pixels.screenshot || pixels.person || pixels.poster)) return { ...none, discarded: true };
+    const pixelOk = pixels.content && (pixels.whiteBoxed || !pixels.photoLike);
+    if (!pixelOk) return none;
+    const reading = await logoVerdictOf(ctx, url, bytes);
+    if (reading === null) return { ...none, unconfirmed: true };
+    if (reading.kind !== "logo") return { ...none, discarded: true };
+    const transparency: BackgroundMode | null =
+      pixels.whiteBoxed && !pixels.dense ? "global" : pixels.whiteEdges >= WHITE_EDGE_SHARE ? "edge" : null;
+    return { logo: true, discarded: false, unconfirmed: false, transparency, brand: reading.brand };
   } catch (error) {
     console.warn("[import/canva] no se pudo revisar un posible logo:", url, error);
     return none;
