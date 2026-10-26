@@ -48,6 +48,10 @@ import { slugSchema } from "./slug";
  * tema suma rasgos de lenguaje medibles (texture, frames, headingsUpper, airy). Todo opcional: lo guardado antes sigue  
  * válido.  
  *  
+*
+ * Ronda de corrección · S2: cada tarifa puede traer su estructura (tipo de renglón, monto numérico, moneda, variantes
+ * de pack, opciones de un modificador porcentual, nota). Todo opcional: las tarifas guardadas antes siguen válidas y
+ * se muestran como siempre.
  * Este archivo no depende del servidor: el formulario también lo puede usar.  
  */
 
@@ -62,7 +66,7 @@ export const LIMITS = {
   pieceTitle: 80,  
   minPieces: 3,  
   /** Canva v1: tope duro de piezas del portafolio (antes 6). */  
-  maxPieces: 30,  
+  maxPieces: 40,  
   /** Canva v1: cuántas piezas elige de entrada el import de Instagram (el comportamiento de siempre). */  
   importSelectPieces: 6,  
   instagramPosts: 12,  
@@ -264,7 +268,11 @@ export const contactSchema = z.object({
   ),  
   tiktok: contactField(  
     handleFrom(/tiktok\.com\/@?([A-Za-z0-9._]+)/i),  
-    (v) => /^[A-Za-z0-9._]{2,24}$/.test(v),"EscribesoloelusuariodeTikTok,porejemplovalen.ugc",),youtube:contactField((v)=>(v.startsWith("@")?`https://www.youtube.com/${v}` : withProtocol(v)),  
+  (v) => /^[A-Za-z0-9._]{2,24}$/.test(v),
+    "Escribe solo el usuario de TikTok, por ejemplo valen.ugc",
+  ),
+  youtube: contactField(
+    (v) => (v.startsWith("@") ? `https://www.youtube.com/${v}` : withProtocol(v)),
     (v) => isHttpUrl(v) && /(^|\.)youtube\.com$|^youtu\.be$/i.test(new URL(v).hostname),  
     "Pega el link de tu canal de YouTube o escribe tu @usuario.",  
   ),  
@@ -496,14 +504,52 @@ export const canvaThemeSchema = z.object({
 });  
 export type CanvaTheme = z.infer<typeof canvaThemeSchema>;
 
-/** Ronda 14 · D: una tarifa leída de su tarifario (lib/import/rate-vision.ts), tal como está escrita en la imagen. */  
-export const canvaRateSchema = z.object({  
-  name: z.string().trim().min(1).max(80),  
-  /** El precio como texto visible ("S/ 500", "$100"): no se convierte ni se interpreta. */  
-  price: z.string().trim().min(1).max(40),  
-  /** Lo que la imagen dice que incluye; vacío si no dice nada. */  
-  includes: z.array(z.string().trim().min(1).max(140)).max(12),  
-});  
+/**
+ * Ronda de corrección · S2: tipo de renglón de un tarifario.
+ * service = servicio con precio (con variantes de pack si solo cambia la cantidad) · extra = agregado de precio fijo ·
+ * modifier = porcentaje sobre la tarifa base (o "a tratar") · note = renglón sin precio numérico.
+ */
+export const RATE_KINDS = ["service", "extra", "modifier", "note"] as const;
+
+/** Un monto leído del texto visible del tarifario (nunca calculado ni convertido). */
+const rateAmountSchema = z.number().nonnegative().max(1_000_000_000);
+
+/** S2: una variante de pack ("3 fotos" · "600 mxn"). amount null = su precio no es numérico (a tratar). */
+export const canvaRateVariantSchema = z.object({
+  label: z.string().trim().min(1).max(60),
+  price: z.string().trim().min(1).max(40),
+  amount: rateAmountSchema.nullable(),
+});
+export type CanvaRateVariant = z.infer<typeof canvaRateVariantSchema>;
+
+/** S2: una opción de un modificador ("30 días" · "+50%"). percent null = negociación especial (a tratar). */
+export const canvaRateOptionSchema = z.object({
+  label: z.string().trim().min(1).max(60),
+  price: z.string().trim().min(1).max(60),
+  percent: z.number().min(-100).max(1000).nullable(),
+});
+export type CanvaRateOption = z.infer<typeof canvaRateOptionSchema>;
+
+/** Ronda 14 · D: una tarifa leída de su tarifario (lib/import/rate-vision.ts), tal como está escrita en la imagen. */
+export const canvaRateSchema = z.object({
+  name: z.string().trim().min(1).max(80),
+  /** El precio como texto visible ("S/ 500", "$100"): no se convierte ni se interpreta. En una nota, su texto. */
+  price: z.string().trim().min(1).max(140),
+  /** Lo que la imagen dice que incluye; vacío si no dice nada. */
+  includes: z.array(z.string().trim().min(1).max(140)).max(12),
+  /** S2: tipo de renglón. Ausente = tarifa plana de siempre (tarjeta). */
+  kind: z.enum(RATE_KINDS).optional(),
+  /** S2: el monto numérico del precio visible (servicio o extra). null = no es numérico. */
+  amount: rateAmountSchema.nullable().optional(),
+  /** S2: la moneda tal como aparece en el tarifario ("mxn", "S/", "$"). null = el tarifario no la escribe. */
+  currency: z.string().trim().min(1).max(12).nullable().optional(),
+  /** S2: variantes de pack de un servicio (el nombre solo cambia por cantidad). */
+  variants: z.array(canvaRateVariantSchema).min(2).max(8).optional(),
+  /** S2: opciones de un modificador porcentual. */
+  options: z.array(canvaRateOptionSchema).min(1).max(8).optional(),
+  /** S2: el texto de una nota sin precio, tal cual. */
+  note: z.string().trim().min(1).max(140).optional(),
+});
 export type CanvaRate = z.infer<typeof canvaRateSchema>;
 
 /** Ronda 14 · D: la lista de tarifas (si viene, trae al menos una). */  
